@@ -245,8 +245,8 @@ Scaffolds the plugin directory. These are config files driving the global binary
   "name": "code-kg",
   "description": "Persistent, reviewable code knowledge graph for AI agents",
   "version": "0.1.0",
-  "author": { "name": "Whaleylaw" },
-  "repository": "https://github.com/Whaleylaw/code-kg",
+  "author": { "name": "The-Agent-Corporation" },
+  "repository": "https://github.com/The-Agent-Corporation/code-kg",
   "license": "MIT"
 }
 ```
@@ -406,7 +406,7 @@ git commit -m "feat(plugin): add Code-KG guidance skill"
 
 ### Task 6: Create the marketplace catalog
 
-Makes the repo installable via `/plugin marketplace add Whaleylaw/code-kg`.
+Makes the repo installable via `/plugin marketplace add The-Agent-Corporation/code-kg`.
 
 **Files:**
 - Create: `.claude-plugin/marketplace.json` (repo root)
@@ -416,7 +416,7 @@ Makes the repo installable via `/plugin marketplace add Whaleylaw/code-kg`.
 ```json
 {
   "name": "code-kg",
-  "owner": { "name": "Whaleylaw" },
+  "owner": { "name": "The-Agent-Corporation" },
   "plugins": [
     {
       "name": "code-kg",
@@ -463,7 +463,7 @@ Prerequisites (once per machine): `code-kg install-global` so `code-kg` is on
 Install:
 
 ```bash
-/plugin marketplace add Whaleylaw/code-kg
+/plugin marketplace add The-Agent-Corporation/code-kg
 /plugin install code-kg@code-kg
 ```
 

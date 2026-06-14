@@ -46,7 +46,7 @@ Consequences, documented for the user (not automated):
 
 ## Repository Layout
 
-The same GitHub repo (`Whaleylaw/code-kg`) is both the tool source and the
+The same GitHub repo (`The-Agent-Corporation/code-kg`) is both the tool source and the
 plugin marketplace. New files only; the npm package is untouched.
 
 ```
@@ -70,7 +70,7 @@ Rationale: only `plugin.json` and `marketplace.json` may live in
 `.claude-plugin/`; everything else (skills/, hooks/, .mcp.json) sits at the
 plugin root. Keeping the plugin in `plugins/code-kg/` isolates it cleanly from
 the package sources. `marketplace.json` at repo root lets `/plugin marketplace
-add Whaleylaw/code-kg` resolve it.
+add The-Agent-Corporation/code-kg` resolve it.
 
 ## Components
 
@@ -81,8 +81,8 @@ add Whaleylaw/code-kg` resolve it.
   "name": "code-kg",
   "description": "Persistent, reviewable code knowledge graph for AI agents",
   "version": "0.1.0",
-  "author": { "name": "Whaleylaw" },
-  "repository": "https://github.com/Whaleylaw/code-kg",
+  "author": { "name": "The-Agent-Corporation" },
+  "repository": "https://github.com/The-Agent-Corporation/code-kg",
   "license": "MIT"
 }
 ```
@@ -198,7 +198,7 @@ repo, asks how to use code-kg, or asks to set one up. Content sections:
 ```json
 {
   "name": "code-kg",
-  "owner": { "name": "Whaleylaw" },
+  "owner": { "name": "The-Agent-Corporation" },
   "plugins": [
     {
       "name": "code-kg",
@@ -213,7 +213,7 @@ User flow on any machine:
 
 ```
 code-kg install-global                 # once per machine (prereq)
-/plugin marketplace add Whaleylaw/code-kg
+/plugin marketplace add The-Agent-Corporation/code-kg
 /plugin install code-kg@code-kg
 ```
 
