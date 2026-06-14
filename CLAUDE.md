@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository
 
-Git repository on branch `main`, with a GitHub remote at `origin` (https://github.com/Whaleylaw/code-kg, public). Push to sync. The committed knowledge base (`lat.md/*.md`, `.code-kg/materialization-manifest.json`) is tracked and meant to be committed alongside code changes; the artifacts in `## Generated/ignored artifacts` below are excluded via `.gitignore`.
+Git repository on branch `main`, with a GitHub remote at `origin` (https://github.com/The-Agent-Corporation/code-kg, public). Push to sync. The committed knowledge base (`lat.md/*.md`, `.code-kg/materialization-manifest.json`) is tracked and meant to be committed alongside code changes; the artifacts in `## Generated/ignored artifacts` below are excluded via `.gitignore`.
 
 ## Source of Truth
 

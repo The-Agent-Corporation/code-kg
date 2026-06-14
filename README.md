@@ -125,7 +125,7 @@ Prerequisites (once per machine): `code-kg install-global` so `code-kg` is on
 Install:
 
 ```bash
-/plugin marketplace add Whaleylaw/code-kg
+/plugin marketplace add The-Agent-Corporation/code-kg
 /plugin install code-kg@code-kg
 ```
 
