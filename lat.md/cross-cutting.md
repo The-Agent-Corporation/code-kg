@@ -13,8 +13,8 @@ Use this section for auth, persistence, configuration, background work, observab
 - src/source-parser.ts (file)
 - src/cli/check.ts (file)
 - src/codekg/graph.ts (file)
-- src/lattice.ts (file)
 - src/codekg/cli.ts (file)
+- src/lattice.ts (file)
 - src/codekg/drift.ts (file)
 - src/cli/hook.ts (file)
 

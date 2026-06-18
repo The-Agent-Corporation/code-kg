@@ -213,6 +213,8 @@ program
     const root = resolve(program.opts().dir ?? process.cwd());
     const plan = await createBootstrapPlan(root);
     const changes = await writeBootstrapPlan(plan);
+    const { installGitHook } = await import('./git-hooks.js');
+    changes.push(await installGitHook(root));
     console.log(
       ['# Code-KG Init', '', ...changes.map((c) => `- ${c}`)].join('\n'),
     );
@@ -528,6 +530,40 @@ agents
     const ctx = rootOnlyContext();
     const { agentsCommand } = await import('./agents.js');
     handleResult(await agentsCommand(ctx, { action: 'status' }));
+  });
+
+const gitHooks = program
+  .command('git-hooks')
+  .description('Install or remove the Code-KG git pre-commit hook');
+
+gitHooks
+  .command('install')
+  .description('Install the Code-KG pre-commit hook into this repository')
+  .option('--force', 'replace an existing non-Code-KG pre-commit hook')
+  .action(async (opts: { force?: boolean }) => {
+    const ctx = rootOnlyContext();
+    const { gitHooksCommand } = await import('./git-hooks.js');
+    handleResult(
+      await gitHooksCommand(ctx, { action: 'install', force: opts.force }),
+    );
+  });
+
+gitHooks
+  .command('uninstall')
+  .description('Remove the Code-KG pre-commit hook from this repository')
+  .action(async () => {
+    const ctx = rootOnlyContext();
+    const { gitHooksCommand } = await import('./git-hooks.js');
+    handleResult(await gitHooksCommand(ctx, { action: 'uninstall' }));
+  });
+
+gitHooks
+  .command('status')
+  .description('Show whether the Code-KG pre-commit hook is installed')
+  .action(async () => {
+    const ctx = rootOnlyContext();
+    const { gitHooksCommand } = await import('./git-hooks.js');
+    handleResult(await gitHooksCommand(ctx, { action: 'status' }));
   });
 
 program

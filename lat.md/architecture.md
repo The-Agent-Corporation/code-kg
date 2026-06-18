@@ -27,23 +27,23 @@ No parsed entrypoint files were available for first-hop dependency flow during b
 
 The initial inventory groups files by broad category so later extraction can focus on high-value paths.
 
-- Code files: 83
-- Test files: 8
+- Code files: 84
+- Test files: 9
 - Documentation files: 76
 - Config files: 2
 - Asset files: 2
-- Unsupported files: 12
+- Unsupported files: 13
 
 ## Structural Graph
 
-Code-KG extracted a deterministic structural graph with 834 nodes, 844 edges, 4 communities using the multi-language-directory-fallback analysis path.
+Code-KG extracted a deterministic structural graph with 853 nodes, 863 edges, 4 communities using the multi-language-directory-fallback analysis path.
 
 ## Communities
 
 Directory-based communities provide the first subsystem map until graph clustering is available.
 
-- src: 58 files, 614 symbols, cohesion 1
-- tests: 29 files, 117 symbols, cohesion 1
+- src: 59 files, 630 symbols, cohesion 1
+- tests: 30 files, 118 symbols, cohesion 1
 - templates: 2 files, 9 symbols, cohesion 1
 - scripts: 1 files, 0 symbols, cohesion 1
 
@@ -56,11 +56,11 @@ High-degree nodes may deserve review as important entry points, bridges, or util
 - src/codekg/bootstrap.ts (file)
 - src/cli/init.ts (file)
 - src/source-parser.ts (file)
-- src/cli/check.ts (file)
 - tests (module)
+- src/cli/check.ts (file)
 - src/codekg/graph.ts (file)
-- src/lattice.ts (file)
 - src/codekg/cli.ts (file)
+- src/lattice.ts (file)
 
 ## Dependency Hotspots
 
@@ -121,19 +121,19 @@ Source file `src/codekg/graph.ts` contains source symbols. Key symbols: `LOCAL_I
 - Imports: none detected
 - Imported by: none detected
 
+### src/codekg/cli.ts
+
+Source file `src/codekg/cli.ts` contains source symbols. Key symbols: `PreviewAcceptOptions`, `ExtractOptions`, and 21 more.
+
+- Symbols: `PreviewAcceptOptions (type)`, `ExtractOptions (type)`, `DriftOptions (type)`, `ReconcileOptions (type)`, `ConfidenceReconcileOptions (type)`, `ApplyBacklinksOptions (type)`, `SearchCliOptions (type)`, `InstallGlobalOptions (type)`, and 15 more
+- Imports: none detected
+- Imported by: none detected
+
 ### src/lattice.ts
 
 Source file `src/lattice.ts` contains source symbols. Key symbols: `Section`, `Ref`, and 21 more.
 
 - Symbols: `Section (type)`, `Ref (type)`, `LatFrontmatter (type)`, `parseFrontmatter (function)`, `findLatticeDir (function)`, `findProjectRoot (function)`, `listLatticeFiles (function)`, `headingText (function)`, and 15 more
-- Imports: none detected
-- Imported by: none detected
-
-### src/codekg/cli.ts
-
-Source file `src/codekg/cli.ts` contains source symbols. Key symbols: `PreviewAcceptOptions`, `ExtractOptions`, and 20 more.
-
-- Symbols: `PreviewAcceptOptions (type)`, `ExtractOptions (type)`, `DriftOptions (type)`, `ReconcileOptions (type)`, `ConfidenceReconcileOptions (type)`, `ApplyBacklinksOptions (type)`, `SearchCliOptions (type)`, `InstallGlobalOptions (type)`, and 14 more
 - Imports: none detected
 - Imported by: none detected
 

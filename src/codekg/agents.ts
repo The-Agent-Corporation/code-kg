@@ -5,6 +5,11 @@ import { fileURLToPath } from 'node:url';
 import type { CmdContext, CmdResult } from '../context.js';
 import { discoverProject } from './discovery.js';
 import { semanticDoctorStatus } from './semantic.js';
+import {
+  gitHookStatusLine,
+  installGitHook,
+  uninstallGitHook,
+} from './git-hooks.js';
 
 const SECTION_START = '<!-- code-kg:agents:start -->';
 const SECTION_END = '<!-- code-kg:agents:end -->';
@@ -365,6 +370,7 @@ async function agentsStatusCommand(ctx: CmdContext): Promise<CmdResult> {
     lines.push('- Codex hook: missing');
   }
 
+  lines.push(await gitHookStatusLine(ctx.projectRoot));
   lines.push(semanticDoctorStatus(ctx));
   lines.push('- MCP command: code-kg mcp');
   lines.push('- Install command: code-kg agents install');
@@ -387,11 +393,13 @@ export async function agentsCommand(
               hookSelection.fallbackInvocation,
             ),
             await installCodexHook(ctx.projectRoot, hookSelection.hookCommand),
+            await installGitHook(ctx.projectRoot),
           ];
         })()
       : [
           await uninstallAgentsMd(ctx.projectRoot),
           await uninstallCodexHook(ctx.projectRoot),
+          await uninstallGitHook(ctx.projectRoot),
         ];
 
   return {

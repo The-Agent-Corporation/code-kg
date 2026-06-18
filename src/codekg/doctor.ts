@@ -5,6 +5,7 @@ import type { CmdContext, CmdResult } from '../context.js';
 import { codeKgCheckCommand } from './check.js';
 import type { MaterializationManifest, ManifestSection } from './types.js';
 import { semanticDoctorStatus } from './semantic.js';
+import { gitHookStatusLine } from './git-hooks.js';
 
 const AGENTS_MARKER = '<!-- code-kg:agents:start -->';
 const CODEX_HOOK_COMMAND = 'code-kg hook-check';
@@ -190,6 +191,7 @@ export async function doctorCommand(ctx: CmdContext): Promise<CmdResult> {
       : '- AGENTS.md guidance: missing',
   );
   lines.push(await codexHookStatus(ctx.projectRoot));
+  lines.push(await gitHookStatusLine(ctx.projectRoot));
   lines.push('- MCP command: code-kg mcp');
   lines.push(
     '- Drift: run `code-kg drift` after source or architecture changes',

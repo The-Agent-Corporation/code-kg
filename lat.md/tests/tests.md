@@ -9,6 +9,7 @@ These paths looked test-related during local discovery.
 
 - tests/cases.test.ts
 - tests/codekg.test.ts
+- tests/git-hooks.test.ts
 - tests/hook.test.ts
 - tests/init-version.test.ts
 - tests/lattice.test.ts
@@ -33,6 +34,14 @@ Test file `tests/cases.test.ts` contains tests and validation symbols. Key symbo
 Test file `tests/codekg.test.ts` contains tests and validation symbols. Key symbols: `roots`, `execFile`, and 10 more.
 
 - Symbols: `roots (const)`, `execFile (const)`, `makeProject (function)`, `ctx (function)`, `readManifest (function)`, `writeManifest (function)`, `addInferredRelationship (function)`, `addImportRelationship (function)`, and 4 more
+- Imports: none detected
+- Imported by: none detected
+
+### tests/git-hooks.test.ts
+
+Test file `tests/git-hooks.test.ts` contains tests and validation symbols. Key symbols: `gitInit`.
+
+- Symbols: `gitInit (function)`
 - Imports: none detected
 - Imported by: none detected
 
