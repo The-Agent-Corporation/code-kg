@@ -4,14 +4,22 @@
       {
         "matcher": "Bash|Grep|Glob|Read|LS",
         "hooks": [
-          { "type": "command", "command": "code-kg hook-check" }
+          {
+            "type": "command",
+            "command": "code-kg hook-check",
+            "timeout": 10
+          }
         ]
       }
     ],
     "SessionStart": [
       {
         "hooks": [
-          { "type": "command", "command": "code-kg session-check" }
+          {
+            "type": "command",
+            "command": "code-kg session-check",
+            "timeout": 15
+          }
         ]
       }
     ]
