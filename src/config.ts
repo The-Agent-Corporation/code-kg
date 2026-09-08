@@ -80,35 +80,52 @@ function getEnvLlmKey(): string | undefined {
   return undefined;
 }
 
+function isChatOnlyKey(key: string): boolean {
+  return ['eyJ', 'sk-ant-', 'sk-or-', 'xai-'].some((prefix) =>
+    key.startsWith(prefix),
+  );
+}
+
 export function getEmbeddingKey(): string | undefined {
+  const config = readConfig();
   const envProvider = process.env.LAT_EMBEDDING_PROVIDER?.trim().toLowerCase();
+  const configuredProvider =
+    envProvider || config.embedding_provider?.trim().toLowerCase() || '';
+
+  if (configuredProvider === 'local') return 'local';
+
   if (envProvider) {
-    if (envProvider === 'local') return 'local';
     if (envProvider !== 'openai' && envProvider !== 'vercel') {
       throw new Error(
         'LAT_EMBEDDING_PROVIDER must be local, openai, or vercel.',
       );
     }
-    const envKey = getEnvLlmKey();
-    if (envKey) return envKey;
-
-    const config = readConfig();
-    return config.llm_key;
-  }
-
-  const envKey = getEnvLlmKey();
-  if (envKey) return envKey;
-
-  const config = readConfig();
-  const provider = config.embedding_provider?.trim().toLowerCase();
-  if (provider) {
-    if (provider === 'local') return 'local';
-    if (provider !== 'openai' && provider !== 'vercel') {
+  } else if (configuredProvider) {
+    if (configuredProvider !== 'openai' && configuredProvider !== 'vercel') {
       throw new Error('embedding_provider must be local, openai, or vercel.');
     }
   }
 
-  if (config.llm_key) return config.llm_key;
+  const envKey = getEnvLlmKey();
+  if (envKey) {
+    // Never route chat-only credentials to an embedding provider, including
+    // when an explicit remote provider or a persisted fallback is configured.
+    if (isChatOnlyKey(envKey)) {
+      return config.llm_key &&
+        !isChatOnlyKey(config.llm_key) &&
+        (config.llm_key.startsWith('sk-') || config.llm_key.startsWith('vck_'))
+        ? config.llm_key
+        : undefined;
+    }
+    return envKey;
+  }
+
+  if (config.llm_key) {
+    if (isChatOnlyKey(config.llm_key)) {
+      return undefined;
+    }
+    return config.llm_key;
+  }
 
   return undefined;
 }

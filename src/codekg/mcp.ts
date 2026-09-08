@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
+import { existsSync } from 'node:fs';
 import { z } from 'zod';
 import { expandCommand } from '../cli/expand.js';
 import { locateCommand } from '../cli/locate.js';
@@ -14,6 +15,17 @@ import { confidenceCommand } from './confidence.js';
 import { driftCommand } from './drift.js';
 import { codeKgSearchCommand } from './search.js';
 import { suppressCommand } from './suppress.js';
+import {
+  askCommand,
+  mapCommand,
+  skeletonCommand,
+  grepCommand,
+  traceCommand,
+} from './query.js';
+import { contextCommand } from './context.js';
+import { changedCommand } from './changed.js';
+import { gapsCommand } from './gaps.js';
+import { workspaceAskCommand, workspacePath } from './workspace.js';
 
 type BudgetOptions = {
   maxTokens?: number;
@@ -98,7 +110,7 @@ export function createCodeKgMcpServer(ctx: CmdContext): McpServer {
         .default(5)
         .describe('Max results, default 5'),
       backend: z
-        .enum(['local', 'semantic', 'auto-semantic'])
+        .enum(['local', 'semantic', 'auto-semantic', 'hybrid'])
         .optional()
         .default('local')
         .describe(
@@ -214,11 +226,129 @@ export function createCodeKgMcpServer(ctx: CmdContext): McpServer {
       toMcp(await applyBacklinksCommand(ctx, { write: write === true })),
   );
 
+  const budget = z.number().int().min(64).max(32000).optional();
+  server.tool(
+    'codekg_workspace_ask',
+    'Search explicitly registered repositories; scope with repository-name/path',
+    {
+      query: z.string().min(1),
+      in: z.string().optional(),
+      limit: z.number().int().min(1).max(100).optional(),
+      source: z.boolean().optional(),
+      semantic: z.boolean().optional(),
+      max_tokens: budget,
+    },
+    async ({ query, max_tokens, ...opts }) =>
+      toMcp(
+        await workspaceAskCommand(ctx, query, {
+          ...opts,
+          maxTokens: max_tokens,
+        }),
+      ),
+  );
+  server.tool(
+    'codekg_ask',
+    'Retrieve reviewed knowledge plus fresh source, ranked by lexical relevance, local semantic search, and dependencies',
+    {
+      query: z.string().min(1),
+      in: z.string().optional(),
+      limit: z.number().int().min(1).max(100).optional(),
+      source: z.boolean().optional(),
+      semantic: z.boolean().optional(),
+      max_tokens: budget,
+    },
+    async ({ query, max_tokens, ...opts }) =>
+      toMcp(await askCommand(ctx, query, { ...opts, maxTokens: max_tokens })),
+  );
+  server.tool(
+    'codekg_trace_calls',
+    'Trace callers, callees, references, and transitive impact; inferred edges remain labeled',
+    {
+      query: z.string().min(1),
+      direction: z.enum(['in', 'out']).optional(),
+      depth: z
+        .union([z.number().int().min(1).max(100), z.literal('all')])
+        .optional(),
+      in: z.string().optional(),
+      max_tokens: budget,
+    },
+    async ({ query, depth, max_tokens, ...opts }) =>
+      toMcp(
+        await traceCommand(ctx, query, {
+          ...opts,
+          depth: depth === 'all' ? Infinity : depth,
+          maxTokens: max_tokens,
+        }),
+      ),
+  );
+  server.tool(
+    'codekg_repo_map',
+    'Read a bounded source map and dependency hotspots',
+    {
+      in: z.string().optional(),
+      max_tokens: budget,
+    },
+    async ({ max_tokens, ...opts }) =>
+      toMcp(await mapCommand(ctx, { ...opts, maxTokens: max_tokens })),
+  );
+  server.tool(
+    'codekg_file_api',
+    'Read signatures and symbol locations in a file',
+    {
+      file: z.string(),
+      max_tokens: budget,
+    },
+    async ({ file, max_tokens }) =>
+      toMcp(await skeletonCommand(ctx, file, { maxTokens: max_tokens })),
+  );
+  server.tool(
+    'codekg_find_all',
+    'Find all literal or regex occurrences in indexed source; output reports total matches even when bounded',
+    {
+      pattern: z.string().min(1),
+      in: z.string().optional(),
+      regex: z.boolean().optional(),
+      ignore_case: z.boolean().optional(),
+      max_tokens: budget,
+    },
+    async ({ pattern, ignore_case, max_tokens, ...opts }) =>
+      toMcp(
+        await grepCommand(ctx, pattern, {
+          ...opts,
+          ignoreCase: ignore_case,
+          maxTokens: max_tokens,
+        }),
+      ),
+  );
+  server.tool(
+    'codekg_context',
+    'Map a source file or symbol to knowledge sections and test relationships',
+    {
+      query: z.string(),
+    },
+    async ({ query }) => toMcp(await contextCommand(ctx, query)),
+  );
+  server.tool(
+    'codekg_changed',
+    'Map working-tree changes to knowledge sections and tests',
+    {},
+    async () => toMcp(await changedCommand(ctx)),
+  );
+  server.tool(
+    'codekg_gaps',
+    'Report missing source documentation and test relationships',
+    {},
+    async () => toMcp(await gapsCommand(ctx)),
+  );
   return server;
 }
 
 export async function startCodeKgMcpServer(): Promise<void> {
-  const latDir = findLatticeDir();
+  const latDir =
+    findLatticeDir() ??
+    (existsSync(workspacePath(process.cwd()))
+      ? join(process.cwd(), 'lat.md')
+      : null);
   if (!latDir) {
     process.stderr.write('No lat.md directory found\n');
     process.exit(1);

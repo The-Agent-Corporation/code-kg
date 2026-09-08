@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import type { CmdContext, CmdResult } from '../context.js';
 import { buildContextInfo } from './context.js';
+import { freshGraph } from './fresh.js';
 
 function gitChangedFiles(projectRoot: string): string[] {
   const commands = [
@@ -35,8 +36,9 @@ export async function changedCommand(ctx: CmdContext): Promise<CmdResult> {
     return { output: lines.join('\n') };
   }
 
+  const graph = await freshGraph(ctx.projectRoot);
   for (const file of files) {
-    const info = await buildContextInfo(ctx, file);
+    const info = await buildContextInfo(ctx, file, graph);
     lines.push(`## ${file}`, '');
     if (!info) {
       lines.push('- No Code-KG context found.', '');

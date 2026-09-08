@@ -19,6 +19,45 @@
             "type": "command",
             "command": "code-kg session-check",
             "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": "code-kg agent-context session",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "code-kg agent-context prompt",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "code-kg agent-context edit",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "code-kg agent-context stop",
+            "timeout": 15
           }
         ]
       }

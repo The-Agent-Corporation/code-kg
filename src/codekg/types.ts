@@ -42,10 +42,19 @@ export type EntityNode = {
     | 'interface'
     | 'method'
     | 'variable'
-    | 'config';
+    | 'config'
+    | 'enum'
+    | 'struct'
+    | 'trait'
+    | 'constant';
   source_file?: string;
   source_span?: SourceSpan;
   confidence: Confidence;
+  body_hash?: string;
+  signature?: string;
+  search_text?: string;
+  language?: string;
+  origin?: 'ast' | 'generic';
 };
 
 export type RelationshipEdge = {
@@ -59,7 +68,8 @@ export type RelationshipEdge = {
     | 'extends'
     | 'implements'
     | 'tests'
-    | 'configures';
+    | 'configures'
+    | 'references';
   level: 'structural' | 'semantic';
   confidence: Confidence;
   confidence_score: number;
@@ -103,6 +113,7 @@ export type ProjectGraph = {
   edges: RelationshipEdge[];
   communities: Community[];
   analysis: GraphAnalysis;
+  source_hashes?: Record<string, string>;
 };
 
 export type BootstrapFile = {
@@ -130,6 +141,7 @@ export type ManifestSection = {
   generated_hash: string;
   current_hash: string;
   last_seen_graph_hash: string;
+  source_hashes?: Record<string, string>;
 };
 
 export type RelationshipStatus =

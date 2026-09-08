@@ -260,6 +260,42 @@ export async function driftCommand(
   findings.push(...findMissingSourceNodes(manifest, graph));
   findings.push(...findStaleRelationships(manifest, graph));
   findings.push(...findSuggestedRelationships(manifest, graph));
+  const changedSources = new Map<string, string[]>();
+  for (const section of Object.values(manifest.sections)) {
+    if (section.status === 'suppressed' || section.status === 'orphaned')
+      continue;
+    for (const [file, previousHash] of Object.entries(
+      section.source_hashes ?? {},
+    )) {
+      const currentHash = graph.source_hashes?.[file];
+      if (currentHash && currentHash !== previousHash) {
+        changedSources.set(file, [
+          ...(changedSources.get(file) ?? []),
+          section.stable_id,
+        ]);
+      }
+    }
+  }
+  for (const [file, sections] of changedSources) {
+    findings.push({
+      severity: 'WARNING',
+      message:
+        'Source content changed: ' +
+        file +
+        '; review knowledge sections ' +
+        sections.join(', ') +
+        '.',
+    });
+  }
+  if (
+    Object.values(manifest.sections).every((section) => !section.source_hashes)
+  ) {
+    findings.push({
+      severity: 'INFO',
+      message:
+        'Legacy manifest has no source-content baseline. Update generated knowledge or explicitly review source baselines before relying on behavioral freshness.',
+    });
+  }
 
   if (!manifestGraphHashes(manifest).has(graphHash)) {
     findings.push({

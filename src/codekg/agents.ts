@@ -139,6 +139,9 @@ function managedAgentsSection(fallbackInvocation?: string): string {
   lines.push(
     'Rules:',
     '- Before broad source reads, grep/glob searches, or answering codebase-structure questions, use `code-kg search "<question>"` or MCP `codekg_search` first.',
+    '- Prefer `code-kg ask "<question>"` or MCP `codekg_ask` for combined knowledge and fresh source context. Use `--in <directory>` to scope a monorepo query.',
+    '- Before changing a symbol or file, inspect `code-kg impact <symbol-or-file>`; use `callers`, `callees`, `skeleton`, and `map` for targeted exploration.',
+    '- Source descriptions are inferred, not accepted knowledge. Verify source evidence and stale-section warnings; refreshing the index never approves or rewrites curated knowledge.',
     '- For conceptual queries, prefer `code-kg search "<question>" --backend auto-semantic` or `codekg_search` with `backend: "auto-semantic"` so semantic search is used when configured and lexical search is used as a fallback.',
     '- Use `code-kg section "<section-id>"` or MCP `codekg_section` to read full sections with outgoing and incoming relationships before opening raw source.',
     '- Treat `lat.md/` as the primary map and raw source as the implementation detail to inspect after the relevant knowledge sections are known.',
@@ -226,7 +229,9 @@ function isCodeKgHook(hook: HookCommand): boolean {
   const command = hook.command.replace(/\\/g, '/');
   return (
     command.includes(CODEX_HOOK_COMMAND) ||
-    (command.includes('codekg/cli.js') && /\bhook-check\b/.test(command))
+    command.includes('code-kg agent-context ') ||
+    (command.includes('codekg/cli.js') &&
+      /\b(hook-check|agent-context)\b/.test(command))
   );
 }
 
@@ -262,7 +267,9 @@ async function readCodexHooks(path: string): Promise<CodexHooksConfig> {
   try {
     return JSON.parse(existing) as CodexHooksConfig;
   } catch {
-    return {};
+    throw new Error(
+      'Invalid hook configuration at ' + path + '; refusing to overwrite it.',
+    );
   }
 }
 
@@ -289,6 +296,32 @@ async function installCodexHook(
       PreToolUse: preToolUse,
     },
   };
+  for (const [event, action] of Object.entries({
+    SessionStart: 'session',
+    UserPromptSubmit: 'prompt',
+    PostToolUse: 'edit',
+    Stop: 'stop',
+  })) {
+    const entries = Array.isArray(hooks[event])
+      ? removeCodeKgHookEntries(hooks[event] as HookEntry[])
+      : [];
+    entries.push({
+      ...(event === 'PostToolUse'
+        ? { matcher: 'Write|Edit|MultiEdit|apply_patch|write_file' }
+        : {}),
+      hooks: [
+        {
+          type: 'command',
+          command: hookCommand.replace(
+            /hook-check$/,
+            'agent-context ' + action,
+          ),
+          timeout: 15,
+        },
+      ],
+    });
+    next.hooks![event] = entries;
+  }
   await writeFile(hooksPath, JSON.stringify(next, null, 2) + '\n');
   return 'installed Codex hook';
 }
@@ -310,6 +343,17 @@ async function uninstallCodexHook(projectRoot: string): Promise<string> {
     ? removeCodeKgHookEntries(hooks.PreToolUse)
     : [];
   const nextHooks = { ...hooks };
+  for (const event of [
+    'SessionStart',
+    'UserPromptSubmit',
+    'PostToolUse',
+    'Stop',
+  ]) {
+    if (!Array.isArray(nextHooks[event])) continue;
+    const cleaned = removeCodeKgHookEntries(nextHooks[event] as HookEntry[]);
+    if (cleaned.length) nextHooks[event] = cleaned;
+    else delete nextHooks[event];
+  }
   if (preToolUse.length > 0) {
     nextHooks.PreToolUse = preToolUse;
   } else {

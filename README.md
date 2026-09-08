@@ -8,6 +8,26 @@ runtime vendors/adapts the lat.md TypeScript runtime internally while adding
 Code-KG bootstrap, materialization, metadata validation, local lexical search,
 and MCP entrypoints.
 
+Code-KG now also incorporates Graft's MIT-licensed structural extraction and
+resolution core, while keeping Code-KG's reviewed knowledge, confidence decisions,
+edit protection, and local semantic search. The original repositories remain
+independent. See [Source Intelligence](docs/INTELLIGENCE.md) for the implemented
+behavior, installation requirements, and limits.
+
+```bash
+code-kg ask "where is authentication checked?"
+code-kg impact src/auth.ts
+code-kg callers authenticate
+code-kg callees authenticate
+code-kg skeleton src/auth.ts
+code-kg map --in packages/api
+code-kg grep "authenticate" --in src
+```
+
+These queries refresh disposable source indexes automatically. They do not
+regenerate or approve `lat.md` prose. `ask` combines current source with knowledge
+sections; `search` retains its existing knowledge-only default.
+
 The current implementation also includes the first MVP 2 structural graph path:
 tree-sitter source-symbol extraction, deterministic local import edges,
 directory-based communities, high-degree node detection, bridge-node detection,
@@ -30,7 +50,7 @@ but source-editing features must use only `source_spans` on sections marked with
 `source_anchor_policy: "edit-safe"`.
 
 The agent guidance slice installs a managed `AGENTS.md` section plus a safe
-Codex PreToolUse hook entry. The guidance tells coding agents to query Code-KG
+Codex lifecycle hooks. The guidance tells coding agents to query Code-KG
 before broad source reads or grep-style exploration; the hook inspects Bash
 tool context plus structured Grep, Glob, Read, LS, read_file, and
 list_directory payloads where the host supports them. It adds a non-blocking
@@ -38,6 +58,11 @@ reminder before broad raw-source search commands such as `rg`, `grep`, `find`,
 or `git grep`; when it can infer the search pattern, it suggests a concrete
 `code-kg search "<query>" --backend auto-semantic` command instead of a generic
 placeholder.
+
+Session, prompt, post-edit, and stop hooks now provide bounded context or refresh
+the structural cache. They make no model requests and never approve knowledge.
+Run `code-kg agents install` again to upgrade managed guidance and hooks; foreign
+hook entries are preserved. The Claude plugin includes the same lifecycle events.
 
 The Code-KG MCP server exposes the daily agent workflow directly: search,
 section reads with approximate token budgets, check, drift, confidence,
@@ -108,7 +133,7 @@ code-kg doctor
 code-kg drift
 ```
 
-After that, use `code-kg search "<question>" --backend auto-semantic` before
+After that, use `code-kg ask "<question>"` before
 broad source searches, `code-kg context <file-or-symbol>` before opening raw
 source files, and `code-kg changed` / `code-kg update` around code changes. See
 [docs/USAGE.md](docs/USAGE.md) for the tested happy path and common checks.
@@ -136,6 +161,8 @@ What it adds:
 - A PreToolUse hook that nudges toward `code-kg search` / `code-kg context`
   before broad grep/glob/read (silent in unmapped repos).
 - A SessionStart hook that offers to bootstrap unmapped code repos.
+- Bounded session orientation, prompt context, post-edit impact context, and
+  a silent stop-time structural refresh in mapped repos.
 - A guidance skill explaining the bootstrap and daily workflow.
 
 Map a repo with `code-kg bootstrap --accept` (see Daily Workflow above).
@@ -170,6 +197,17 @@ Remote embeddings are still supported through `LAT_LLM_KEY`:
 
 - OpenAI keys (`sk-...`) use `text-embedding-3-small`
 - Vercel AI Gateway keys (`vck_...`) use `openai/text-embedding-3-small`
+
+Persisted local embedding selection takes precedence over chat credentials.
+To override it, explicitly set `LAT_EMBEDDING_PROVIDER=openai` or `vercel` with
+the corresponding embedding key. Anthropic, OpenRouter, and xAI chat keys are
+never selected as embedding credentials, including through saved-key fallback.
+
+This selection controls embeddings only. When chat credentials are configured,
+`code-kg update` also attempts paragraph enrichment with the detected chat
+provider. Keep chat credentials unset and out of the selected configuration
+when maintenance must remain entirely local; source descriptions use the
+separate explicit endpoint described in [Source Intelligence](docs/INTELLIGENCE.md).
 
 Use `--backend auto-semantic` when you want the best configured backend without
 breaking offline/local workflows. It selects semantic search when an embedding

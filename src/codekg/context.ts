@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { CmdContext, CmdResult } from '../context.js';
 import { flattenSections, loadAllSections, type Section } from '../lattice.js';
-import { extractProjectGraph } from './graph.js';
+import { freshGraph } from './fresh.js';
 import type {
   EntityNode,
   MaterializationManifest,
@@ -149,8 +149,9 @@ function matchingSections(
 export async function buildContextInfo(
   ctx: CmdContext,
   query: string,
+  graphArg?: ProjectGraph,
 ): Promise<ContextInfo | null> {
-  const graph = await extractProjectGraph(ctx.projectRoot);
+  const graph = graphArg ?? (await freshGraph(ctx.projectRoot));
   const nodes = matchedNodes(graph, query);
   if (nodes.length === 0) return null;
 

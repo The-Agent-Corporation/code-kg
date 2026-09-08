@@ -19,6 +19,7 @@ import type {
   MaterializationManifest,
   ProjectGraph,
 } from './types.js';
+import { clampLeadingParagraph } from './limits.js';
 
 type MergeProposal = {
   stableId: string;
@@ -168,9 +169,11 @@ function highlightSummary(
     category === 'test'
       ? 'contains tests and validation symbols'
       : 'contains source symbols';
-  return `${noun} \`${path}\` ${purpose}. Key symbols: ${briefInlineCodeList(
-    symbols.map((symbol) => symbol.label),
-  )}.`;
+  return clampLeadingParagraph(
+    `${noun} \`${path}\` ${purpose}. Key symbols: ${briefInlineCodeList(
+      symbols.map((symbol) => symbol.label),
+    )}.`,
+  );
 }
 
 function renderFileHighlight(
@@ -294,7 +297,9 @@ No parsed entrypoint files were available for first-hop dependency flow during b
       return [
         `### ${path}`,
         '',
-        `Entry point \`${path}\` imports first-hop local files including ${briefInlineCodeList(imports)}.`,
+        clampLeadingParagraph(
+          `Entry point \`${path}\` imports first-hop local files including ${briefInlineCodeList(imports)}.`,
+        ),
         '',
         `- Imports: ${inlineCodeList(imports, SOURCE_IMPORT_LIMIT)}`,
         '',
@@ -341,7 +346,9 @@ No source files had incoming local imports during bootstrap.
     ...hotspots.flatMap(({ path, importedBy }) => [
       `### ${path}`,
       '',
-      `Source file \`${path}\` is imported by local files including ${briefInlineCodeList(importedBy)}.`,
+      clampLeadingParagraph(
+        `Source file \`${path}\` is imported by local files including ${briefInlineCodeList(importedBy)}.`,
+      ),
       '',
       `- Imported by: ${inlineCodeList(importedBy, SOURCE_IMPORT_LIMIT)}`,
       '',
@@ -381,7 +388,9 @@ No test-to-source import relationships were detected during bootstrap.
     ...coverage.flatMap(({ path, tests }) => [
       `### ${path}`,
       '',
-      `Source file \`${path}\` is covered by test imports from ${briefInlineCodeList(tests)}.`,
+      clampLeadingParagraph(
+        `Source file \`${path}\` is covered by test imports from ${briefInlineCodeList(tests)}.`,
+      ),
       '',
       `- Tests: ${inlineCodeList(tests, SOURCE_IMPORT_LIMIT)}`,
       '',
@@ -708,6 +717,8 @@ function manifest(plan: BootstrapPlan): MaterializationManifest {
       generated_hash: contentHash,
       current_hash: contentHash,
       last_seen_graph_hash: graphHash,
+      source_hashes:
+        stable === 'architecture' ? plan.graph.source_hashes : undefined,
     };
   }
   return {

@@ -8,7 +8,11 @@ import {
 import { formatResultList } from '../format.js';
 import { hasEmbeddingConfig } from '../config.js';
 
-export type CodeKgSearchBackend = 'local' | 'semantic' | 'auto-semantic';
+export type CodeKgSearchBackend =
+  | 'local'
+  | 'semantic'
+  | 'auto-semantic'
+  | 'hybrid';
 type ResolvedSearchBackend = 'local' | 'semantic';
 
 export type CodeKgSearchOptions = {
@@ -121,6 +125,10 @@ export async function codeKgSearchCommand(
   query: string | undefined,
   opts: CodeKgSearchOptions = {},
 ): Promise<CmdResult> {
+  if (opts.backend === 'hybrid') {
+    const { askCommand } = await import('./query.js');
+    return askCommand(ctx, query ?? '', { limit: opts.limit });
+  }
   const selected = selectCodeKgSearchBackend(opts);
   const limit = opts.limit ?? 5;
 

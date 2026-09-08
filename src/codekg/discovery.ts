@@ -1,9 +1,11 @@
 import { extname } from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { walkEntries } from '../walk.js';
+import { GRAPH_EXTENSIONS } from './structural.js';
 import type { DiscoveryResult, FileCategory, DiscoveredFile } from './types.js';
 
 const CODE_EXTENSIONS = new Set([
+  ...GRAPH_EXTENSIONS,
   '.c',
   '.cc',
   '.cpp',
@@ -43,15 +45,24 @@ const CONFIG_FILES = new Set([
 ]);
 
 function isIgnoredByCodeKg(path: string): boolean {
+  const segments = path.split('/');
   return (
     path.startsWith('lat.md/') ||
     path.startsWith('.code-kg/') ||
     path.startsWith('node_modules/') ||
     path.startsWith('dist/') ||
     path.startsWith('build/') ||
+    path.startsWith('example/') ||
+    path.startsWith('examples/') ||
+    path.startsWith('vendor/') ||
+    path.startsWith('third_party/') ||
     path.includes('/node_modules/') ||
     path.includes('/dist/') ||
-    path.includes('/build/')
+    path.includes('/build/') ||
+    segments.includes('example') ||
+    segments.includes('examples') ||
+    segments.includes('vendor') ||
+    segments.includes('third_party')
   );
 }
 

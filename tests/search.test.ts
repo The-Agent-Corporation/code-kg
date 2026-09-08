@@ -153,6 +153,73 @@ describe('ensureSchema', () => {
 });
 
 describe('embedding config', () => {
+  it.each([
+    ['xai-test', 'sk-or-test', undefined, undefined],
+    ['xai-test', 'sk-ant-test', undefined, undefined],
+    ['sk-or-test', undefined, 'openai', undefined],
+    ['sk-ant-test', undefined, 'vercel', undefined],
+    [undefined, 'sk-or-test', 'openai', undefined],
+    ['xai-test', 'sk-test', undefined, 'sk-test'],
+    ['sk-or-test', 'vck_test', undefined, 'vck_test'],
+  ])(
+    'resolves embedding credentials safely: env=%s config=%s provider=%s',
+    (envKey, configKey, provider, expected) => {
+      const tmp = mkdtempSync(join(tmpdir(), 'lat-config-'));
+      const originalEnv = {
+        XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME,
+        LAT_EMBEDDING_PROVIDER: process.env.LAT_EMBEDDING_PROVIDER,
+        LAT_LLM_KEY: process.env.LAT_LLM_KEY,
+        LAT_LLM_KEY_FILE: process.env.LAT_LLM_KEY_FILE,
+        LAT_LLM_KEY_HELPER: process.env.LAT_LLM_KEY_HELPER,
+      };
+      try {
+        process.env.XDG_CONFIG_HOME = tmp;
+        delete process.env.LAT_LLM_KEY_FILE;
+        delete process.env.LAT_LLM_KEY_HELPER;
+        if (envKey) process.env.LAT_LLM_KEY = envKey;
+        else delete process.env.LAT_LLM_KEY;
+        if (provider) process.env.LAT_EMBEDDING_PROVIDER = provider;
+        else delete process.env.LAT_EMBEDDING_PROVIDER;
+        writeConfig({ llm_key: configKey });
+        expect(getEmbeddingKey()).toBe(expected);
+      } finally {
+        for (const [key, value] of Object.entries(originalEnv)) {
+          if (value === undefined) delete process.env[key];
+          else process.env[key] = value;
+        }
+        rmSync(tmp, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it('keeps persisted local embeddings independent of chat key helpers', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'lat-config-'));
+    const originalEnv = {
+      XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME,
+      LAT_EMBEDDING_PROVIDER: process.env.LAT_EMBEDDING_PROVIDER,
+      LAT_LLM_KEY: process.env.LAT_LLM_KEY,
+      LAT_LLM_KEY_FILE: process.env.LAT_LLM_KEY_FILE,
+      LAT_LLM_KEY_HELPER: process.env.LAT_LLM_KEY_HELPER,
+    };
+    try {
+      process.env.XDG_CONFIG_HOME = tmp;
+      delete process.env.LAT_EMBEDDING_PROVIDER;
+      delete process.env.LAT_LLM_KEY;
+      process.env.LAT_LLM_KEY_FILE = join(tmp, 'missing-key');
+      process.env.LAT_LLM_KEY_HELPER = 'exit 1';
+      writeConfig({ embedding_provider: 'local' });
+      expect(getEmbeddingKey()).toBe('local');
+      process.env.LAT_LLM_KEY = 'sk-test';
+      expect(getEmbeddingKey()).toBe('local');
+    } finally {
+      for (const [key, value] of Object.entries(originalEnv)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
   it('uses persisted local embedding provider when no env key is set', () => {
     const tmp = mkdtempSync(join(tmpdir(), 'lat-config-'));
     const originalEnv = {

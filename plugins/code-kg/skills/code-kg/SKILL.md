@@ -11,8 +11,9 @@ daily query/validate tools.
 
 ## Prerequisite
 
-If `code-kg` is not found, it is not installed on this machine. Tell the user to
-run `code-kg install-global` (or `npm i -g code-kg`) once, then retry.
+If `code-kg` is not found, locate the user's Code-KG source checkout, install its
+dependencies, run `pnpm build`, then `node dist/src/codekg/cli.js install-global`
+there. Do not assume this private package is published to npm.
 
 ## Onboard a repo (no `lat.md/` yet)
 
@@ -26,6 +27,15 @@ code-kg doctor                  # readiness report
 ```
 
 ## Daily workflow (repo already mapped)
+
+- Prefer `code-kg ask "<question>"` or MCP `codekg_ask` for reviewed knowledge
+  plus fresh source context. Use `--in <directory>` to constrain the scope.
+- Before changes, inspect `code-kg impact <symbol-or-file>`; use `callers`,
+  `callees`, `map`, and `skeleton` for targeted navigation. Inferred edges and
+  source descriptions remain inferred; verify evidence before accepting them.
+- Source refreshes do not update reviewed prose. Surface drift and review it;
+  `review-source <stable-id> --write` is an explicit acknowledgement, not an
+  automatic repair operation.
 
 - **Before broad source search**, query the graph first — MCP `codekg_search`
   with `backend: "auto-semantic"`, or `code-kg search "<question>" --backend
@@ -44,6 +54,9 @@ code-kg doctor                  # readiness report
   `codekg_section`, `codekg_locate`, `codekg_expand`, `codekg_check`,
   `codekg_drift`, `codekg_confidence`, `codekg_suppress`, `codekg_refs`,
   `codekg_apply_backlinks`. Prefer these for queries and validation.
+- **Source MCP tools**: `codekg_ask`, `codekg_trace_calls`, `codekg_repo_map`,
+  `codekg_file_api`, `codekg_find_all`, `codekg_context`, `codekg_changed`,
+  `codekg_gaps`, and `codekg_workspace_ask`.
 - **CLI via Bash** for everything not exposed over MCP: `bootstrap`, `doctor`,
   `semantic`, `context`, `gaps`, `changed`, `update`.
 

@@ -84,7 +84,7 @@ function handleResult(result: CmdResult): void {
 }
 
 function parsePositiveInteger(value: string): number {
-  const parsed = Number.parseInt(value, 10);
+  const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed < 1) {
     throw new InvalidArgumentError('must be a positive integer');
   }
@@ -92,11 +92,16 @@ function parsePositiveInteger(value: string): number {
 }
 
 function parseSearchBackend(value: string): CodeKgSearchBackend {
-  if (value === 'local' || value === 'semantic' || value === 'auto-semantic') {
+  if (
+    value === 'local' ||
+    value === 'semantic' ||
+    value === 'auto-semantic' ||
+    value === 'hybrid'
+  ) {
     return value;
   }
   throw new InvalidArgumentError(
-    'must be "local", "semantic", or "auto-semantic"',
+    'must be "local", "semantic", "auto-semantic", or "hybrid"',
   );
 }
 
@@ -332,6 +337,37 @@ program
     const ctx = resolveContext(program.opts());
     const { updateCommand } = await import('./update.js');
     handleResult(await updateCommand(ctx));
+  });
+
+program
+  .command('enrich')
+  .description(
+    'Rewrite generated section summaries with an LLM (requires LAT_LLM_KEY)',
+  )
+  .option(
+    '--source',
+    'Describe actual source files in a disposable, freshness-checked cache',
+  )
+  .option(
+    '--base-url <url>',
+    'OpenAI-compatible model endpoint, including localhost',
+  )
+  .option('--model <model>', 'Source summary model')
+  .option(
+    '--limit <count>',
+    'Maximum source files to generate',
+    parsePositiveInteger,
+    20,
+  )
+  .action(async (opts) => {
+    const ctx = resolveContext(program.opts());
+    if (opts.source) {
+      const { enrichSourcesCommand } = await import('./meaning.js');
+      handleResult(await enrichSourcesCommand(ctx, opts));
+      return;
+    }
+    const { enrichCommand } = await import('./enrich.js');
+    handleResult(await enrichCommand(ctx));
   });
 
 for (const command of ['locate', 'section', 'refs', 'expand'] as const) {
@@ -578,6 +614,21 @@ program
   });
 
 program
+  .command('agent-context')
+  .argument('<event>', 'session, prompt, edit, or stop')
+  .description('Supply bounded, local-only context to agent lifecycle hooks')
+  .action(async (event) => {
+    const { agentContextCommand } = await import('./agent-context.js');
+    handleResult(
+      await agentContextCommand(
+        rootOnlyContext(),
+        event,
+        (await readStdinIfAvailable()) ?? '',
+      ),
+    );
+  });
+
+program
   .command('session-check')
   .description('Run the safe Code-KG SessionStart bootstrap-offer check')
   .action(async () => {
@@ -594,6 +645,148 @@ program
   .action(async () => {
     const { startCodeKgMcpServer } = await import('./mcp.js');
     await startCodeKgMcpServer();
+  });
+
+program
+  .command('review-source')
+  .argument('<section-stable-id>')
+  .description(
+    'Explicitly acknowledge source review and preserve a section as curated',
+  )
+  .option('--write', 'Record the reviewed source hashes; default is preview')
+  .action(async (id, opts) => {
+    const { reviewSourceCommand } = await import('./review-source.js');
+    handleResult(
+      await reviewSourceCommand(rootOnlyContext(), id, opts.write === true),
+    );
+  });
+
+program
+  .command('ask')
+  .description(
+    'Search reviewed knowledge and fresh source with lexical, semantic, and graph ranking',
+  )
+  .argument('<query>')
+  .option('--workspace', 'Search explicitly registered repositories')
+  .option('--in <path>', 'Limit source scope')
+  .option('--limit <count>', 'Maximum hits', parsePositiveInteger, 8)
+  .option(
+    '--max-tokens <count>',
+    'Approximate output budget',
+    parsePositiveInteger,
+    3000,
+  )
+  .option('--no-source', 'Return pointers instead of source excerpts')
+  .option('--no-semantic', 'Use only local lexical and graph ranking')
+  .option('--json', 'Return structured results')
+  .action(async (query, opts) => {
+    const { ask, formatQuery } = await import('./query.js');
+    const { askWorkspace } = await import('./workspace.js');
+    const result = await (opts.workspace ? askWorkspace : ask)(
+      rootOnlyContext().projectRoot,
+      query,
+      opts,
+    );
+    console.log(opts.json ? JSON.stringify(result) : formatQuery(result, opts));
+  });
+const workspace = program
+  .command('workspace')
+  .description('Manage explicit local multi-repository search roots');
+workspace
+  .command('add')
+  .argument('<directories...>')
+  .action(async (directories) => {
+    const { workspaceCommand } = await import('./workspace.js');
+    handleResult(await workspaceCommand(rootOnlyContext(), 'add', directories));
+  });
+workspace.command('list').action(async () => {
+  const { workspaceCommand } = await import('./workspace.js');
+  handleResult(await workspaceCommand(rootOnlyContext(), 'list'));
+});
+workspace
+  .command('remove')
+  .argument('<names...>')
+  .action(async (names) => {
+    const { workspaceCommand } = await import('./workspace.js');
+    handleResult(await workspaceCommand(rootOnlyContext(), 'remove', names));
+  });
+for (const name of ['callers', 'callees', 'impact']) {
+  program
+    .command(name)
+    .argument('<symbol-or-file>')
+    .option(
+      '--depth <count>',
+      'Traversal depth or all',
+      (value) => (value === 'all' ? Infinity : parsePositiveInteger(value)),
+      name === 'impact' ? Infinity : 1,
+    )
+    .option('--in <path>', 'Limit traversal to scope')
+    .option(
+      '--max-tokens <count>',
+      'Approximate output budget',
+      parsePositiveInteger,
+      3000,
+    )
+    .option('--json', 'Return structured results')
+    .action(async (query, opts) => {
+      const { trace, traceCommand } = await import('./query.js');
+      const options = {
+        ...opts,
+        direction: name === 'callees' ? ('out' as const) : ('in' as const),
+      };
+      if (opts.json)
+        console.log(
+          JSON.stringify(
+            await trace(rootOnlyContext().projectRoot, query, options),
+          ),
+        );
+      else handleResult(await traceCommand(rootOnlyContext(), query, options));
+    });
+}
+program
+  .command('map')
+  .description('Show a bounded repository map and dependency hotspots')
+  .option('--in <path>')
+  .option(
+    '--max-tokens <count>',
+    'Approximate output budget',
+    parsePositiveInteger,
+    3000,
+  )
+  .action(async (opts) => {
+    const { mapCommand } = await import('./query.js');
+    handleResult(await mapCommand(rootOnlyContext(), opts));
+  });
+program
+  .command('skeleton')
+  .argument('<file>')
+  .description('Show a source file API without reading its entire body')
+  .option(
+    '--max-tokens <count>',
+    'Approximate output budget',
+    parsePositiveInteger,
+    3000,
+  )
+  .action(async (file, opts) => {
+    const { skeletonCommand } = await import('./query.js');
+    handleResult(await skeletonCommand(rootOnlyContext(), file, opts));
+  });
+program
+  .command('grep')
+  .argument('<pattern>')
+  .description('Find all occurrences in indexed source files')
+  .option('--in <path>')
+  .option('--regex', 'Interpret the pattern as a ripgrep regex')
+  .option('-i, --ignore-case')
+  .option(
+    '--max-tokens <count>',
+    'Approximate output budget',
+    parsePositiveInteger,
+    3000,
+  )
+  .action(async (pattern, opts) => {
+    const { grepCommand } = await import('./query.js');
+    handleResult(await grepCommand(rootOnlyContext(), pattern, opts));
   });
 
 await program.parseAsync();

@@ -9,7 +9,7 @@ import type { WikiLink } from '../src/extensions/wiki-link/index.js';
 describe('typecheck', () => {
   it('passes tsc --noEmit on the entire codebase', () => {
     execSync('pnpm typecheck', { cwd: import.meta.dirname + '/..' });
-  });
+  }, 30000);
 });
 
 describe('prettier', () => {

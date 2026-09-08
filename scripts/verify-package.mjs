@@ -40,7 +40,15 @@ mkdirSync(join(sample, 'src'), { recursive: true });
 mkdirSync(join(sample, 'tests'), { recursive: true });
 writeFileSync(
   join(consumer, 'package.json'),
-  '{"private":true,"type":"module"}\n',
+  JSON.stringify({
+    private: true,
+    type: 'module',
+    pnpm: {
+      onlyBuiltDependencies: JSON.parse(
+        await readFile(join(root, 'package.json'), 'utf8'),
+      ).pnpm.onlyBuiltDependencies,
+    },
+  }) + '\n',
 );
 writeFileSync(
   join(sample, 'package.json'),
@@ -68,6 +76,13 @@ const tarballPath = join(packDir, tarball);
 const members = run('tar', ['-tzf', tarballPath]);
 assertIncludes(members, 'package/dist/src/codekg/cli.js', 'tarball');
 assertIncludes(members, 'package/templates/init/lat.md', 'tarball');
+assertIncludes(members, 'package/THIRD_PARTY_NOTICES.md', 'tarball');
+assertIncludes(members, 'package/dist/src/vendor/graft/LICENSE', 'tarball');
+assertIncludes(
+  members,
+  'package/dist/src/vendor/graft/graph/queries/rust.scm',
+  'tarball',
+);
 if (
   members.includes('package/lat.md/.cache/') ||
   members.includes('package/.code-kg/')
@@ -96,6 +111,25 @@ assertIncludes(doctor, '.code-kg/cache/: ignored', 'doctor');
 assertIncludes(doctor, 'lat.md/.cache/: ignored', 'doctor');
 
 const context = run(bin, ['context', 'src/index.ts'], { cwd: sample });
+const ask = run(bin, ['ask', 'makeValue', '--no-semantic'], { cwd: sample });
+assertIncludes(ask, 'return 1', 'fresh source ask');
+const calls = run(bin, ['callers', 'makeValue'], { cwd: sample });
+assertIncludes(calls, 'src/index.ts', 'module-level call tracing');
+writeFileSync(
+  join(sample, 'src/example.kt'),
+  'fun greet(): Int { return 1 }\n',
+);
+assertIncludes(
+  run(bin, ['skeleton', 'example.kt'], { cwd: sample }),
+  'greet',
+  'native Kotlin parser',
+);
+writeFileSync(join(sample, 'src/example.rs'), 'pub fn greet() -> i32 { 1 }\n');
+assertIncludes(
+  run(bin, ['skeleton', 'example.rs'], { cwd: sample }),
+  'greet',
+  'shipped WASM query assets',
+);
 assertIncludes(context, '# Code-KG Context', 'context');
 assertIncludes(context, 'tested by: `tests/index.test.ts`', 'context');
 const gaps = run(bin, ['gaps'], { cwd: sample });

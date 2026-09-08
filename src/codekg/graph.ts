@@ -1,17 +1,17 @@
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, extname, join, posix, resolve } from 'node:path';
-import {
-  parseSourceSymbols,
-  SOURCE_EXTENSIONS,
-  type SourceSymbol,
-} from '../source-parser.js';
+import type { SourceSymbol } from '../source-parser.js';
 import { discoverProject } from './discovery.js';
+import {
+  extractStructural,
+  GRAPH_EXTENSIONS,
+  sourceHash,
+} from './structural.js';
+import { writeJsonAtomic } from './cache.js';
 import type {
   Community,
   DiscoveryResult,
   EntityNode,
-  FileCategory,
   Gap,
   GraphFragment,
   ProjectGraph,
@@ -199,6 +199,10 @@ function joinPythonModule(moduleSpec: string, importedName: string): string {
 }
 
 function candidatePaths(base: string): string[] {
+  if (/\.[cm]?jsx?$/.test(base)) {
+    const stem = base.replace(/\.[cm]?jsx?$/, '');
+    return [base, stem + '.ts', stem + '.tsx', stem + '.mts', stem + '.cts'];
+  }
   if (extname(base)) return [base];
   return [
     ...LOCAL_IMPORT_EXTENSIONS.map((ext) => `${base}${ext}`),
@@ -259,73 +263,6 @@ function resolveLocalImports(
 
 function uniqueStrings(items: string[]): string[] {
   return [...new Set(items)].sort();
-}
-
-async function fragmentForFile(
-  root: string,
-  path: string,
-  knownPaths: Set<string>,
-  fileCategories: Map<string, FileCategory>,
-): Promise<GraphFragment> {
-  const nodes: EntityNode[] = [];
-  const edges: RelationshipEdge[] = [];
-  const parseErrors: string[] = [];
-  const module = moduleNode(moduleLabel(path));
-  const file = fileNode(path);
-  nodes.push(module, file);
-  edges.push(edge(module.id, file.id, 'contains', path));
-
-  let content: string;
-  try {
-    content = await readFile(`${root}/${path}`, 'utf-8');
-  } catch (err) {
-    return {
-      nodes,
-      edges,
-      parse_errors: [`${path}: ${(err as Error).message}`],
-    };
-  }
-
-  try {
-    const symbols = await parseSourceSymbols(path, content);
-    const byLabel = new Map<string, EntityNode>();
-    for (const symbol of symbols) {
-      const node = symbolNode(path, symbol);
-      nodes.push(node);
-      byLabel.set(node.label, node);
-      edges.push(edge(file.id, node.id, 'contains', path, symbol.startLine));
-    }
-
-    for (const symbol of symbols.filter((entry) => entry.parent)) {
-      const parent = byLabel.get(symbol.parent!);
-      const child = byLabel.get(`${symbol.parent}#${symbol.name}`);
-      if (parent && child) {
-        edges.push(
-          edge(parent.id, child.id, 'contains', path, symbol.startLine),
-        );
-      }
-    }
-  } catch (err) {
-    parseErrors.push(`${path}: ${(err as Error).message}`);
-  }
-
-  for (const importSpec of extractImportSpecs(path, content)) {
-    for (const target of resolveLocalImports(path, importSpec, knownPaths)) {
-      edges.push(
-        edge(file.id, fileNode(target).id, 'imports', path, importSpec.line),
-      );
-      if (
-        fileCategories.get(path) === 'test' &&
-        fileCategories.get(target) === 'code'
-      ) {
-        edges.push(
-          edge(file.id, fileNode(target).id, 'tests', path, importSpec.line),
-        );
-      }
-    }
-  }
-
-  return { nodes, edges, parse_errors: parseErrors };
 }
 
 function mergeFragments(fragments: GraphFragment[]): GraphFragment {
@@ -464,25 +401,150 @@ function analyzeGraph(fragment: GraphFragment): ProjectGraph {
 export async function extractProjectGraph(
   rootArg = '.',
   discoveryArg?: DiscoveryResult,
+  options: { cache?: boolean } = {},
 ): Promise<ProjectGraph> {
   const root = resolve(rootArg);
   const discovery = discoveryArg ?? (await discoverProject(root));
   const codePaths = discovery.files
     .filter((file) => file.category === 'code' || file.category === 'test')
-    .filter((file) => SOURCE_EXTENSIONS.has(file.extension))
+    .filter((file) => GRAPH_EXTENSIONS.has(file.extension))
     .map((file) => file.path);
   const knownPaths = new Set(codePaths);
   const fileCategories = new Map(
     discovery.files.map((file) => [file.path, file.category]),
   );
-  const fragments = await Promise.all(
-    codePaths.map((path) =>
-      fragmentForFile(root, path, knownPaths, fileCategories),
-    ),
+  const snapshot = await extractStructural(
+    root,
+    codePaths,
+    options.cache === true,
   );
+  const fragments: GraphFragment[] = [];
+  for (const path of codePaths) {
+    const content = snapshot.contents.get(path);
+    const extracted = snapshot.files.get(path);
+    if (content === undefined) continue;
+    const module = moduleNode(moduleLabel(path));
+    const file = fileNode(path);
+    file.body_hash = sourceHash(content);
+    file.search_text = content.slice(0, 16000);
+    const nodes = [module, file];
+    const edges = [edge(module.id, file.id, 'contains', path)];
+    for (const symbol of extracted?.legacy ?? []) {
+      const node = symbolNode(path, symbol);
+      node.signature = symbol.signature;
+      node.body_hash = sourceHash(
+        content
+          .split('\n')
+          .slice(symbol.startLine - 1, symbol.endLine)
+          .join('\n'),
+      );
+      nodes.push(node);
+      edges.push(edge(file.id, node.id, 'contains', path, symbol.startLine));
+    }
+    // Preserve Python's package/submodule fallback from the original extractor.
+    if (path.endsWith('.py')) {
+      for (const spec of extractImportSpecs(path, content)) {
+        for (const target of resolveLocalImports(path, spec, knownPaths)) {
+          edges.push(
+            edge(file.id, fileNode(target).id, 'imports', path, spec.line),
+          );
+        }
+      }
+    }
+    fragments.push({ nodes, edges, parse_errors: [] });
+  }
   const fragment = mergeFragments(fragments);
+  const byId = new Map(fragment.nodes.map((n) => [n.id, n]));
+  const byLocation = new Map(
+    fragment.nodes.map((n) => [
+      JSON.stringify([n.source_file, n.label, n.source_span?.start_line]),
+      n,
+    ]),
+  );
+  const mapped = new Map<string, string>();
+  for (const raw of snapshot.nodes) {
+    const label =
+      raw.kind === 'file'
+        ? raw.path
+        : raw.owner
+          ? raw.owner + '#' + raw.name
+          : raw.id.slice(raw.path.length + 1).replace(/\./g, '#');
+    const span = /^L(\d+)-L(\d+)$/.exec(raw.span);
+    const start = Number(span?.[1] ?? 1);
+    const end = Number(span?.[2] ?? start);
+    let node =
+      raw.kind === 'file'
+        ? byId.get(fileNode(raw.path).id)
+        : byLocation.get(JSON.stringify([raw.path, label, start]));
+    if (!node) {
+      node = {
+        id: stableId('symbol', raw.path, label, raw.kind),
+        label,
+        kind: raw.kind,
+        source_file: raw.path,
+        source_span: { file: raw.path, start_line: start, end_line: end },
+        confidence: 'EXTRACTED',
+      };
+      fragment.nodes.push(node);
+      byId.set(node.id, node);
+      byLocation.set(JSON.stringify([raw.path, label, start]), node);
+    }
+    node.body_hash =
+      raw.kind === 'file' ? node.body_hash : 'sha256:' + raw.body_hash;
+    node.signature = raw.signature ?? undefined;
+    node.search_text = raw.body_text ?? node.search_text;
+    node.origin = raw.origin;
+    mapped.set(raw.id, node.id);
+  }
+  for (const raw of snapshot.edges) {
+    const source = mapped.get(raw.source);
+    const target = mapped.get(raw.target);
+    if (!source || !target) continue; // External modules are not local evidence.
+    const sourceNode = byId.get(source)!;
+    const relationship = edge(
+      source,
+      target,
+      raw.relation,
+      sourceNode.source_file,
+      sourceNode.source_span?.start_line,
+    );
+    if (raw.confidence === 'inferred') {
+      relationship.confidence = 'INFERRED';
+      relationship.confidence_score = 0.7;
+    }
+    fragment.edges.push(relationship);
+  }
+  for (const relationship of fragment.edges.filter(
+    (entry) => entry.relation === 'imports',
+  )) {
+    const source = byId.get(relationship.source);
+    const target = byId.get(relationship.target);
+    if (
+      source?.source_file &&
+      target?.source_file &&
+      fileCategories.get(source.source_file) === 'test' &&
+      fileCategories.get(target.source_file) === 'code'
+    ) {
+      fragment.edges.push(
+        edge(source.id, target.id, 'tests', source.source_file),
+      );
+    }
+  }
+  fragment.edges = [
+    ...new Map(fragment.edges.map((entry) => [entry.id, entry])).values(),
+  ].sort((a, b) => a.id.localeCompare(b.id));
+  fragment.nodes.sort((a, b) => a.id.localeCompare(b.id));
+  fragment.parse_errors.push(...snapshot.errors);
   validateGraphFragment(fragment);
-  return analyzeGraph(fragment);
+  return {
+    ...analyzeGraph(fragment),
+    source_hashes: Object.fromEntries(
+      [...snapshot.contents].map(([path, content]) => [
+        path,
+        sourceHash(content),
+      ]),
+    ),
+  };
 }
 
 export function hashProjectGraph(graph: ProjectGraph): string {
@@ -495,8 +557,7 @@ export async function writeGraphCache(
 ): Promise<string> {
   const root = resolve(rootArg);
   const target = join(root, GRAPH_CACHE_PATH);
-  await mkdir(dirname(target), { recursive: true });
-  await writeFile(target, JSON.stringify(graph, null, 2) + '\n', 'utf-8');
+  await writeJsonAtomic(target, graph);
   return GRAPH_CACHE_PATH;
 }
 

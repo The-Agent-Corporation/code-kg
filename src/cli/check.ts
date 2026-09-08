@@ -17,6 +17,7 @@ import { SOURCE_EXTENSIONS, clearSymbolCache } from '../source-parser.js';
 import { walkEntries } from '../walk.js';
 import type { CmdContext, CmdResult, Styler } from '../context.js';
 import { INIT_VERSION, readInitVersion } from '../init-version.js';
+import { LEADING_PARAGRAPH_MAX, bodyTextLength } from '../codekg/limits.js';
 
 export type CheckError = {
   file: string;
@@ -389,12 +390,7 @@ export async function checkIndex(latticeDir: string): Promise<IndexError[]> {
 // --- Section structure validation ---
 
 /** Max characters for the first paragraph of a section (excluding [[wiki links]]). */
-const MAX_BODY_LENGTH = 250;
-
-/** Count body text length excluding `[[...]]` wiki link markers and content. */
-function bodyTextLength(body: string): number {
-  return body.replace(/\[\[[^\]]*\]\]/g, '').length;
-}
+const MAX_BODY_LENGTH = LEADING_PARAGRAPH_MAX;
 
 export async function checkSections(latticeDir: string): Promise<CheckError[]> {
   const projectRoot = dirname(latticeDir);
