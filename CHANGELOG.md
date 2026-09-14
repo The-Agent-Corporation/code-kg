@@ -4,6 +4,23 @@
 
 ### Added
 
+- Reticle-style `code-kg work verify` with pass/fail/inconclusive verdicts; `work close` now requires a passing verification unless `--force` / `--allow-inconclusive`.
+- Ouroboros-style interview loop: `work interview`, `work answer`, `work assume`, `work accept`, `work seal` (auto-interview on create; acceptance stays separate from the build brief).
+- Caliper-shaped skill eval harness (`evals/skills/*.eval.yaml`, `pnpm test:skill-evals`) for structural packaging + ablation notes.
+- Plugin skills `anti-slop-code` (load-bearing code checks) and `ui-skills-route` (UI Skills MCP/CLI router).
+- MCP tools for verify/interview/answer/assume/accept/seal.
+
+### Added (earlier)
+
+- Worktree isolation (`code-kg work isolate` / `work start --worktree`), evidence pairs (`work evidence pair`), and agent skills for code-structure / evidence / before-and-after / unslop.
+- Agent work tracker (`code-kg work`) with ready/claim/close, dependency links,
+  discovered-from provenance, session `prime`, and knowledge-graph priming via
+  `work start` so agents search `lat.md` before broad source greps.
+- MCP tools `codekg_work_ready`, `codekg_work_start`, `codekg_work_prime`,
+  `codekg_work_create`, `codekg_work_claim`, `codekg_work_close`, and
+  `codekg_work_show`.
+- Managed AGENTS.md guidance and SessionStart context now include work-tracker
+  workflow hints.
 - Standalone `code-kg` CLI outside the source `lat.md-main` and Graphify repos.
 - Bootstrap and materialization for `lat.md/` plus `.code-kg/materialization-manifest.json`.
 - Deterministic source graph extraction with symbols, imports, test coverage links, and generated relationship sections.

@@ -49,6 +49,44 @@ code-kg check
 code-kg drift
 ```
 
+## Multi-step Work Tracking
+
+For longer agent sessions, use the Beads/GSD-style work tracker instead of
+markdown TODOs. Items live in `.code-kg/work/` and `work start` primes each task
+from the knowledge graph before coding. Prefer isolated worktrees and attach
+before/after evidence before closing.
+
+```bash
+code-kg work create "Harden drift apply-safe" --query "drift reconcile" --priority 1 --accept "drift apply-safe stays green"
+code-kg work ready
+code-kg work interview <id>
+code-kg work answer <id> --question q1 --answer "..."
+code-kg work seal <id>
+code-kg work start <id> --worktree   # claim + isolate + knowledge prime
+code-kg work evidence pair <id> --before before.png --after after.png
+code-kg work verify <id> --verdict pass --summary "runtime check ok" --method runtime
+code-kg work create "Follow-up" --discovered-from <id>
+code-kg work close <id> --reason "shipped"
+code-kg work cleanup <id>
+code-kg work prime                   # session orientation for the next agent turn
+```
+
+Project skills that reinforce this loop:
+
+- `code-structure` — actions vs shared services
+- `evidence` / `before-and-after` — proof before close
+- `unslop` — human-readable PR/commit prose
+- `anti-slop-code` — load-bearing code checks (complements unslop)
+- `ui-skills-route` — route UI work through the UI Skills registry
+
+`work close` requires a latest `work verify --verdict pass` (or `--allow-inconclusive` / `--force`).
+Structural skill packaging checks: `pnpm test:skill-evals`.
+
+SessionStart hooks include a compact ready/in-progress summary when work exists.
+MCP tools mirror the same flow: `codekg_work_ready`, `codekg_work_start`,
+`codekg_work_prime`, `codekg_work_verify`, `codekg_work_interview`,
+`codekg_work_seal`, and related create/claim/close/show tools.
+
 ## Hook Behavior
 
 `code-kg agents install` adds managed guidance to `AGENTS.md` and installs a

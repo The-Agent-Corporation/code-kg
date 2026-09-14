@@ -49,7 +49,8 @@
     "format": "prettier --write 'src/**/*.ts'",
     "format:check": "prettier --check 'src/**/*.ts'",
     "cook-test-rag": "tsx scripts/cook-test-rag.ts",
-    "test:package": "pnpm build && node scripts/verify-package.mjs"
+    "test:package": "pnpm build && node scripts/verify-package.mjs",
+    "test:skill-evals": "node scripts/run-skill-evals.mjs"
   },
   "devDependencies": {
     "@types/mdast": "^4.0.4",

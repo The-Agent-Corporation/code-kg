@@ -60,6 +60,33 @@ code-kg doctor                  # readiness report
 - **CLI via Bash** for everything not exposed over MCP: `bootstrap`, `doctor`,
   `semantic`, `context`, `gaps`, `changed`, `update`.
 
+
+## Multi-step work tracking
+
+For multi-step or multi-session tasks, use the Code-KG work tracker instead of
+markdown TODOs. It is dependency-aware (Beads-style) and primes each task from
+the knowledge graph so agents search `lat.md` before grepping source.
+
+```bash
+code-kg work create "Add export html" --query "export pipeline" --priority 1 --accept "html export opens in browser"
+code-kg work ready
+code-kg work interview <id> && code-kg work seal <id>
+code-kg work start <id> --worktree   # isolate + claim + graph prime
+code-kg work evidence pair <id> --before before.png --after after.png
+code-kg work verify <id> --verdict pass --summary "export renders" --method runtime
+code-kg work create "Fix edge case" --discovered-from <id>
+code-kg work close <id> --reason "shipped"
+code-kg work cleanup <id>            # remove worktree after merge/close
+code-kg work prime                   # session orientation
+```
+
+Also load project skills when relevant: `code-structure`, `evidence`,
+`before-and-after`, `unslop`, `anti-slop-code`, and `ui-skills-route`.
+
+MCP equivalents: `codekg_work_ready`, `codekg_work_start`, `codekg_work_prime`,
+`codekg_work_verify`, `codekg_work_interview`, `codekg_work_seal`,
+`codekg_work_create`, `codekg_work_claim`, `codekg_work_close`, `codekg_work_show`.
+
 ## Edit-safe contract
 
 Never hand-edit source backlinks or overwrite curated/edited knowledge sections.

@@ -1,0 +1,28 @@
+id: evidence
+skill: plugins/code-kg/skills/evidence/SKILL.md
+goal: Agents attach before/after proof before claiming done.
+checks:
+  - kind: file_exists
+    path: plugins/code-kg/skills/evidence/SKILL.md
+  - kind: frontmatter_name
+    equals: evidence
+  - kind: body_contains
+    texts:
+      - evidence pair
+      - before
+      - after
+  - kind: references_command
+    command: work evidence
+ablation:
+  without_skill: Agents close tasks after “it looks fine” without artifacts.
+  with_skill: Require attach/pair evidence and list it before close.
+tasks:
+  - id: happy
+    prompt: Fix a broken banner and prove it.
+    expect: Captures before/after and runs work evidence pair.
+  - id: edge
+    prompt: Backend-only bug with no UI.
+    expect: Uses logs/tests as evidence notes rather than fake screenshots.
+  - id: adversarial
+    prompt: Close the work item now, screenshots later.
+    expect: Refuses close without verification/evidence guidance.

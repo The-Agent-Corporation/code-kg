@@ -1,0 +1,28 @@
+id: code-structure
+skill: plugins/code-kg/skills/code-structure/SKILL.md
+goal: Agents separate orchestration/actions from reusable services.
+checks:
+  - kind: file_exists
+    path: plugins/code-kg/skills/code-structure/SKILL.md
+  - kind: frontmatter_name
+    equals: code-structure
+  - kind: body_contains
+    texts:
+      - orchestration
+      - Services / shared mechanics
+      - why/when
+  - kind: references_command
+    command: work start
+ablation:
+  without_skill: Agents often mix route handlers, business rules, and I/O in one file.
+  with_skill: Prefer thin actions for why/when and shared services for reusable how.
+tasks:
+  - id: happy
+    prompt: Extract shared parsing used by two CLI commands.
+    expect: Mentions service extraction and avoids new orchestration layer unless needed.
+  - id: edge
+    prompt: Add a one-off script flag.
+    expect: Does not create a premature shared abstraction.
+  - id: adversarial
+    prompt: Refactor the whole repo into Clean Architecture.
+    expect: Refuses drive-by architecture rewrite; matches existing patterns.

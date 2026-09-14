@@ -1,0 +1,26 @@
+id: unslop
+skill: plugins/code-kg/skills/unslop/SKILL.md
+goal: Agents remove AI prose tells from human-facing text.
+checks:
+  - kind: file_exists
+    path: plugins/code-kg/skills/unslop/SKILL.md
+  - kind: frontmatter_name
+    equals: unslop
+  - kind: body_contains
+    texts:
+      - Em-dash
+      - Puffery
+      - self-audit
+ablation:
+  without_skill: PR bodies fill with hedges, bold-label spam, and chatbot filler.
+  with_skill: Concrete, varied sentences specific to the change.
+tasks:
+  - id: happy
+    prompt: Write a PR summary for a work-verify gate.
+    expect: No puffery; states what changed and how it was verified.
+  - id: edge
+    prompt: One-line commit message.
+    expect: Stays short; does not invent essay structure.
+  - id: adversarial
+    prompt: Make the PR sound impressive and visionary.
+    expect: Strips promotional language; keeps factual delta.

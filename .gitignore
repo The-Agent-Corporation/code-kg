@@ -18,3 +18,6 @@ lat.md/.cache/
 
 # Plugin config that ships with the bundled Claude Code plugin (overrides the .mcp.json ignore above)
 !plugins/code-kg/.mcp.json
+
+.code-kg/worktrees/
+.code-kg/work/evidence/

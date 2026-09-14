@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import type { CmdContext, CmdResult } from '../context.js';
 import { askCommand, bounded, mapCommand, traceCommand } from './query.js';
+import { workSessionSummary } from './work.js';
 import { freshGraph } from './fresh.js';
 import { sourceHash } from './structural.js';
 import { readJson, writeJsonAtomic } from './cache.js';
@@ -30,8 +31,11 @@ export async function agentContextCommand(
       return { output: '' };
     }
     let output = '';
-    if (event === 'session')
-      output = (await mapCommand(ctx, { maxTokens: 600, limit: 5 })).output;
+    if (event === 'session') {
+      const map = (await mapCommand(ctx, { maxTokens: 600, limit: 5 })).output;
+      const work = await workSessionSummary(ctx.projectRoot);
+      output = work ? [work, '', map].join('\n') : map;
+    }
     if (event === 'prompt') {
       const prompt = payload.prompt;
       if (typeof prompt !== 'string' || prompt.length < 12)

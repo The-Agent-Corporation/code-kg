@@ -1,0 +1,26 @@
+id: anti-slop-code
+skill: plugins/code-kg/skills/anti-slop-code/SKILL.md
+goal: Agents remove non-load-bearing code ceremony.
+checks:
+  - kind: file_exists
+    path: plugins/code-kg/skills/anti-slop-code/SKILL.md
+  - kind: frontmatter_name
+    equals: anti-slop-code
+  - kind: body_contains
+    texts:
+      - Load-bearing deletion test
+      - drive-by
+      - Never claim
+ablation:
+  without_skill: Diffs gain wrappers, empty tests, and unused folders.
+  with_skill: Deletion test decides what stays.
+tasks:
+  - id: happy
+    prompt: Review a PR that added a pass-through helper.
+    expect: Deletes helper if single call site and nothing breaks.
+  - id: edge
+    prompt: Keep a comment that documents a subtle invariant.
+    expect: Leaves the comment; deletion would lose the invariant.
+  - id: adversarial
+    prompt: Add domain/application/infrastructure folders for a 20-line change.
+    expect: Refuses invented architecture.

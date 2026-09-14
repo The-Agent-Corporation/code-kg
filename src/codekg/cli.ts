@@ -537,6 +537,585 @@ program
     );
   });
 
+
+const work = program
+  .command('work')
+  .description(
+    'Agent work tracker (Beads/GSD-style) primed by the Code-KG knowledge graph',
+  );
+
+work
+  .command('init')
+  .description('Initialize .code-kg/work storage')
+  .action(async () => {
+    const { workInitCommand } = await import('./work.js');
+    handleResult(await workInitCommand(rootOnlyContext()));
+  });
+
+work
+  .command('create')
+  .description('Create a work item')
+  .argument('<title>', 'work title')
+  .option('-d, --description <text>', 'longer description')
+  .option('-t, --type <type>', 'task, bug, feature, epic, or chore', 'task')
+  .option('-p, --priority <n>', 'priority 0 (highest) to 4', (v) => Number(v))
+  .option('--parent <id>', 'parent work id')
+  .option('--dep <id>', 'blocking dependency id', (v, acc: string[]) => [...acc, v], [])
+  .option('--discovered-from <id>', 'provenance parent work id')
+  .option('--query <text>', 'knowledge query to run on start', (v, acc: string[]) => [...acc, v], [])
+  .option('--section <id>', 'linked knowledge section id', (v, acc: string[]) => [...acc, v], [])
+  .option('--source <path>', 'linked source path', (v, acc: string[]) => [...acc, v], [])
+  .option('--assumption <text>', 'recorded assumption', (v, acc: string[]) => [...acc, v], [])
+  .option('--accept <text>', 'acceptance criterion', (v, acc: string[]) => [...acc, v], [])
+  .option('--no-interview', 'skip auto interview questions on create')
+  .option('--json', 'emit JSON')
+  .action(
+    async (
+      title: string,
+      opts: {
+        description?: string;
+        type?: string;
+        priority?: number;
+        parent?: string;
+        dep?: string[];
+        discoveredFrom?: string;
+        query?: string[];
+        section?: string[];
+        source?: string[];
+        assumption?: string[];
+        accept?: string[];
+        interview?: boolean;
+        json?: boolean;
+      },
+    ) => {
+      const { workCreateCommand } = await import('./work.js');
+      handleResult(
+        await workCreateCommand(rootOnlyContext(), {
+          title,
+          description: opts.description,
+          type: opts.type,
+          priority: opts.priority,
+          parent: opts.parent,
+          deps: opts.dep,
+          discoveredFrom: opts.discoveredFrom,
+          queries: opts.query,
+          sectionIds: opts.section,
+          sourcePaths: opts.source,
+          assumptions: opts.assumption,
+          acceptance: opts.accept,
+          interview: opts.interview,
+          json: opts.json,
+        }),
+      );
+    },
+  );
+
+work
+  .command('list')
+  .description('List work items')
+  .option('--status <status>', 'open, in_progress, blocked, closed, or all', 'all')
+  .option('--json', 'emit JSON')
+  .action(async (opts: { status?: string; json?: boolean }) => {
+    const { workListCommand } = await import('./work.js');
+    handleResult(await workListCommand(rootOnlyContext(), opts));
+  });
+
+work
+  .command('ready')
+  .description('List unblocked open work')
+  .option('--json', 'emit JSON')
+  .action(async (opts: { json?: boolean }) => {
+    const { workReadyCommand } = await import('./work.js');
+    handleResult(await workReadyCommand(rootOnlyContext(), opts));
+  });
+
+work
+  .command('show')
+  .description('Show one work item')
+  .argument('<id>', 'work id')
+  .option('--json', 'emit JSON')
+  .action(async (id: string, opts: { json?: boolean }) => {
+    const { workShowCommand } = await import('./work.js');
+    handleResult(await workShowCommand(rootOnlyContext(), { id, json: opts.json }));
+  });
+
+work
+  .command('claim')
+  .description('Claim a ready work item')
+  .argument('<id>', 'work id')
+  .option('--assignee <name>', 'assignee label')
+  .option('--json', 'emit JSON')
+  .action(async (id: string, opts: { assignee?: string; json?: boolean }) => {
+    const { workClaimCommand } = await import('./work.js');
+    handleResult(
+      await workClaimCommand(rootOnlyContext(), {
+        id,
+        assignee: opts.assignee,
+        json: opts.json,
+      }),
+    );
+  });
+
+work
+  .command('update')
+  .description('Update a work item')
+  .argument('<id>', 'work id')
+  .option('--title <text>', 'new title')
+  .option('-d, --description <text>', 'new description')
+  .option('-t, --type <type>', 'task, bug, feature, epic, or chore')
+  .option('-p, --priority <n>', 'priority 0-4', (v) => Number(v))
+  .option('--status <status>', 'open, in_progress, blocked, or closed')
+  .option('--assignee <name>', 'assignee label')
+  .option('--query <text>', 'add a knowledge query', (v, acc: string[]) => [...acc, v], [])
+  .option('--section <id>', 'add a section id', (v, acc: string[]) => [...acc, v], [])
+  .option('--source <path>', 'add a source path', (v, acc: string[]) => [...acc, v], [])
+  .option('--json', 'emit JSON')
+  .action(
+    async (
+      id: string,
+      opts: {
+        title?: string;
+        description?: string;
+        type?: string;
+        priority?: number;
+        status?: string;
+        assignee?: string;
+        query?: string[];
+        section?: string[];
+        source?: string[];
+        json?: boolean;
+      },
+    ) => {
+      const { workUpdateCommand } = await import('./work.js');
+      handleResult(
+        await workUpdateCommand(rootOnlyContext(), {
+          id,
+          title: opts.title,
+          description: opts.description,
+          type: opts.type,
+          priority: opts.priority,
+          status: opts.status,
+          assignee: opts.assignee,
+          addQuery: opts.query,
+          addSection: opts.section,
+          addSource: opts.source,
+          json: opts.json,
+        }),
+      );
+    },
+  );
+
+work
+  .command('close')
+  .description('Close a work item (requires pass verification unless --force)')
+  .argument('<id>', 'work id')
+  .option('-r, --reason <text>', 'close reason')
+  .option('--force', 'bypass verification gate')
+  .option(
+    '--allow-inconclusive',
+    'allow close when latest verification is inconclusive',
+  )
+  .option('--json', 'emit JSON')
+  .action(
+    async (
+      id: string,
+      opts: {
+        reason?: string;
+        force?: boolean;
+        allowInconclusive?: boolean;
+        json?: boolean;
+      },
+    ) => {
+      const { workCloseCommand } = await import('./work.js');
+      handleResult(
+        await workCloseCommand(rootOnlyContext(), {
+          id,
+          reason: opts.reason,
+          force: opts.force,
+          allowInconclusive: opts.allowInconclusive,
+          json: opts.json,
+        }),
+      );
+    },
+  );
+
+work
+  .command('verify')
+  .description(
+    'Record a Reticle-style runtime/check verdict before closing work',
+  )
+  .argument('<id>', 'work id')
+  .requiredOption(
+    '--verdict <verdict>',
+    'pass, fail, or inconclusive',
+  )
+  .requiredOption('--summary <text>', 'what was checked and what happened')
+  .option('--method <text>', 'runtime, test, manual, reticle, ...', 'manual')
+  .option(
+    '--check <name:verdict>',
+    'named check result (repeatable)',
+    (v, acc: string[]) => [...acc, v],
+    [],
+  )
+  .option(
+    '--evidence-id <id>',
+    'link existing evidence id (repeatable)',
+    (v, acc: string[]) => [...acc, v],
+    [],
+  )
+  .option('--json', 'emit JSON')
+  .action(
+    async (
+      id: string,
+      opts: {
+        verdict: string;
+        summary: string;
+        method?: string;
+        check?: string[];
+        evidenceId?: string[];
+        json?: boolean;
+      },
+    ) => {
+      const { workVerifyCommand } = await import('./work.js');
+      handleResult(
+        await workVerifyCommand(rootOnlyContext(), {
+          id,
+          verdict: opts.verdict,
+          summary: opts.summary,
+          method: opts.method,
+          check: opts.check,
+          evidenceId: opts.evidenceId,
+          json: opts.json,
+        }),
+      );
+    },
+  );
+
+work
+  .command('interview')
+  .description('Generate or show Ouroboros-style clarifying questions')
+  .argument('<id>', 'work id')
+  .option('--refresh', 'regenerate questions (keeps matching prior answers)')
+  .option('--json', 'emit JSON')
+  .action(
+    async (id: string, opts: { refresh?: boolean; json?: boolean }) => {
+      const { workInterviewCommand } = await import('./work.js');
+      handleResult(
+        await workInterviewCommand(rootOnlyContext(), {
+          id,
+          refresh: opts.refresh,
+          json: opts.json,
+        }),
+      );
+    },
+  );
+
+work
+  .command('answer')
+  .description('Answer an interview question on a work item')
+  .argument('<id>', 'work id')
+  .requiredOption('--question <id-or-text>', 'question id (q1) or prompt snippet')
+  .requiredOption('--answer <text>', 'answer text')
+  .option('--json', 'emit JSON')
+  .action(
+    async (
+      id: string,
+      opts: { question: string; answer: string; json?: boolean },
+    ) => {
+      const { workAnswerCommand } = await import('./work.js');
+      handleResult(
+        await workAnswerCommand(rootOnlyContext(), {
+          id,
+          question: opts.question,
+          answer: opts.answer,
+          json: opts.json,
+        }),
+      );
+    },
+  );
+
+work
+  .command('assume')
+  .description('Record an assumption on a work item')
+  .argument('<id>', 'work id')
+  .requiredOption('--text <text>', 'assumption text')
+  .option('--json', 'emit JSON')
+  .action(async (id: string, opts: { text: string; json?: boolean }) => {
+    const { workAssumeCommand } = await import('./work.js');
+    handleResult(
+      await workAssumeCommand(rootOnlyContext(), {
+        id,
+        text: opts.text,
+        json: opts.json,
+      }),
+    );
+  });
+
+work
+  .command('accept')
+  .description('Add an acceptance criterion (kept out of the build brief)')
+  .argument('<id>', 'work id')
+  .requiredOption('--criterion <text>', 'acceptance criterion')
+  .option('--json', 'emit JSON')
+  .action(async (id: string, opts: { criterion: string; json?: boolean }) => {
+    const { workAcceptCommand } = await import('./work.js');
+    handleResult(
+      await workAcceptCommand(rootOnlyContext(), {
+        id,
+        criterion: opts.criterion,
+        json: opts.json,
+      }),
+    );
+  });
+
+work
+  .command('seal')
+  .description('Seal the interview once questions/acceptance are ready')
+  .argument('<id>', 'work id')
+  .option('--force', 'seal even if questions/acceptance are incomplete')
+  .option('--json', 'emit JSON')
+  .action(async (id: string, opts: { force?: boolean; json?: boolean }) => {
+    const { workSealCommand } = await import('./work.js');
+    handleResult(
+      await workSealCommand(rootOnlyContext(), {
+        id,
+        force: opts.force,
+        json: opts.json,
+      }),
+    );
+  });
+
+work
+  .command('dep')
+  .description('Add a dependency link between work items')
+  .argument('<id>', 'work id')
+  .option('--blocks <id>', 'this item is blocked by <id>')
+  .option('--discovered-from <id>', 'this item was discovered from <id>')
+  .option('--related <id>', 'related work id')
+  .option('--parent-of <id>', 'this item is parent of <id>')
+  .option('--json', 'emit JSON')
+  .action(
+    async (
+      id: string,
+      opts: {
+        blocks?: string;
+        discoveredFrom?: string;
+        related?: string;
+        parentOf?: string;
+        json?: boolean;
+      },
+    ) => {
+      const { workDepCommand } = await import('./work.js');
+      handleResult(
+        await workDepCommand(rootOnlyContext(), {
+          id,
+          blocks: opts.blocks,
+          discoveredFrom: opts.discoveredFrom,
+          related: opts.related,
+          parentOf: opts.parentOf,
+          json: opts.json,
+        }),
+      );
+    },
+  );
+
+work
+  .command('start')
+  .description('Claim a work item and prime it from the knowledge graph')
+  .argument('<id>', 'work id')
+  .option('--assignee <name>', 'assignee label')
+  .option('--worktree', 'create an isolated git worktree before priming')
+  .option('--force-scope', 'ignore open-PR overlap warnings when using --worktree')
+  .option('--max-tokens <n>', 'knowledge context budget', (v) => Number(v))
+  .option('--json', 'emit JSON')
+  .action(
+    async (
+      id: string,
+      opts: {
+        assignee?: string;
+        worktree?: boolean;
+        forceScope?: boolean;
+        maxTokens?: number;
+        json?: boolean;
+      },
+    ) => {
+      const { workStartCommand } = await import('./work.js');
+      handleResult(
+        await workStartCommand(rootOnlyContext(), {
+          id,
+          assignee: opts.assignee,
+          worktree: opts.worktree,
+          forceScope: opts.forceScope,
+          maxTokens: opts.maxTokens,
+          json: opts.json,
+        }),
+      );
+    },
+  );
+
+work
+  .command('isolate')
+  .description('Create an isolated git worktree for a work item')
+  .argument('<id>', 'work id')
+  .option('--force-scope', 'ignore open-PR overlap warnings')
+  .option('--json', 'emit JSON')
+  .action(
+    async (id: string, opts: { forceScope?: boolean; json?: boolean }) => {
+      const { workIsolateCommand } = await import('./work.js');
+      handleResult(
+        await workIsolateCommand(rootOnlyContext(), {
+          id,
+          forceScope: opts.forceScope,
+          json: opts.json,
+        }),
+      );
+    },
+  );
+
+work
+  .command('cleanup')
+  .description('Remove the isolated worktree/branch for a work item')
+  .argument('<id>', 'work id')
+  .option('--force', 'force-remove a dirty worktree')
+  .option('--json', 'emit JSON')
+  .action(async (id: string, opts: { force?: boolean; json?: boolean }) => {
+    const { workCleanupCommand } = await import('./work.js');
+    handleResult(
+      await workCleanupCommand(rootOnlyContext(), {
+        id,
+        force: opts.force,
+        json: opts.json,
+      }),
+    );
+  });
+
+const workEvidence = work
+  .command('evidence')
+  .description('Attach before/after proof and other evidence to a work item');
+
+workEvidence
+  .command('attach')
+  .description('Copy a file into work evidence storage and link it')
+  .argument('<id>', 'work id')
+  .requiredOption(
+    '--kind <kind>',
+    'before, after, pair, recording, or note',
+  )
+  .requiredOption('--path <path>', 'evidence file path')
+  .option('--label <text>', 'short label')
+  .option('--paired-with <evidence-id>', 'related evidence id')
+  .option('--notes <text>', 'optional notes')
+  .option('--json', 'emit JSON')
+  .action(
+    async (
+      id: string,
+      opts: {
+        kind: string;
+        path: string;
+        label?: string;
+        pairedWith?: string;
+        notes?: string;
+        json?: boolean;
+      },
+    ) => {
+      const { workEvidenceAttachCommand } = await import('./work.js');
+      handleResult(
+        await workEvidenceAttachCommand(rootOnlyContext(), {
+          id,
+          kind: opts.kind as
+            | 'before'
+            | 'after'
+            | 'pair'
+            | 'recording'
+            | 'note',
+          path: opts.path,
+          label: opts.label,
+          pairedWith: opts.pairedWith,
+          notes: opts.notes,
+          json: opts.json,
+        }),
+      );
+    },
+  );
+
+workEvidence
+  .command('pair')
+  .description('Attach a before/after evidence pair to a work item')
+  .argument('<id>', 'work id')
+  .requiredOption('--before <path>', 'before snapshot path')
+  .requiredOption('--after <path>', 'after snapshot path')
+  .option('--label <text>', 'pair label')
+  .option('--notes <text>', 'optional notes')
+  .option('--json', 'emit JSON')
+  .action(
+    async (
+      id: string,
+      opts: {
+        before: string;
+        after: string;
+        label?: string;
+        notes?: string;
+        json?: boolean;
+      },
+    ) => {
+      const { workEvidencePairCommand } = await import('./work.js');
+      handleResult(
+        await workEvidencePairCommand(rootOnlyContext(), {
+          id,
+          before: opts.before,
+          after: opts.after,
+          label: opts.label,
+          notes: opts.notes,
+          json: opts.json,
+        }),
+      );
+    },
+  );
+
+workEvidence
+  .command('list')
+  .description('List evidence attached to a work item')
+  .argument('<id>', 'work id')
+  .option('--json', 'emit JSON')
+  .action(async (id: string, opts: { json?: boolean }) => {
+    const { workEvidenceListCommand } = await import('./work.js');
+    handleResult(
+      await workEvidenceListCommand(rootOnlyContext(), { id, json: opts.json }),
+    );
+  });
+
+work
+  .command('prime')
+  .description('Print ready/in-progress work plus knowledge context for agents')
+  .option('--max-tokens <n>', 'knowledge context budget', (v) => Number(v))
+  .option('--json', 'emit JSON')
+  .action(async (opts: { maxTokens?: number; json?: boolean }) => {
+    const { workPrimeCommand } = await import('./work.js');
+    handleResult(await workPrimeCommand(rootOnlyContext(), opts));
+  });
+
+work
+  .command('remember')
+  .description('Store a durable project memory for future prime output')
+  .argument('<text>', 'memory text')
+  .option('--json', 'emit JSON')
+  .action(async (text: string, opts: { json?: boolean }) => {
+    const { workRememberCommand } = await import('./work.js');
+    handleResult(
+      await workRememberCommand(rootOnlyContext(), { text, json: opts.json }),
+    );
+  });
+
+work
+  .command('memories')
+  .description('List stored project memories')
+  .option('--json', 'emit JSON')
+  .action(async (opts: { json?: boolean }) => {
+    const { workMemoriesCommand } = await import('./work.js');
+    handleResult(await workMemoriesCommand(rootOnlyContext(), opts));
+  });
+
+
 const agents = program
   .command('agents')
   .description('Install or remove Code-KG guidance for coding agents');
