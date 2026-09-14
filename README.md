@@ -146,8 +146,10 @@ After that, use `code-kg ask "<question>"` before
 broad source searches, `code-kg context <file-or-symbol>` before opening raw
 source files, and `code-kg changed` / `code-kg update` around code changes.
 For multi-step agent work, use `code-kg work` (Beads/GSD-style tracking primed
-by the knowledge graph) instead of markdown TODOs: `work ready`, `work start <id>`,
-`work close <id>`. See [docs/USAGE.md](docs/USAGE.md) for the tested happy path
+by the knowledge graph) instead of markdown TODOs: `work ready`, `work start <id> --worktree`,
+`work evidence pair`, `work close <id>`. Load the `code-structure`, `evidence`,
+`before-and-after`, and `unslop` skills for the rest of the delivery loop. See
+[docs/USAGE.md](docs/USAGE.md) for the tested happy path
 and common checks.
 
 ## Use as a Claude Code Plugin
