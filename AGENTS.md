@@ -3,8 +3,6 @@
 
 This project may have a reviewable knowledge base in `lat.md/` and Code-KG metadata in `.code-kg/`.
 
-Local CLI fallback: if `code-kg` is not on PATH, run `'/exec-daemon/node' '/workspace/dist/src/codekg/cli.js' <command>`.
-
 Rules:
 - Before broad source reads, grep/glob searches, or answering codebase-structure questions, use `code-kg search "<question>"` or MCP `codekg_search` first.
 - Prefer `code-kg ask "<question>"` or MCP `codekg_ask` for combined knowledge and fresh source context. Use `--in <directory>` to scope a monorepo query.
