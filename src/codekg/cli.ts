@@ -537,6 +537,272 @@ program
     );
   });
 
+
+const work = program
+  .command('work')
+  .description(
+    'Agent work tracker (Beads/GSD-style) primed by the Code-KG knowledge graph',
+  );
+
+work
+  .command('init')
+  .description('Initialize .code-kg/work storage')
+  .action(async () => {
+    const { workInitCommand } = await import('./work.js');
+    handleResult(await workInitCommand(rootOnlyContext()));
+  });
+
+work
+  .command('create')
+  .description('Create a work item')
+  .argument('<title>', 'work title')
+  .option('-d, --description <text>', 'longer description')
+  .option('-t, --type <type>', 'task, bug, feature, epic, or chore', 'task')
+  .option('-p, --priority <n>', 'priority 0 (highest) to 4', (v) => Number(v))
+  .option('--parent <id>', 'parent work id')
+  .option('--dep <id>', 'blocking dependency id', (v, acc: string[]) => [...acc, v], [])
+  .option('--discovered-from <id>', 'provenance parent work id')
+  .option('--query <text>', 'knowledge query to run on start', (v, acc: string[]) => [...acc, v], [])
+  .option('--section <id>', 'linked knowledge section id', (v, acc: string[]) => [...acc, v], [])
+  .option('--source <path>', 'linked source path', (v, acc: string[]) => [...acc, v], [])
+  .option('--json', 'emit JSON')
+  .action(
+    async (
+      title: string,
+      opts: {
+        description?: string;
+        type?: string;
+        priority?: number;
+        parent?: string;
+        dep?: string[];
+        discoveredFrom?: string;
+        query?: string[];
+        section?: string[];
+        source?: string[];
+        json?: boolean;
+      },
+    ) => {
+      const { workCreateCommand } = await import('./work.js');
+      handleResult(
+        await workCreateCommand(rootOnlyContext(), {
+          title,
+          description: opts.description,
+          type: opts.type,
+          priority: opts.priority,
+          parent: opts.parent,
+          deps: opts.dep,
+          discoveredFrom: opts.discoveredFrom,
+          queries: opts.query,
+          sectionIds: opts.section,
+          sourcePaths: opts.source,
+          json: opts.json,
+        }),
+      );
+    },
+  );
+
+work
+  .command('list')
+  .description('List work items')
+  .option('--status <status>', 'open, in_progress, blocked, closed, or all', 'all')
+  .option('--json', 'emit JSON')
+  .action(async (opts: { status?: string; json?: boolean }) => {
+    const { workListCommand } = await import('./work.js');
+    handleResult(await workListCommand(rootOnlyContext(), opts));
+  });
+
+work
+  .command('ready')
+  .description('List unblocked open work')
+  .option('--json', 'emit JSON')
+  .action(async (opts: { json?: boolean }) => {
+    const { workReadyCommand } = await import('./work.js');
+    handleResult(await workReadyCommand(rootOnlyContext(), opts));
+  });
+
+work
+  .command('show')
+  .description('Show one work item')
+  .argument('<id>', 'work id')
+  .option('--json', 'emit JSON')
+  .action(async (id: string, opts: { json?: boolean }) => {
+    const { workShowCommand } = await import('./work.js');
+    handleResult(await workShowCommand(rootOnlyContext(), { id, json: opts.json }));
+  });
+
+work
+  .command('claim')
+  .description('Claim a ready work item')
+  .argument('<id>', 'work id')
+  .option('--assignee <name>', 'assignee label')
+  .option('--json', 'emit JSON')
+  .action(async (id: string, opts: { assignee?: string; json?: boolean }) => {
+    const { workClaimCommand } = await import('./work.js');
+    handleResult(
+      await workClaimCommand(rootOnlyContext(), {
+        id,
+        assignee: opts.assignee,
+        json: opts.json,
+      }),
+    );
+  });
+
+work
+  .command('update')
+  .description('Update a work item')
+  .argument('<id>', 'work id')
+  .option('--title <text>', 'new title')
+  .option('-d, --description <text>', 'new description')
+  .option('-t, --type <type>', 'task, bug, feature, epic, or chore')
+  .option('-p, --priority <n>', 'priority 0-4', (v) => Number(v))
+  .option('--status <status>', 'open, in_progress, blocked, or closed')
+  .option('--assignee <name>', 'assignee label')
+  .option('--query <text>', 'add a knowledge query', (v, acc: string[]) => [...acc, v], [])
+  .option('--section <id>', 'add a section id', (v, acc: string[]) => [...acc, v], [])
+  .option('--source <path>', 'add a source path', (v, acc: string[]) => [...acc, v], [])
+  .option('--json', 'emit JSON')
+  .action(
+    async (
+      id: string,
+      opts: {
+        title?: string;
+        description?: string;
+        type?: string;
+        priority?: number;
+        status?: string;
+        assignee?: string;
+        query?: string[];
+        section?: string[];
+        source?: string[];
+        json?: boolean;
+      },
+    ) => {
+      const { workUpdateCommand } = await import('./work.js');
+      handleResult(
+        await workUpdateCommand(rootOnlyContext(), {
+          id,
+          title: opts.title,
+          description: opts.description,
+          type: opts.type,
+          priority: opts.priority,
+          status: opts.status,
+          assignee: opts.assignee,
+          addQuery: opts.query,
+          addSection: opts.section,
+          addSource: opts.source,
+          json: opts.json,
+        }),
+      );
+    },
+  );
+
+work
+  .command('close')
+  .description('Close a work item')
+  .argument('<id>', 'work id')
+  .option('-r, --reason <text>', 'close reason')
+  .option('--json', 'emit JSON')
+  .action(async (id: string, opts: { reason?: string; json?: boolean }) => {
+    const { workCloseCommand } = await import('./work.js');
+    handleResult(
+      await workCloseCommand(rootOnlyContext(), {
+        id,
+        reason: opts.reason,
+        json: opts.json,
+      }),
+    );
+  });
+
+work
+  .command('dep')
+  .description('Add a dependency link between work items')
+  .argument('<id>', 'work id')
+  .option('--blocks <id>', 'this item is blocked by <id>')
+  .option('--discovered-from <id>', 'this item was discovered from <id>')
+  .option('--related <id>', 'related work id')
+  .option('--parent-of <id>', 'this item is parent of <id>')
+  .option('--json', 'emit JSON')
+  .action(
+    async (
+      id: string,
+      opts: {
+        blocks?: string;
+        discoveredFrom?: string;
+        related?: string;
+        parentOf?: string;
+        json?: boolean;
+      },
+    ) => {
+      const { workDepCommand } = await import('./work.js');
+      handleResult(
+        await workDepCommand(rootOnlyContext(), {
+          id,
+          blocks: opts.blocks,
+          discoveredFrom: opts.discoveredFrom,
+          related: opts.related,
+          parentOf: opts.parentOf,
+          json: opts.json,
+        }),
+      );
+    },
+  );
+
+work
+  .command('start')
+  .description('Claim a work item and prime it from the knowledge graph')
+  .argument('<id>', 'work id')
+  .option('--assignee <name>', 'assignee label')
+  .option('--max-tokens <n>', 'knowledge context budget', (v) => Number(v))
+  .option('--json', 'emit JSON')
+  .action(
+    async (
+      id: string,
+      opts: { assignee?: string; maxTokens?: number; json?: boolean },
+    ) => {
+      const { workStartCommand } = await import('./work.js');
+      handleResult(
+        await workStartCommand(rootOnlyContext(), {
+          id,
+          assignee: opts.assignee,
+          maxTokens: opts.maxTokens,
+          json: opts.json,
+        }),
+      );
+    },
+  );
+
+work
+  .command('prime')
+  .description('Print ready/in-progress work plus knowledge context for agents')
+  .option('--max-tokens <n>', 'knowledge context budget', (v) => Number(v))
+  .option('--json', 'emit JSON')
+  .action(async (opts: { maxTokens?: number; json?: boolean }) => {
+    const { workPrimeCommand } = await import('./work.js');
+    handleResult(await workPrimeCommand(rootOnlyContext(), opts));
+  });
+
+work
+  .command('remember')
+  .description('Store a durable project memory for future prime output')
+  .argument('<text>', 'memory text')
+  .option('--json', 'emit JSON')
+  .action(async (text: string, opts: { json?: boolean }) => {
+    const { workRememberCommand } = await import('./work.js');
+    handleResult(
+      await workRememberCommand(rootOnlyContext(), { text, json: opts.json }),
+    );
+  });
+
+work
+  .command('memories')
+  .description('List stored project memories')
+  .option('--json', 'emit JSON')
+  .action(async (opts: { json?: boolean }) => {
+    const { workMemoriesCommand } = await import('./work.js');
+    handleResult(await workMemoriesCommand(rootOnlyContext(), opts));
+  });
+
+
 const agents = program
   .command('agents')
   .description('Install or remove Code-KG guidance for coding agents');

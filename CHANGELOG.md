@@ -4,6 +4,14 @@
 
 ### Added
 
+- Agent work tracker (`code-kg work`) with ready/claim/close, dependency links,
+  discovered-from provenance, session `prime`, and knowledge-graph priming via
+  `work start` so agents search `lat.md` before broad source greps.
+- MCP tools `codekg_work_ready`, `codekg_work_start`, `codekg_work_prime`,
+  `codekg_work_create`, `codekg_work_claim`, `codekg_work_close`, and
+  `codekg_work_show`.
+- Managed AGENTS.md guidance and SessionStart context now include work-tracker
+  workflow hints.
 - Standalone `code-kg` CLI outside the source `lat.md-main` and Graphify repos.
 - Bootstrap and materialization for `lat.md/` plus `.code-kg/materialization-manifest.json`.
 - Deterministic source graph extraction with symbols, imports, test coverage links, and generated relationship sections.

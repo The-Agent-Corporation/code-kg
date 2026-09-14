@@ -5,7 +5,8 @@
 # generated sections, rebuilds the semantic index, validates, and stages the
 # tracked KB files so the knowledge update rides the SAME commit as the code.
 #
-# Bypass for a single commit with:  git commit --no-verify
+# Installed by `code-kg git-hooks install`. Re-running install updates it in
+# place. Bypass for a single commit with:  git commit --no-verify
 
 # Nothing to do if the code-kg CLI isn't on PATH.
 if ! command -v code-kg >/dev/null 2>&1; then

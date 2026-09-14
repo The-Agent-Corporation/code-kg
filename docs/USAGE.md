@@ -49,6 +49,25 @@ code-kg check
 code-kg drift
 ```
 
+## Multi-step Work Tracking
+
+For longer agent sessions, use the Beads/GSD-style work tracker instead of
+markdown TODOs. Items live in `.code-kg/work/` and `work start` primes each task
+from the knowledge graph before coding.
+
+```bash
+code-kg work create "Harden drift apply-safe" --query "drift reconcile" --priority 1
+code-kg work ready
+code-kg work start <id>          # claim + knowledge-graph orientation
+code-kg work create "Follow-up" --discovered-from <id>
+code-kg work close <id> --reason "shipped"
+code-kg work prime               # session orientation for the next agent turn
+```
+
+SessionStart hooks include a compact ready/in-progress summary when work exists.
+MCP tools mirror the same flow: `codekg_work_ready`, `codekg_work_start`,
+`codekg_work_prime`, and related create/claim/close/show tools.
+
 ## Hook Behavior
 
 `code-kg agents install` adds managed guidance to `AGENTS.md` and installs a

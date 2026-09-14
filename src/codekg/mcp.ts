@@ -25,6 +25,15 @@ import {
 import { contextCommand } from './context.js';
 import { changedCommand } from './changed.js';
 import { gapsCommand } from './gaps.js';
+import {
+  workClaimCommand,
+  workCloseCommand,
+  workCreateCommand,
+  workPrimeCommand,
+  workReadyCommand,
+  workShowCommand,
+  workStartCommand,
+} from './work.js';
 import { workspaceAskCommand, workspacePath } from './workspace.js';
 
 type BudgetOptions = {
@@ -334,6 +343,109 @@ export function createCodeKgMcpServer(ctx: CmdContext): McpServer {
     {},
     async () => toMcp(await changedCommand(ctx)),
   );
+
+  server.tool(
+    'codekg_work_ready',
+    'List unblocked open agent work items',
+    {
+      json: z.boolean().optional(),
+    },
+    async ({ json }) => toMcp(await workReadyCommand(ctx, { json })),
+  );
+  server.tool(
+    'codekg_work_show',
+    'Show one agent work item',
+    {
+      id: z.string(),
+      json: z.boolean().optional(),
+    },
+    async ({ id, json }) => toMcp(await workShowCommand(ctx, { id, json })),
+  );
+  server.tool(
+    'codekg_work_create',
+    'Create an agent work item (use instead of markdown TODOs)',
+    {
+      title: z.string(),
+      description: z.string().optional(),
+      type: z.string().optional(),
+      priority: z.number().optional(),
+      parent: z.string().optional(),
+      deps: z.array(z.string()).optional(),
+      discovered_from: z.string().optional(),
+      queries: z.array(z.string()).optional(),
+      section_ids: z.array(z.string()).optional(),
+      source_paths: z.array(z.string()).optional(),
+      json: z.boolean().optional(),
+    },
+    async (args) =>
+      toMcp(
+        await workCreateCommand(ctx, {
+          title: args.title,
+          description: args.description,
+          type: args.type,
+          priority: args.priority,
+          parent: args.parent,
+          deps: args.deps,
+          discoveredFrom: args.discovered_from,
+          queries: args.queries,
+          sectionIds: args.section_ids,
+          sourcePaths: args.source_paths,
+          json: args.json,
+        }),
+      ),
+  );
+  server.tool(
+    'codekg_work_claim',
+    'Claim a ready work item',
+    {
+      id: z.string(),
+      assignee: z.string().optional(),
+      json: z.boolean().optional(),
+    },
+    async ({ id, assignee, json }) =>
+      toMcp(await workClaimCommand(ctx, { id, assignee, json })),
+  );
+  server.tool(
+    'codekg_work_start',
+    'Claim a work item and prime it from the Code-KG knowledge graph before coding',
+    {
+      id: z.string(),
+      assignee: z.string().optional(),
+      max_tokens: z.number().optional(),
+      json: z.boolean().optional(),
+    },
+    async ({ id, assignee, max_tokens, json }) =>
+      toMcp(
+        await workStartCommand(ctx, {
+          id,
+          assignee,
+          maxTokens: max_tokens,
+          json,
+        }),
+      ),
+  );
+  server.tool(
+    'codekg_work_close',
+    'Close a finished work item',
+    {
+      id: z.string(),
+      reason: z.string().optional(),
+      json: z.boolean().optional(),
+    },
+    async ({ id, reason, json }) =>
+      toMcp(await workCloseCommand(ctx, { id, reason, json })),
+  );
+  server.tool(
+    'codekg_work_prime',
+    'Session orientation: ready/in-progress work plus knowledge-graph context',
+    {
+      max_tokens: z.number().optional(),
+      json: z.boolean().optional(),
+    },
+    async ({ max_tokens, json }) =>
+      toMcp(await workPrimeCommand(ctx, { maxTokens: max_tokens, json })),
+  );
+
   server.tool(
     'codekg_gaps',
     'Report missing source documentation and test relationships',

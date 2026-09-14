@@ -147,6 +147,9 @@ function managedAgentsSection(fallbackInvocation?: string): string {
     '- Treat `lat.md/` as the primary map and raw source as the implementation detail to inspect after the relevant knowledge sections are known.',
     '- After modifying code or knowledge docs, run `code-kg check` and use `code-kg drift` to compare source and the knowledge base.',
     '- Do not manually add source backlinks; use `code-kg apply-backlinks --preview` and then `code-kg apply-backlinks --write` only for sections marked edit-safe.',
+    '- For multi-step work, use `code-kg work` instead of markdown TODOs: `work ready`, `work start <id>`, `work close <id>`.',
+    '- Before executing a work item, run `code-kg work start <id>` (or `work prime`) so search uses the knowledge graph instead of broad grep.',
+    '- When you discover new work mid-task, create it with `code-kg work create "..." --discovered-from <id>` and keep dependencies explicit.',
     SECTION_END,
     '',
   );

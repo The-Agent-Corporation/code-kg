@@ -110,6 +110,12 @@ node dist/src/codekg/cli.js semantic status
 node dist/src/codekg/cli.js semantic enable-local
 node dist/src/codekg/cli.js semantic reindex
 node dist/src/codekg/cli.js agents install
+node dist/src/codekg/cli.js work init
+node dist/src/codekg/cli.js work create "Example task" --query "entry points"
+node dist/src/codekg/cli.js work ready
+node dist/src/codekg/cli.js work start <id>
+node dist/src/codekg/cli.js work prime
+node dist/src/codekg/cli.js work close <id> --reason "done"
 node dist/src/codekg/cli.js agents status
 node dist/src/codekg/cli.js agents uninstall
 node dist/src/codekg/cli.js hook-check
@@ -135,8 +141,11 @@ code-kg drift
 
 After that, use `code-kg ask "<question>"` before
 broad source searches, `code-kg context <file-or-symbol>` before opening raw
-source files, and `code-kg changed` / `code-kg update` around code changes. See
-[docs/USAGE.md](docs/USAGE.md) for the tested happy path and common checks.
+source files, and `code-kg changed` / `code-kg update` around code changes.
+For multi-step agent work, use `code-kg work` (Beads/GSD-style tracking primed
+by the knowledge graph) instead of markdown TODOs: `work ready`, `work start <id>`,
+`work close <id>`. See [docs/USAGE.md](docs/USAGE.md) for the tested happy path
+and common checks.
 
 ## Use as a Claude Code Plugin
 

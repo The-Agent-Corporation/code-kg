@@ -60,6 +60,25 @@ code-kg doctor                  # readiness report
 - **CLI via Bash** for everything not exposed over MCP: `bootstrap`, `doctor`,
   `semantic`, `context`, `gaps`, `changed`, `update`.
 
+
+## Multi-step work tracking
+
+For multi-step or multi-session tasks, use the Code-KG work tracker instead of
+markdown TODOs. It is dependency-aware (Beads-style) and primes each task from
+the knowledge graph so agents search `lat.md` before grepping source.
+
+```bash
+code-kg work create "Add export html" --query "export pipeline" --priority 1
+code-kg work ready
+code-kg work start <id>    # claim + ask/search the knowledge graph
+code-kg work create "Fix edge case" --discovered-from <id>
+code-kg work close <id> --reason "shipped"
+code-kg work prime         # session orientation
+```
+
+MCP equivalents: `codekg_work_ready`, `codekg_work_start`, `codekg_work_prime`,
+`codekg_work_create`, `codekg_work_claim`, `codekg_work_close`, `codekg_work_show`.
+
 ## Edit-safe contract
 
 Never hand-edit source backlinks or overwrite curated/edited knowledge sections.
