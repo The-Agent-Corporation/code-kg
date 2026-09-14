@@ -4,6 +4,7 @@
 
 ### Added
 
+- Worktree isolation (`code-kg work isolate` / `work start --worktree`), evidence pairs (`work evidence pair`), and agent skills for code-structure / evidence / before-and-after / unslop.
 - Agent work tracker (`code-kg work`) with ready/claim/close, dependency links,
   discovered-from provenance, session `prime`, and knowledge-graph priming via
   `work start` so agents search `lat.md` before broad source greps.

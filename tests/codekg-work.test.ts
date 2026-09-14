@@ -13,16 +13,34 @@ import { createCodeKgMcpServer } from '../src/codekg/mcp.js';
 import { agentsCommand } from '../src/codekg/agents.js';
 import {
   workClaimCommand,
+  workCleanupCommand,
   workCloseCommand,
   workCreateCommand,
   workDepCommand,
+  workEvidenceListCommand,
+  workEvidencePairCommand,
   workInitCommand,
+  workIsolateCommand,
   workPrimeCommand,
   workReadyCommand,
   workSessionSummary,
   workStartCommand,
 } from '../src/codekg/work.js';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 
+const execFileAsync = promisify(execFile);
+
+async function initGitRepo(root: string): Promise<void> {
+  await execFileAsync('git', ['init'], { cwd: root });
+  await execFileAsync('git', ['config', 'user.email', 'test@example.com'], {
+    cwd: root,
+  });
+  await execFileAsync('git', ['config', 'user.name', 'Test'], { cwd: root });
+  await execFileAsync('git', ['add', '.'], { cwd: root });
+  await execFileAsync('git', ['commit', '-m', 'init'], { cwd: root });
+  await execFileAsync('git', ['branch', '-M', 'main'], { cwd: root });
+}
 const roots: string[] = [];
 
 async function makeProject(): Promise<string> {
@@ -169,6 +187,9 @@ describe('code-kg work tracker', () => {
     const agentsMd = await readFile(join(root, 'AGENTS.md'), 'utf-8');
     expect(agentsMd).toContain('code-kg work');
     expect(agentsMd).toContain('work start');
+    expect(agentsMd).toContain('--worktree');
+    expect(agentsMd).toContain('evidence pair');
+    expect(agentsMd).toContain('code-structure');
     expect(agentsMd).toContain('--discovered-from');
   });
 
@@ -204,5 +225,58 @@ describe('code-kg work tracker', () => {
       await client.close();
       await server.close();
     }
+  });
+
+  it('isolates work into a git worktree and cleans it up', async () => {
+    const root = await makeProject();
+    await initGitRepo(root);
+    const c = ctx(root);
+    await workInitCommand(c);
+    const created = await workCreateCommand(c, {
+      title: 'Isolate me',
+      json: true,
+    });
+    const id = JSON.parse(created.output).id as string;
+
+    const isolated = await workIsolateCommand(c, { id, json: true });
+    expect(isolated.isError).toBeFalsy();
+    const payload = JSON.parse(isolated.output) as {
+      item: { worktree_path?: string; worktree_branch?: string };
+    };
+    expect(payload.item.worktree_path).toBeTruthy();
+    expect(payload.item.worktree_branch).toMatch(/^agent\//);
+
+    const cleanup = await workCleanupCommand(c, { id, force: true, json: true });
+    expect(cleanup.isError).toBeFalsy();
+    expect(JSON.parse(cleanup.output).worktree_path).toBeUndefined();
+  });
+
+  it('stores before/after evidence pairs on a work item', async () => {
+    const root = await makeProject();
+    const c = ctx(root);
+    await workInitCommand(c);
+    const created = await workCreateCommand(c, {
+      title: 'Prove the fix',
+      json: true,
+    });
+    const id = JSON.parse(created.output).id as string;
+    const before = join(root, 'before.txt');
+    const after = join(root, 'after.txt');
+    await writeFile(before, 'broken');
+    await writeFile(after, 'fixed');
+
+    const paired = await workEvidencePairCommand(c, {
+      id,
+      before,
+      after,
+      label: 'banner',
+      json: true,
+    });
+    expect(paired.isError).toBeFalsy();
+    const list = await workEvidenceListCommand(c, { id, json: true });
+    const evidence = JSON.parse(list.output) as Array<{ kind: string }>;
+    expect(evidence.some((entry) => entry.kind === 'before')).toBe(true);
+    expect(evidence.some((entry) => entry.kind === 'after')).toBe(true);
+    expect(evidence.some((entry) => entry.kind === 'pair')).toBe(true);
   });
 });

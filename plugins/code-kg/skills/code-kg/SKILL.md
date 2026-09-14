@@ -70,11 +70,16 @@ the knowledge graph so agents search `lat.md` before grepping source.
 ```bash
 code-kg work create "Add export html" --query "export pipeline" --priority 1
 code-kg work ready
-code-kg work start <id>    # claim + ask/search the knowledge graph
+code-kg work start <id> --worktree   # isolate + claim + graph prime
+code-kg work evidence pair <id> --before before.png --after after.png
 code-kg work create "Fix edge case" --discovered-from <id>
 code-kg work close <id> --reason "shipped"
-code-kg work prime         # session orientation
+code-kg work cleanup <id>            # remove worktree after merge/close
+code-kg work prime                   # session orientation
 ```
+
+Also load project skills when relevant: `code-structure`, `evidence`,
+`before-and-after`, and `unslop`.
 
 MCP equivalents: `codekg_work_ready`, `codekg_work_start`, `codekg_work_prime`,
 `codekg_work_create`, `codekg_work_claim`, `codekg_work_close`, `codekg_work_show`.

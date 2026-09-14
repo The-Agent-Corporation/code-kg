@@ -752,24 +752,165 @@ work
   .description('Claim a work item and prime it from the knowledge graph')
   .argument('<id>', 'work id')
   .option('--assignee <name>', 'assignee label')
+  .option('--worktree', 'create an isolated git worktree before priming')
+  .option('--force-scope', 'ignore open-PR overlap warnings when using --worktree')
   .option('--max-tokens <n>', 'knowledge context budget', (v) => Number(v))
   .option('--json', 'emit JSON')
   .action(
     async (
       id: string,
-      opts: { assignee?: string; maxTokens?: number; json?: boolean },
+      opts: {
+        assignee?: string;
+        worktree?: boolean;
+        forceScope?: boolean;
+        maxTokens?: number;
+        json?: boolean;
+      },
     ) => {
       const { workStartCommand } = await import('./work.js');
       handleResult(
         await workStartCommand(rootOnlyContext(), {
           id,
           assignee: opts.assignee,
+          worktree: opts.worktree,
+          forceScope: opts.forceScope,
           maxTokens: opts.maxTokens,
           json: opts.json,
         }),
       );
     },
   );
+
+work
+  .command('isolate')
+  .description('Create an isolated git worktree for a work item')
+  .argument('<id>', 'work id')
+  .option('--force-scope', 'ignore open-PR overlap warnings')
+  .option('--json', 'emit JSON')
+  .action(
+    async (id: string, opts: { forceScope?: boolean; json?: boolean }) => {
+      const { workIsolateCommand } = await import('./work.js');
+      handleResult(
+        await workIsolateCommand(rootOnlyContext(), {
+          id,
+          forceScope: opts.forceScope,
+          json: opts.json,
+        }),
+      );
+    },
+  );
+
+work
+  .command('cleanup')
+  .description('Remove the isolated worktree/branch for a work item')
+  .argument('<id>', 'work id')
+  .option('--force', 'force-remove a dirty worktree')
+  .option('--json', 'emit JSON')
+  .action(async (id: string, opts: { force?: boolean; json?: boolean }) => {
+    const { workCleanupCommand } = await import('./work.js');
+    handleResult(
+      await workCleanupCommand(rootOnlyContext(), {
+        id,
+        force: opts.force,
+        json: opts.json,
+      }),
+    );
+  });
+
+const workEvidence = work
+  .command('evidence')
+  .description('Attach before/after proof and other evidence to a work item');
+
+workEvidence
+  .command('attach')
+  .description('Copy a file into work evidence storage and link it')
+  .argument('<id>', 'work id')
+  .requiredOption(
+    '--kind <kind>',
+    'before, after, pair, recording, or note',
+  )
+  .requiredOption('--path <path>', 'evidence file path')
+  .option('--label <text>', 'short label')
+  .option('--paired-with <evidence-id>', 'related evidence id')
+  .option('--notes <text>', 'optional notes')
+  .option('--json', 'emit JSON')
+  .action(
+    async (
+      id: string,
+      opts: {
+        kind: string;
+        path: string;
+        label?: string;
+        pairedWith?: string;
+        notes?: string;
+        json?: boolean;
+      },
+    ) => {
+      const { workEvidenceAttachCommand } = await import('./work.js');
+      handleResult(
+        await workEvidenceAttachCommand(rootOnlyContext(), {
+          id,
+          kind: opts.kind as
+            | 'before'
+            | 'after'
+            | 'pair'
+            | 'recording'
+            | 'note',
+          path: opts.path,
+          label: opts.label,
+          pairedWith: opts.pairedWith,
+          notes: opts.notes,
+          json: opts.json,
+        }),
+      );
+    },
+  );
+
+workEvidence
+  .command('pair')
+  .description('Attach a before/after evidence pair to a work item')
+  .argument('<id>', 'work id')
+  .requiredOption('--before <path>', 'before snapshot path')
+  .requiredOption('--after <path>', 'after snapshot path')
+  .option('--label <text>', 'pair label')
+  .option('--notes <text>', 'optional notes')
+  .option('--json', 'emit JSON')
+  .action(
+    async (
+      id: string,
+      opts: {
+        before: string;
+        after: string;
+        label?: string;
+        notes?: string;
+        json?: boolean;
+      },
+    ) => {
+      const { workEvidencePairCommand } = await import('./work.js');
+      handleResult(
+        await workEvidencePairCommand(rootOnlyContext(), {
+          id,
+          before: opts.before,
+          after: opts.after,
+          label: opts.label,
+          notes: opts.notes,
+          json: opts.json,
+        }),
+      );
+    },
+  );
+
+workEvidence
+  .command('list')
+  .description('List evidence attached to a work item')
+  .argument('<id>', 'work id')
+  .option('--json', 'emit JSON')
+  .action(async (id: string, opts: { json?: boolean }) => {
+    const { workEvidenceListCommand } = await import('./work.js');
+    handleResult(
+      await workEvidenceListCommand(rootOnlyContext(), { id, json: opts.json }),
+    );
+  });
 
 work
   .command('prime')

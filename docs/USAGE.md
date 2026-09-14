@@ -53,16 +53,25 @@ code-kg drift
 
 For longer agent sessions, use the Beads/GSD-style work tracker instead of
 markdown TODOs. Items live in `.code-kg/work/` and `work start` primes each task
-from the knowledge graph before coding.
+from the knowledge graph before coding. Prefer isolated worktrees and attach
+before/after evidence before closing.
 
 ```bash
 code-kg work create "Harden drift apply-safe" --query "drift reconcile" --priority 1
 code-kg work ready
-code-kg work start <id>          # claim + knowledge-graph orientation
+code-kg work start <id> --worktree   # claim + isolate + knowledge prime
+code-kg work evidence pair <id> --before before.png --after after.png
 code-kg work create "Follow-up" --discovered-from <id>
 code-kg work close <id> --reason "shipped"
-code-kg work prime               # session orientation for the next agent turn
+code-kg work cleanup <id>
+code-kg work prime                   # session orientation for the next agent turn
 ```
+
+Project skills that reinforce this loop:
+
+- `code-structure` — actions vs shared services
+- `evidence` / `before-and-after` — proof before close
+- `unslop` — human-readable PR/commit prose
 
 SessionStart hooks include a compact ready/in-progress summary when work exists.
 MCP tools mirror the same flow: `codekg_work_ready`, `codekg_work_start`,

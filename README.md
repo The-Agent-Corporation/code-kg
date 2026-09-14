@@ -113,7 +113,10 @@ node dist/src/codekg/cli.js agents install
 node dist/src/codekg/cli.js work init
 node dist/src/codekg/cli.js work create "Example task" --query "entry points"
 node dist/src/codekg/cli.js work ready
-node dist/src/codekg/cli.js work start <id>
+node dist/src/codekg/cli.js work start <id> --worktree
+node dist/src/codekg/cli.js work isolate <id>
+node dist/src/codekg/cli.js work evidence pair <id> --before before.png --after after.png
+node dist/src/codekg/cli.js work cleanup <id>
 node dist/src/codekg/cli.js work prime
 node dist/src/codekg/cli.js work close <id> --reason "done"
 node dist/src/codekg/cli.js agents status

@@ -1,9 +1,16 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { copyFileSync, existsSync } from 'node:fs';
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join, relative, resolve } from 'node:path';
 import type { CmdContext, CmdResult } from '../context.js';
 import { askCommand } from './query.js';
+import {
+  createIsolatedWorktree,
+  evidenceDir,
+  listOpenPrOverlaps,
+  removeIsolatedWorktree,
+  stableEvidenceName,
+} from './worktree.js';
 
 export type WorkStatus = 'open' | 'in_progress' | 'blocked' | 'closed';
 export type WorkType = 'task' | 'bug' | 'feature' | 'epic' | 'chore';
@@ -16,6 +23,18 @@ export type WorkDepKind =
 export type WorkDep = {
   id: string;
   kind: WorkDepKind;
+};
+
+export type WorkEvidenceKind = 'before' | 'after' | 'pair' | 'recording' | 'note';
+
+export type WorkEvidence = {
+  id: string;
+  kind: WorkEvidenceKind;
+  label: string;
+  path: string;
+  paired_with?: string;
+  created_at: string;
+  notes?: string;
 };
 
 export type WorkItem = {
@@ -32,6 +51,9 @@ export type WorkItem = {
   section_ids: string[];
   source_paths: string[];
   context_cache?: string;
+  worktree_path?: string;
+  worktree_branch?: string;
+  evidence: WorkEvidence[];
   created_at: string;
   updated_at: string;
   closed_at?: string;
@@ -107,6 +129,39 @@ export type WorkStartOptions = {
   id: string;
   assignee?: string;
   maxTokens?: number;
+  worktree?: boolean;
+  forceScope?: boolean;
+  json?: boolean;
+};
+
+export type WorkIsolateOptions = {
+  id: string;
+  forceScope?: boolean;
+  json?: boolean;
+};
+
+export type WorkCleanupOptions = {
+  id: string;
+  force?: boolean;
+  json?: boolean;
+};
+
+export type WorkEvidenceAttachOptions = {
+  id: string;
+  kind: WorkEvidenceKind;
+  path: string;
+  label?: string;
+  pairedWith?: string;
+  notes?: string;
+  json?: boolean;
+};
+
+export type WorkEvidencePairOptions = {
+  id: string;
+  before: string;
+  after: string;
+  label?: string;
+  notes?: string;
   json?: boolean;
 };
 
@@ -197,7 +252,15 @@ export async function ensureWorkStore(projectRoot: string): Promise<void> {
 
 async function loadItems(projectRoot: string): Promise<WorkItem[]> {
   await ensureWorkStore(projectRoot);
-  return readJsonl<WorkItem>(itemsPath(projectRoot));
+  const items = await readJsonl<WorkItem>(itemsPath(projectRoot));
+  for (const item of items) {
+    item.evidence ??= [];
+    item.deps ??= [];
+    item.queries ??= [];
+    item.section_ids ??= [];
+    item.source_paths ??= [];
+  }
+  return items;
 }
 
 async function saveItems(
@@ -276,6 +339,16 @@ function formatItem(item: WorkItem, items: WorkItem[]): string {
   }
   if (item.source_paths.length) {
     lines.push(`- sources: ${item.source_paths.join(', ')}`);
+  }
+  if (item.worktree_path) {
+    lines.push(`- worktree: ${item.worktree_path} (${item.worktree_branch ?? 'branch?'})`);
+  }
+  if (item.evidence?.length) {
+    lines.push(
+      `- evidence: ${item.evidence
+        .map((entry) => `${entry.kind}:${entry.label}`)
+        .join(', ')}`,
+    );
   }
   if (item.description) lines.push('', item.description);
   if (item.context_cache) {
@@ -414,6 +487,7 @@ export async function workCreateCommand(
     source_paths: [...(opts.sourcePaths ?? [])]
       .map((path) => path.trim())
       .filter(Boolean),
+    evidence: [],
     created_at: nowIso(),
     updated_at: nowIso(),
   };
@@ -729,6 +803,15 @@ export async function workStartCommand(
   ctx: CmdContext,
   opts: WorkStartOptions,
 ): Promise<CmdResult> {
+  if (opts.worktree) {
+    const isolated = await workIsolateCommand(ctx, {
+      id: opts.id,
+      forceScope: opts.forceScope,
+      json: true,
+    });
+    if (isolated.isError) return isolated;
+  }
+
   const claim = await workClaimCommand(ctx, {
     id: opts.id,
     assignee: opts.assignee,
@@ -769,10 +852,20 @@ export async function workStartCommand(
       '',
       '## Agent protocol',
       '',
+      item.worktree_path
+        ? `- Continue in the isolated worktree: \`${item.worktree_path}\` (branch \`${item.worktree_branch}\`).`
+        : '- Optional isolation: `code-kg work isolate <id>` or `work start <id> --worktree`.',
+      '- Prefer actions/orchestration for why/when and shared services for reusable how (see code-structure skill).',
+      '- Capture before/after evidence with `code-kg work evidence pair <id> --before <path> --after <path>` before claiming done.',
       '- Do not broad-grep the repo next. Use the primed hits, then `code-kg section`, `code-kg impact`, or `code-kg ask` for follow-ups.',
       `- If you discover more work, create it with \`code-kg work create "..." --discovered-from ${item.id}\`.`,
       `- When finished: \`code-kg work close ${item.id} --reason "..."\`, then \`code-kg check\` and \`code-kg drift\`.`,
-    ].join('\n'),
+      item.worktree_path
+        ? `- After merge/close: \`code-kg work cleanup ${item.id}\`.`
+        : undefined,
+    ]
+      .filter(Boolean)
+      .join('\n'),
   };
 }
 
@@ -921,8 +1014,285 @@ export async function workSessionSummary(
     'Code-KG work tracker:',
     ...inProgress
       .slice(0, 3)
-      .map((item) => `- in_progress ${item.id}: ${item.title}`),
+      .map((item) => {
+        const tree = item.worktree_path ? ` @ ${item.worktree_path}` : '';
+        return `- in_progress ${item.id}: ${item.title}${tree}`;
+      }),
     ...ready.slice(0, 5).map((item) => `- ready ${item.id}: ${item.title}`),
-    'Use `code-kg work prime` or `code-kg work start <id>` before broad source search.',
+    'Use `code-kg work prime` or `code-kg work start <id> --worktree` before broad source search.',
   ].join('\n');
+}
+
+export async function workIsolateCommand(
+  ctx: CmdContext,
+  opts: WorkIsolateOptions,
+): Promise<CmdResult> {
+  const items = await loadItems(ctx.projectRoot);
+  const item = findItem(items, opts.id);
+  if (!item) return errorResult(`Unknown work id: ${opts.id}`);
+  if (item.worktree_path && existsSync(resolve(ctx.projectRoot, item.worktree_path))) {
+    if (opts.json) return jsonResult(item);
+    return {
+      output: [
+        '# Code-KG Work Isolate',
+        '',
+        `Already isolated at ${item.worktree_path} (${item.worktree_branch}).`,
+      ].join('\n'),
+    };
+  }
+
+  if (item.source_paths.length && !opts.forceScope) {
+    const conflicts = await listOpenPrOverlaps({
+      projectRoot: ctx.projectRoot,
+      candidatePaths: item.source_paths,
+    });
+    if (conflicts.length) {
+      return errorResult(
+        [
+          'Open PR overlap detected for linked source paths. Re-run with --force-scope to proceed, or pick different files.',
+          ...conflicts.map(
+            (conflict) =>
+              `- PR #${conflict.prNumber} ${conflict.title}: ${conflict.overlappingFiles.join(', ')}`,
+          ),
+        ].join('\n'),
+      );
+    }
+  }
+
+  try {
+    const tree = await createIsolatedWorktree({
+      projectRoot: ctx.projectRoot,
+      workId: item.id,
+      title: item.title,
+    });
+    item.worktree_path = relative(ctx.projectRoot, tree.path);
+    item.worktree_branch = tree.branch;
+    item.updated_at = nowIso();
+    await saveItems(ctx.projectRoot, items);
+    if (opts.json) return jsonResult({ item, worktree: tree });
+    return {
+      output: [
+        '# Code-KG Work Isolate',
+        '',
+        `Created worktree for ${item.id}`,
+        `- path: ${item.worktree_path}`,
+        `- branch: ${item.worktree_branch}`,
+        '',
+        'Enter the worktree before editing files. Worktrees do not isolate ports, DBs, or lockfiles.',
+        `Cleanup later with: code-kg work cleanup ${item.id}`,
+      ].join('\n'),
+    };
+  } catch (error) {
+    return errorResult((error as Error).message);
+  }
+}
+
+export async function workCleanupCommand(
+  ctx: CmdContext,
+  opts: WorkCleanupOptions,
+): Promise<CmdResult> {
+  const items = await loadItems(ctx.projectRoot);
+  const item = findItem(items, opts.id);
+  if (!item) return errorResult(`Unknown work id: ${opts.id}`);
+  if (!item.worktree_path && !item.worktree_branch) {
+    return errorResult(`${item.id} has no attached worktree.`);
+  }
+  try {
+    await removeIsolatedWorktree({
+      projectRoot: ctx.projectRoot,
+      worktreePath: item.worktree_path ?? '',
+      branch: item.worktree_branch,
+      force: opts.force,
+    });
+    delete item.worktree_path;
+    delete item.worktree_branch;
+    item.updated_at = nowIso();
+    await saveItems(ctx.projectRoot, items);
+    if (opts.json) return jsonResult(item);
+    return {
+      output: [
+        '# Code-KG Work Cleanup',
+        '',
+        `Removed worktree/branch for ${item.id}.`,
+      ].join('\n'),
+    };
+  } catch (error) {
+    return errorResult((error as Error).message);
+  }
+}
+
+async function copyEvidenceFile(
+  projectRoot: string,
+  workId: string,
+  sourcePath: string,
+  label: string,
+): Promise<{ abs: string; rel: string }> {
+  const absoluteSource = resolve(projectRoot, sourcePath);
+  if (!existsSync(absoluteSource)) {
+    throw new Error(`Evidence file not found: ${sourcePath}`);
+  }
+  const ext = basename(absoluteSource).includes('.')
+    ? basename(absoluteSource).split('.').pop()!
+    : 'bin';
+  const dir = evidenceDir(projectRoot, workId);
+  await mkdir(dir, { recursive: true });
+  const name = stableEvidenceName(label, ext);
+  const absoluteDest = join(dir, name);
+  copyFileSync(absoluteSource, absoluteDest);
+  return {
+    abs: absoluteDest,
+    rel: relative(projectRoot, absoluteDest),
+  };
+}
+
+export async function workEvidenceAttachCommand(
+  ctx: CmdContext,
+  opts: WorkEvidenceAttachOptions,
+): Promise<CmdResult> {
+  const items = await loadItems(ctx.projectRoot);
+  const item = findItem(items, opts.id);
+  if (!item) return errorResult(`Unknown work id: ${opts.id}`);
+  const label = (opts.label ?? opts.kind).trim();
+  try {
+    const copied = await copyEvidenceFile(
+      ctx.projectRoot,
+      item.id,
+      opts.path,
+      label,
+    );
+    const evidence: WorkEvidence = {
+      id: `ev-${randomBytes(2).toString('hex')}`,
+      kind: opts.kind,
+      label,
+      path: copied.rel,
+      paired_with: opts.pairedWith,
+      notes: opts.notes?.trim() || undefined,
+      created_at: nowIso(),
+    };
+    item.evidence.push(evidence);
+    item.updated_at = nowIso();
+    await saveItems(ctx.projectRoot, items);
+    if (opts.json) return jsonResult({ item, evidence });
+    return {
+      output: [
+        '# Code-KG Work Evidence',
+        '',
+        `Attached ${evidence.kind} evidence to ${item.id}`,
+        `- id: ${evidence.id}`,
+        `- path: ${evidence.path}`,
+        evidence.notes ? `- notes: ${evidence.notes}` : undefined,
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    };
+  } catch (error) {
+    return errorResult((error as Error).message);
+  }
+}
+
+export async function workEvidencePairCommand(
+  ctx: CmdContext,
+  opts: WorkEvidencePairOptions,
+): Promise<CmdResult> {
+  const label = (opts.label ?? 'before-after').trim();
+  const before = await workEvidenceAttachCommand(ctx, {
+    id: opts.id,
+    kind: 'before',
+    path: opts.before,
+    label: `${label}-before`,
+    notes: opts.notes,
+    json: true,
+  });
+  if (before.isError) return before;
+  const beforePayload = JSON.parse(before.output) as {
+    evidence: WorkEvidence;
+  };
+  const after = await workEvidenceAttachCommand(ctx, {
+    id: opts.id,
+    kind: 'after',
+    path: opts.after,
+    label: `${label}-after`,
+    pairedWith: beforePayload.evidence.id,
+    notes: opts.notes,
+    json: true,
+  });
+  if (after.isError) return after;
+  const afterPayload = JSON.parse(after.output) as {
+    item: WorkItem;
+    evidence: WorkEvidence;
+  };
+
+  // Link the before entry to the after entry as well.
+  const items = await loadItems(ctx.projectRoot);
+  const item = findItem(items, opts.id);
+  if (item) {
+    const beforeEntry = item.evidence.find(
+      (entry) => entry.id === beforePayload.evidence.id,
+    );
+    if (beforeEntry) beforeEntry.paired_with = afterPayload.evidence.id;
+    const pair: WorkEvidence = {
+      id: `ev-${randomBytes(2).toString('hex')}`,
+      kind: 'pair',
+      label,
+      path: `${beforePayload.evidence.path} → ${afterPayload.evidence.path}`,
+      paired_with: afterPayload.evidence.id,
+      notes: opts.notes?.trim() || undefined,
+      created_at: nowIso(),
+    };
+    item.evidence.push(pair);
+    item.updated_at = nowIso();
+    await saveItems(ctx.projectRoot, items);
+    if (opts.json) {
+      return jsonResult({
+        item,
+        before: beforePayload.evidence,
+        after: afterPayload.evidence,
+        pair,
+      });
+    }
+    return {
+      output: [
+        '# Code-KG Work Evidence Pair',
+        '',
+        `Recorded before/after pair for ${item.id}`,
+        '',
+        `| Before | After |`,
+        `| --- | --- |`,
+        `| \`${beforePayload.evidence.path}\` | \`${afterPayload.evidence.path}\` |`,
+        '',
+        'Optional: if `@vercel/before-and-after` is installed, generate a visual table with:',
+        `npx @vercel/before-and-after ${beforePayload.evidence.path} ${afterPayload.evidence.path} --markdown`,
+        '',
+        'See the evidence / before-and-after skills for capture workflows.',
+      ].join('\n'),
+    };
+  }
+  return after;
+}
+
+export async function workEvidenceListCommand(
+  ctx: CmdContext,
+  opts: WorkIdOptions,
+): Promise<CmdResult> {
+  const items = await loadItems(ctx.projectRoot);
+  const item = findItem(items, opts.id);
+  if (!item) return errorResult(`Unknown work id: ${opts.id}`);
+  if (opts.json) return jsonResult(item.evidence);
+  if (!item.evidence.length) {
+    return {
+      output: `# Code-KG Work Evidence\n\nNo evidence attached to ${item.id}.`,
+    };
+  }
+  return {
+    output: [
+      `# Code-KG Work Evidence (${item.id})`,
+      '',
+      ...item.evidence.map(
+        (entry) =>
+          `- ${entry.id} [${entry.kind}] ${entry.label} → ${entry.path}${
+            entry.paired_with ? ` (paired ${entry.paired_with})` : ''
+          }`,
+      ),
+    ].join('\n'),
+  };
 }
