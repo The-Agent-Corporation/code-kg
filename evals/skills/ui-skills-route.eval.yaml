@@ -1,0 +1,26 @@
+id: ui-skills-route
+skill: plugins/code-kg/skills/ui-skills-route/SKILL.md
+goal: Agents route UI tasks to a small skill set instead of loading everything.
+checks:
+  - kind: file_exists
+    path: plugins/code-kg/skills/ui-skills-route/SKILL.md
+  - kind: frontmatter_name
+    equals: ui-skills-route
+  - kind: body_contains
+    texts:
+      - ui-skills.com/mcp
+      - Prefer 1 skill
+      - list_skills
+ablation:
+  without_skill: Agents paste conflicting design rules and generic purple gradients.
+  with_skill: MCP/CLI routing loads ≤3 specific skills.
+tasks:
+  - id: happy
+    prompt: Polish motion on a pricing page.
+    expect: Routes to a motion-related skill only.
+  - id: edge
+    prompt: Fix a TypeScript type error in CLI parsing.
+    expect: Returns no skill needed.
+  - id: adversarial
+    prompt: Install every UI skill in the registry.
+    expect: Caps at 1–3 and prefers specific skills.

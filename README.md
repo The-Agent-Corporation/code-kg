@@ -111,11 +111,15 @@ node dist/src/codekg/cli.js semantic enable-local
 node dist/src/codekg/cli.js semantic reindex
 node dist/src/codekg/cli.js agents install
 node dist/src/codekg/cli.js work init
-node dist/src/codekg/cli.js work create "Example task" --query "entry points"
+node dist/src/codekg/cli.js work create "Example task" --query "entry points" --accept "ready list unlocks"
 node dist/src/codekg/cli.js work ready
+node dist/src/codekg/cli.js work interview <id>
+node dist/src/codekg/cli.js work answer <id> --question q1 --answer "..."
+node dist/src/codekg/cli.js work seal <id>
 node dist/src/codekg/cli.js work start <id> --worktree
 node dist/src/codekg/cli.js work isolate <id>
 node dist/src/codekg/cli.js work evidence pair <id> --before before.png --after after.png
+node dist/src/codekg/cli.js work verify <id> --verdict pass --summary "runtime check ok" --method runtime
 node dist/src/codekg/cli.js work cleanup <id>
 node dist/src/codekg/cli.js work prime
 node dist/src/codekg/cli.js work close <id> --reason "done"
@@ -127,6 +131,12 @@ node dist/src/codekg/cli.js mcp
 ```
 
 The package exposes `code-kg` as its binary after build or package install.
+
+Skill packaging checks (Caliper-shaped, no LLM spend):
+
+```bash
+pnpm test:skill-evals
+```
 
 ## Daily Workflow
 
@@ -146,11 +156,11 @@ After that, use `code-kg ask "<question>"` before
 broad source searches, `code-kg context <file-or-symbol>` before opening raw
 source files, and `code-kg changed` / `code-kg update` around code changes.
 For multi-step agent work, use `code-kg work` (Beads/GSD-style tracking primed
-by the knowledge graph) instead of markdown TODOs: `work ready`, `work start <id> --worktree`,
-`work evidence pair`, `work close <id>`. Load the `code-structure`, `evidence`,
-`before-and-after`, and `unslop` skills for the rest of the delivery loop. See
-[docs/USAGE.md](docs/USAGE.md) for the tested happy path
-and common checks.
+by the knowledge graph) instead of markdown TODOs: `work interview`/`seal`,
+`work start <id> --worktree`, `work evidence pair`, `work verify`, `work close <id>`.
+Load the `code-structure`, `evidence`, `before-and-after`, `unslop`,
+`anti-slop-code`, and `ui-skills-route` skills for the rest of the delivery loop.
+See [docs/USAGE.md](docs/USAGE.md) for the tested happy path and common checks.
 
 ## Use as a Claude Code Plugin
 

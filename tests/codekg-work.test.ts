@@ -12,6 +12,8 @@ import {
 import { createCodeKgMcpServer } from '../src/codekg/mcp.js';
 import { agentsCommand } from '../src/codekg/agents.js';
 import {
+  workAcceptCommand,
+  workAnswerCommand,
   workClaimCommand,
   workCleanupCommand,
   workCloseCommand,
@@ -20,11 +22,14 @@ import {
   workEvidenceListCommand,
   workEvidencePairCommand,
   workInitCommand,
+  workInterviewCommand,
   workIsolateCommand,
   workPrimeCommand,
   workReadyCommand,
+  workSealCommand,
   workSessionSummary,
   workStartCommand,
+  workVerifyCommand,
 } from '../src/codekg/work.js';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -118,6 +123,20 @@ describe('code-kg work tracker', () => {
     expect(claimBlocked.output).toContain('blocked');
 
     await workClaimCommand(c, { id: parentId, assignee: 'tester' });
+    const blockedClose = await workCloseCommand(c, {
+      id: parentId,
+      reason: 'done',
+    });
+    expect(blockedClose.isError).toBe(true);
+    expect(blockedClose.output).toContain('verification');
+
+    await workVerifyCommand(c, {
+      id: parentId,
+      verdict: 'pass',
+      summary: 'Ready items unlock and claim gates work',
+      method: 'test',
+      check: ['ready-gate:pass'],
+    });
     await workCloseCommand(c, { id: parentId, reason: 'done' });
 
     const readyAfter = await workReadyCommand(c, { json: true });
@@ -191,6 +210,68 @@ describe('code-kg work tracker', () => {
     expect(agentsMd).toContain('evidence pair');
     expect(agentsMd).toContain('code-structure');
     expect(agentsMd).toContain('--discovered-from');
+    expect(agentsMd).toContain('work verify');
+    expect(agentsMd).toContain('work interview');
+    expect(agentsMd).toContain('anti-slop-code');
+    expect(agentsMd).toContain('ui-skills-route');
+  });
+
+  it('interviews, seals, verifies, and gates close', async () => {
+    const root = await makeProject();
+    const c = ctx(root);
+    await workInitCommand(c);
+
+    const created = await workCreateCommand(c, {
+      title: 'Improve search somehow',
+      json: true,
+    });
+    const id = JSON.parse(created.output).id as string;
+    expect(JSON.parse(created.output).interview.questions.length).toBeGreaterThan(
+      0,
+    );
+
+    const interview = await workInterviewCommand(c, { id, json: true });
+    const questions = JSON.parse(interview.output).questions as Array<{
+      id: string;
+      prompt: string;
+    }>;
+    for (const question of questions) {
+      await workAnswerCommand(c, {
+        id,
+        question: question.id,
+        answer: `Answer for ${question.id}`,
+      });
+    }
+    await workAcceptCommand(c, {
+      id,
+      criterion: 'search returns seeded hit',
+    });
+    const sealed = await workSealCommand(c, { id, json: true });
+    expect(JSON.parse(sealed.output).interview.sealed_at).toBeTruthy();
+
+    const failClose = await workCloseCommand(c, { id, reason: 'nope' });
+    expect(failClose.isError).toBe(true);
+
+    await workVerifyCommand(c, {
+      id,
+      verdict: 'fail',
+      summary: 'search still broken',
+      method: 'runtime',
+    });
+    const failStill = await workCloseCommand(c, { id, reason: 'nope' });
+    expect(failStill.isError).toBe(true);
+    expect(failStill.output).toContain('fail');
+
+    await workVerifyCommand(c, {
+      id,
+      verdict: 'pass',
+      summary: 'search returns seeded hit',
+      method: 'runtime',
+      check: ['search returns seeded hit:pass'],
+    });
+    const closed = await workCloseCommand(c, { id, reason: 'verified' });
+    expect(closed.isError).toBeFalsy();
+    expect(closed.output).toContain('Closed');
   });
 
   it('exposes work tools over MCP', async () => {
@@ -209,6 +290,9 @@ describe('code-kg work tracker', () => {
       expect(names).toContain('codekg_work_ready');
       expect(names).toContain('codekg_work_start');
       expect(names).toContain('codekg_work_prime');
+      expect(names).toContain('codekg_work_verify');
+      expect(names).toContain('codekg_work_interview');
+      expect(names).toContain('codekg_work_seal');
 
       const created = await client.callTool({
         name: 'codekg_work_create',

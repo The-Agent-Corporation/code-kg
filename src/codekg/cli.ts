@@ -565,6 +565,9 @@ work
   .option('--query <text>', 'knowledge query to run on start', (v, acc: string[]) => [...acc, v], [])
   .option('--section <id>', 'linked knowledge section id', (v, acc: string[]) => [...acc, v], [])
   .option('--source <path>', 'linked source path', (v, acc: string[]) => [...acc, v], [])
+  .option('--assumption <text>', 'recorded assumption', (v, acc: string[]) => [...acc, v], [])
+  .option('--accept <text>', 'acceptance criterion', (v, acc: string[]) => [...acc, v], [])
+  .option('--no-interview', 'skip auto interview questions on create')
   .option('--json', 'emit JSON')
   .action(
     async (
@@ -579,6 +582,9 @@ work
         query?: string[];
         section?: string[];
         source?: string[];
+        assumption?: string[];
+        accept?: string[];
+        interview?: boolean;
         json?: boolean;
       },
     ) => {
@@ -595,6 +601,9 @@ work
           queries: opts.query,
           sectionIds: opts.section,
           sourcePaths: opts.source,
+          assumptions: opts.assumption,
+          acceptance: opts.accept,
+          interview: opts.interview,
           json: opts.json,
         }),
       );
@@ -698,16 +707,179 @@ work
 
 work
   .command('close')
-  .description('Close a work item')
+  .description('Close a work item (requires pass verification unless --force)')
   .argument('<id>', 'work id')
   .option('-r, --reason <text>', 'close reason')
+  .option('--force', 'bypass verification gate')
+  .option(
+    '--allow-inconclusive',
+    'allow close when latest verification is inconclusive',
+  )
   .option('--json', 'emit JSON')
-  .action(async (id: string, opts: { reason?: string; json?: boolean }) => {
-    const { workCloseCommand } = await import('./work.js');
+  .action(
+    async (
+      id: string,
+      opts: {
+        reason?: string;
+        force?: boolean;
+        allowInconclusive?: boolean;
+        json?: boolean;
+      },
+    ) => {
+      const { workCloseCommand } = await import('./work.js');
+      handleResult(
+        await workCloseCommand(rootOnlyContext(), {
+          id,
+          reason: opts.reason,
+          force: opts.force,
+          allowInconclusive: opts.allowInconclusive,
+          json: opts.json,
+        }),
+      );
+    },
+  );
+
+work
+  .command('verify')
+  .description(
+    'Record a Reticle-style runtime/check verdict before closing work',
+  )
+  .argument('<id>', 'work id')
+  .requiredOption(
+    '--verdict <verdict>',
+    'pass, fail, or inconclusive',
+  )
+  .requiredOption('--summary <text>', 'what was checked and what happened')
+  .option('--method <text>', 'runtime, test, manual, reticle, ...', 'manual')
+  .option(
+    '--check <name:verdict>',
+    'named check result (repeatable)',
+    (v, acc: string[]) => [...acc, v],
+    [],
+  )
+  .option(
+    '--evidence-id <id>',
+    'link existing evidence id (repeatable)',
+    (v, acc: string[]) => [...acc, v],
+    [],
+  )
+  .option('--json', 'emit JSON')
+  .action(
+    async (
+      id: string,
+      opts: {
+        verdict: string;
+        summary: string;
+        method?: string;
+        check?: string[];
+        evidenceId?: string[];
+        json?: boolean;
+      },
+    ) => {
+      const { workVerifyCommand } = await import('./work.js');
+      handleResult(
+        await workVerifyCommand(rootOnlyContext(), {
+          id,
+          verdict: opts.verdict,
+          summary: opts.summary,
+          method: opts.method,
+          check: opts.check,
+          evidenceId: opts.evidenceId,
+          json: opts.json,
+        }),
+      );
+    },
+  );
+
+work
+  .command('interview')
+  .description('Generate or show Ouroboros-style clarifying questions')
+  .argument('<id>', 'work id')
+  .option('--refresh', 'regenerate questions (keeps matching prior answers)')
+  .option('--json', 'emit JSON')
+  .action(
+    async (id: string, opts: { refresh?: boolean; json?: boolean }) => {
+      const { workInterviewCommand } = await import('./work.js');
+      handleResult(
+        await workInterviewCommand(rootOnlyContext(), {
+          id,
+          refresh: opts.refresh,
+          json: opts.json,
+        }),
+      );
+    },
+  );
+
+work
+  .command('answer')
+  .description('Answer an interview question on a work item')
+  .argument('<id>', 'work id')
+  .requiredOption('--question <id-or-text>', 'question id (q1) or prompt snippet')
+  .requiredOption('--answer <text>', 'answer text')
+  .option('--json', 'emit JSON')
+  .action(
+    async (
+      id: string,
+      opts: { question: string; answer: string; json?: boolean },
+    ) => {
+      const { workAnswerCommand } = await import('./work.js');
+      handleResult(
+        await workAnswerCommand(rootOnlyContext(), {
+          id,
+          question: opts.question,
+          answer: opts.answer,
+          json: opts.json,
+        }),
+      );
+    },
+  );
+
+work
+  .command('assume')
+  .description('Record an assumption on a work item')
+  .argument('<id>', 'work id')
+  .requiredOption('--text <text>', 'assumption text')
+  .option('--json', 'emit JSON')
+  .action(async (id: string, opts: { text: string; json?: boolean }) => {
+    const { workAssumeCommand } = await import('./work.js');
     handleResult(
-      await workCloseCommand(rootOnlyContext(), {
+      await workAssumeCommand(rootOnlyContext(), {
         id,
-        reason: opts.reason,
+        text: opts.text,
+        json: opts.json,
+      }),
+    );
+  });
+
+work
+  .command('accept')
+  .description('Add an acceptance criterion (kept out of the build brief)')
+  .argument('<id>', 'work id')
+  .requiredOption('--criterion <text>', 'acceptance criterion')
+  .option('--json', 'emit JSON')
+  .action(async (id: string, opts: { criterion: string; json?: boolean }) => {
+    const { workAcceptCommand } = await import('./work.js');
+    handleResult(
+      await workAcceptCommand(rootOnlyContext(), {
+        id,
+        criterion: opts.criterion,
+        json: opts.json,
+      }),
+    );
+  });
+
+work
+  .command('seal')
+  .description('Seal the interview once questions/acceptance are ready')
+  .argument('<id>', 'work id')
+  .option('--force', 'seal even if questions/acceptance are incomplete')
+  .option('--json', 'emit JSON')
+  .action(async (id: string, opts: { force?: boolean; json?: boolean }) => {
+    const { workSealCommand } = await import('./work.js');
+    handleResult(
+      await workSealCommand(rootOnlyContext(), {
+        id,
+        force: opts.force,
         json: opts.json,
       }),
     );

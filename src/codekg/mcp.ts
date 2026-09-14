@@ -26,13 +26,19 @@ import { contextCommand } from './context.js';
 import { changedCommand } from './changed.js';
 import { gapsCommand } from './gaps.js';
 import {
+  workAcceptCommand,
+  workAnswerCommand,
+  workAssumeCommand,
   workClaimCommand,
   workCloseCommand,
   workCreateCommand,
+  workInterviewCommand,
   workPrimeCommand,
   workReadyCommand,
+  workSealCommand,
   workShowCommand,
   workStartCommand,
+  workVerifyCommand,
 } from './work.js';
 import { workspaceAskCommand, workspacePath } from './workspace.js';
 
@@ -375,6 +381,9 @@ export function createCodeKgMcpServer(ctx: CmdContext): McpServer {
       queries: z.array(z.string()).optional(),
       section_ids: z.array(z.string()).optional(),
       source_paths: z.array(z.string()).optional(),
+      assumptions: z.array(z.string()).optional(),
+      acceptance: z.array(z.string()).optional(),
+      interview: z.boolean().optional(),
       json: z.boolean().optional(),
     },
     async (args) =>
@@ -390,6 +399,9 @@ export function createCodeKgMcpServer(ctx: CmdContext): McpServer {
           queries: args.queries,
           sectionIds: args.section_ids,
           sourcePaths: args.source_paths,
+          assumptions: args.assumptions,
+          acceptance: args.acceptance,
+          interview: args.interview,
           json: args.json,
         }),
       ),
@@ -426,14 +438,105 @@ export function createCodeKgMcpServer(ctx: CmdContext): McpServer {
   );
   server.tool(
     'codekg_work_close',
-    'Close a finished work item',
+    'Close a finished work item (requires pass verification unless force)',
     {
       id: z.string(),
       reason: z.string().optional(),
+      force: z.boolean().optional(),
+      allow_inconclusive: z.boolean().optional(),
       json: z.boolean().optional(),
     },
-    async ({ id, reason, json }) =>
-      toMcp(await workCloseCommand(ctx, { id, reason, json })),
+    async ({ id, reason, force, allow_inconclusive, json }) =>
+      toMcp(
+        await workCloseCommand(ctx, {
+          id,
+          reason,
+          force,
+          allowInconclusive: allow_inconclusive,
+          json,
+        }),
+      ),
+  );
+  server.tool(
+    'codekg_work_verify',
+    'Record a Reticle-style pass/fail/inconclusive verification before close',
+    {
+      id: z.string(),
+      verdict: z.string(),
+      summary: z.string(),
+      method: z.string().optional(),
+      checks: z.array(z.string()).optional(),
+      evidence_ids: z.array(z.string()).optional(),
+      json: z.boolean().optional(),
+    },
+    async ({ id, verdict, summary, method, checks, evidence_ids, json }) =>
+      toMcp(
+        await workVerifyCommand(ctx, {
+          id,
+          verdict,
+          summary,
+          method,
+          check: checks,
+          evidenceId: evidence_ids,
+          json,
+        }),
+      ),
+  );
+  server.tool(
+    'codekg_work_interview',
+    'Generate or show clarifying interview questions for a work item',
+    {
+      id: z.string(),
+      refresh: z.boolean().optional(),
+      json: z.boolean().optional(),
+    },
+    async ({ id, refresh, json }) =>
+      toMcp(await workInterviewCommand(ctx, { id, refresh, json })),
+  );
+  server.tool(
+    'codekg_work_answer',
+    'Answer an interview question on a work item',
+    {
+      id: z.string(),
+      question: z.string(),
+      answer: z.string(),
+      json: z.boolean().optional(),
+    },
+    async ({ id, question, answer, json }) =>
+      toMcp(await workAnswerCommand(ctx, { id, question, answer, json })),
+  );
+  server.tool(
+    'codekg_work_assume',
+    'Record an assumption on a work item',
+    {
+      id: z.string(),
+      text: z.string(),
+      json: z.boolean().optional(),
+    },
+    async ({ id, text, json }) =>
+      toMcp(await workAssumeCommand(ctx, { id, text, json })),
+  );
+  server.tool(
+    'codekg_work_accept',
+    'Add an acceptance criterion kept separate from the build brief',
+    {
+      id: z.string(),
+      criterion: z.string(),
+      json: z.boolean().optional(),
+    },
+    async ({ id, criterion, json }) =>
+      toMcp(await workAcceptCommand(ctx, { id, criterion, json })),
+  );
+  server.tool(
+    'codekg_work_seal',
+    'Seal interview/acceptance before implementation',
+    {
+      id: z.string(),
+      force: z.boolean().optional(),
+      json: z.boolean().optional(),
+    },
+    async ({ id, force, json }) =>
+      toMcp(await workSealCommand(ctx, { id, force, json })),
   );
   server.tool(
     'codekg_work_prime',

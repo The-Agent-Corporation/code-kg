@@ -37,6 +37,39 @@ export type WorkEvidence = {
   notes?: string;
 };
 
+/** Reticle-style runtime / check verdict for "is it actually done?" */
+export type WorkVerdict = 'pass' | 'fail' | 'inconclusive';
+
+export type WorkCheckResult = {
+  name: string;
+  verdict: WorkVerdict;
+  detail?: string;
+};
+
+export type WorkVerification = {
+  id: string;
+  verdict: WorkVerdict;
+  summary: string;
+  method?: string;
+  checks: WorkCheckResult[];
+  evidence_ids: string[];
+  created_at: string;
+};
+
+export type WorkInterviewQuestion = {
+  id: string;
+  prompt: string;
+  answer?: string;
+  answered_at?: string;
+};
+
+/** Ouroboros-style interview → assumptions → acceptance before build. */
+export type WorkInterview = {
+  questions: WorkInterviewQuestion[];
+  generated_at: string;
+  sealed_at?: string;
+};
+
 export type WorkItem = {
   id: string;
   title: string;
@@ -54,6 +87,10 @@ export type WorkItem = {
   worktree_path?: string;
   worktree_branch?: string;
   evidence: WorkEvidence[];
+  assumptions: string[];
+  acceptance: string[];
+  interview?: WorkInterview;
+  verifications: WorkVerification[];
   created_at: string;
   updated_at: string;
   closed_at?: string;
@@ -77,6 +114,9 @@ export type WorkCreateOptions = {
   queries?: string[];
   sectionIds?: string[];
   sourcePaths?: string[];
+  assumptions?: string[];
+  acceptance?: string[];
+  interview?: boolean;
   json?: boolean;
 };
 
@@ -113,6 +153,49 @@ export type WorkClaimOptions = {
 export type WorkCloseOptions = {
   id: string;
   reason?: string;
+  force?: boolean;
+  allowInconclusive?: boolean;
+  json?: boolean;
+};
+
+export type WorkVerifyOptions = {
+  id: string;
+  verdict: string;
+  summary: string;
+  method?: string;
+  check?: string[];
+  evidenceId?: string[];
+  json?: boolean;
+};
+
+export type WorkInterviewOptions = {
+  id: string;
+  refresh?: boolean;
+  json?: boolean;
+};
+
+export type WorkAnswerOptions = {
+  id: string;
+  question: string;
+  answer: string;
+  json?: boolean;
+};
+
+export type WorkAssumeOptions = {
+  id: string;
+  text: string;
+  json?: boolean;
+};
+
+export type WorkAcceptOptions = {
+  id: string;
+  criterion: string;
+  json?: boolean;
+};
+
+export type WorkSealOptions = {
+  id: string;
+  force?: boolean;
   json?: boolean;
 };
 
@@ -259,6 +342,9 @@ async function loadItems(projectRoot: string): Promise<WorkItem[]> {
     item.queries ??= [];
     item.section_ids ??= [];
     item.source_paths ??= [];
+    item.assumptions ??= [];
+    item.acceptance ??= [];
+    item.verifications ??= [];
   }
   return items;
 }
@@ -350,12 +436,103 @@ function formatItem(item: WorkItem, items: WorkItem[]): string {
         .join(', ')}`,
     );
   }
+  if (item.assumptions?.length) {
+    lines.push(
+      `- assumptions: ${item.assumptions.map((text) => JSON.stringify(text)).join('; ')}`,
+    );
+  }
+  if (item.acceptance?.length) {
+    lines.push(
+      `- acceptance: ${item.acceptance.map((text) => JSON.stringify(text)).join('; ')}`,
+    );
+  }
+  if (item.interview) {
+    const answered = item.interview.questions.filter((q) => q.answer).length;
+    const total = item.interview.questions.length;
+    lines.push(
+      `- interview: ${answered}/${total} answered${item.interview.sealed_at ? ' (sealed)' : ''}`,
+    );
+  }
+  const latest = latestVerification(item);
+  if (latest) {
+    lines.push(
+      `- verification: ${latest.verdict} — ${latest.summary}${latest.method ? ` [${latest.method}]` : ''}`,
+    );
+  }
   if (item.description) lines.push('', item.description);
   if (item.context_cache) {
     lines.push('', '### Cached knowledge context', '', item.context_cache);
   }
   if (item.close_reason) lines.push('', `Close reason: ${item.close_reason}`);
   return lines.join('\n');
+}
+
+function latestVerification(item: WorkItem): WorkVerification | undefined {
+  if (!item.verifications?.length) return undefined;
+  return [...item.verifications].sort((a, b) =>
+    a.created_at.localeCompare(b.created_at),
+  )[item.verifications.length - 1];
+}
+
+function parseVerdict(value: string): WorkVerdict {
+  const normalized = value.trim().toLowerCase();
+  if (
+    normalized !== 'pass' &&
+    normalized !== 'fail' &&
+    normalized !== 'inconclusive'
+  ) {
+    throw new Error('Verdict must be pass, fail, or inconclusive.');
+  }
+  return normalized;
+}
+
+function parseCheckFlag(raw: string): WorkCheckResult {
+  const trimmed = raw.trim();
+  const colon = trimmed.lastIndexOf(':');
+  if (colon <= 0) {
+    throw new Error(
+      `Invalid --check "${raw}". Use name:pass|fail|inconclusive.`,
+    );
+  }
+  const name = trimmed.slice(0, colon).trim();
+  const verdict = parseVerdict(trimmed.slice(colon + 1));
+  if (!name) throw new Error(`Invalid --check "${raw}". Name is required.`);
+  return { name, verdict };
+}
+
+function generateInterviewQuestions(item: WorkItem): WorkInterviewQuestion[] {
+  const prompts: string[] = [];
+  const blob = `${item.title}\n${item.description}`.toLowerCase();
+  if (!item.description.trim()) {
+    prompts.push('What is the concrete, user-visible outcome of this work?');
+  }
+  if (!item.acceptance.length) {
+    prompts.push(
+      'What observable check proves this is done (command, UI flow, or assertion)?',
+    );
+  }
+  if (!item.source_paths.length) {
+    prompts.push('Which files or modules are in scope for this change?');
+  }
+  if (
+    /\b(improve|better|fix|somehow|properly|clean up|refactor)\b/.test(blob)
+  ) {
+    prompts.push(
+      'What is wrong today versus what “done” looks like in measurable terms?',
+    );
+  }
+  prompts.push('What is explicitly out of scope and must not change?');
+  prompts.push(
+    'How will you verify at runtime (tests, CLI, browser/app flow) after the change?',
+  );
+  return prompts.map((prompt, index) => ({
+    id: `q${index + 1}`,
+    prompt,
+  }));
+}
+
+function unansweredQuestions(item: WorkItem): WorkInterviewQuestion[] {
+  return (item.interview?.questions ?? []).filter((question) => !question.answer);
 }
 
 function formatItemList(
@@ -488,9 +665,22 @@ export async function workCreateCommand(
       .map((path) => path.trim())
       .filter(Boolean),
     evidence: [],
+    assumptions: [...(opts.assumptions ?? [])]
+      .map((text) => text.trim())
+      .filter(Boolean),
+    acceptance: [...(opts.acceptance ?? [])]
+      .map((text) => text.trim())
+      .filter(Boolean),
+    verifications: [],
     created_at: nowIso(),
     updated_at: nowIso(),
   };
+  if (opts.interview !== false) {
+    item.interview = {
+      questions: generateInterviewQuestions(item),
+      generated_at: nowIso(),
+    };
+  }
   items.push(item);
   await saveItems(ctx.projectRoot, items);
 
@@ -503,9 +693,23 @@ export async function workCreateCommand(
       '',
       formatItem(item, items),
       '',
+      item.interview
+        ? [
+            'Interview questions (answer before sealing):',
+            ...item.interview.questions.map(
+              (question) => `- ${question.id}: ${question.prompt}`,
+            ),
+            '',
+            `Answer with: code-kg work answer ${item.id} --question <id> --answer "..."`,
+            `Seal with: code-kg work seal ${item.id}`,
+            '',
+          ].join('\n')
+        : '',
       'Start with knowledge context:',
       `- code-kg work start ${item.id}`,
-    ].join('\n'),
+    ]
+      .filter(Boolean)
+      .join('\n'),
   };
 }
 
@@ -673,12 +877,62 @@ export async function workCloseCommand(
   const items = await loadItems(ctx.projectRoot);
   const item = findItem(items, opts.id);
   if (!item) return errorResult(`Unknown work id: ${opts.id}`);
+
+  if (!opts.force) {
+    const latest = latestVerification(item);
+    if (!latest) {
+      return errorResult(
+        [
+          `${item.id} has no verification yet. Record a Reticle-style runtime check before closing:`,
+          `  code-kg work verify ${item.id} --verdict pass --summary "..." --method runtime`,
+          'Or close with --force to bypass (not recommended).',
+        ].join('\n'),
+      );
+    }
+    if (latest.verdict === 'fail') {
+      return errorResult(
+        [
+          `${item.id} latest verification is fail: ${latest.summary}`,
+          'Fix the failure, re-verify with pass, or close with --force.',
+        ].join('\n'),
+      );
+    }
+    if (latest.verdict === 'inconclusive' && !opts.allowInconclusive) {
+      return errorResult(
+        [
+          `${item.id} latest verification is inconclusive: ${latest.summary}`,
+          'Re-verify to pass, or close with --allow-inconclusive / --force.',
+        ].join('\n'),
+      );
+    }
+  }
+
   item.status = 'closed';
   item.closed_at = nowIso();
   item.updated_at = item.closed_at;
   if (opts.reason?.trim()) item.close_reason = opts.reason.trim();
   await saveItems(ctx.projectRoot, items);
   if (opts.json) return jsonResult(item);
+
+  const latest = latestVerification(item);
+  const warnings: string[] = [];
+  if (!item.evidence.some((entry) => entry.kind === 'pair' || entry.kind === 'after')) {
+    warnings.push(
+      '- No before/after evidence attached; consider `work evidence pair` next time.',
+    );
+  }
+  if (item.acceptance.length && latest) {
+    const covered = new Set(latest.checks.map((check) => check.name));
+    const missing = item.acceptance.filter(
+      (criterion) => ![...covered].some((name) => criterion.includes(name) || name.includes(criterion.slice(0, 24))),
+    );
+    if (missing.length) {
+      warnings.push(
+        `- Acceptance criteria without matching verify checks: ${missing.map((text) => JSON.stringify(text)).join('; ')}`,
+      );
+    }
+  }
+
   return {
     output: [
       '# Code-KG Work',
@@ -687,7 +941,293 @@ export async function workCloseCommand(
       '',
       formatItem(item, items),
       '',
+      latest
+        ? `Close gate: verification ${latest.verdict}${opts.force ? ' (forced)' : ''}.`
+        : 'Close gate: bypassed with --force (no verification).',
+      ...warnings,
+      '',
       'After closing implementation work, run `code-kg check` and `code-kg drift`.',
+    ]
+      .filter(Boolean)
+      .join('\n'),
+  };
+}
+
+export async function workVerifyCommand(
+  ctx: CmdContext,
+  opts: WorkVerifyOptions,
+): Promise<CmdResult> {
+  const items = await loadItems(ctx.projectRoot);
+  const item = findItem(items, opts.id);
+  if (!item) return errorResult(`Unknown work id: ${opts.id}`);
+  const summary = opts.summary.trim();
+  if (!summary) return errorResult('Verification --summary is required.');
+
+  let verdict: WorkVerdict;
+  let checks: WorkCheckResult[];
+  try {
+    verdict = parseVerdict(opts.verdict);
+    checks = (opts.check ?? []).map(parseCheckFlag);
+  } catch (error) {
+    return errorResult((error as Error).message);
+  }
+
+  const evidenceIds: string[] = [];
+  for (const evidenceId of opts.evidenceId ?? []) {
+    const match = item.evidence.find(
+      (entry) =>
+        entry.id === evidenceId ||
+        entry.id.endsWith(evidenceId) ||
+        entry.id.startsWith(evidenceId),
+    );
+    if (!match) return errorResult(`Unknown evidence id: ${evidenceId}`);
+    evidenceIds.push(match.id);
+  }
+
+  // If checks disagree, overall verdict cannot be stronger than the worst check.
+  if (checks.length) {
+    if (checks.some((check) => check.verdict === 'fail')) verdict = 'fail';
+    else if (
+      checks.some((check) => check.verdict === 'inconclusive') &&
+      verdict === 'pass'
+    ) {
+      verdict = 'inconclusive';
+    }
+  }
+
+  const verification: WorkVerification = {
+    id: `vf-${randomBytes(2).toString('hex')}`,
+    verdict,
+    summary,
+    method: opts.method?.trim() || 'manual',
+    checks,
+    evidence_ids: evidenceIds,
+    created_at: nowIso(),
+  };
+  item.verifications.push(verification);
+  item.updated_at = nowIso();
+  await saveItems(ctx.projectRoot, items);
+  if (opts.json) return jsonResult({ item, verification });
+  return {
+    output: [
+      '# Code-KG Work Verify',
+      '',
+      `Recorded ${verification.verdict} for ${item.id}`,
+      `- id: ${verification.id}`,
+      `- method: ${verification.method}`,
+      `- summary: ${verification.summary}`,
+      checks.length
+        ? `- checks: ${checks.map((check) => `${check.name}:${check.verdict}`).join(', ')}`
+        : undefined,
+      evidenceIds.length ? `- evidence: ${evidenceIds.join(', ')}` : undefined,
+      '',
+      verdict === 'pass'
+        ? `Close with: code-kg work close ${item.id} --reason "..."`
+        : verdict === 'inconclusive'
+          ? `Close requires --allow-inconclusive, or re-verify to pass.`
+          : 'Fix failures and re-run work verify before closing.',
+    ]
+      .filter(Boolean)
+      .join('\n'),
+  };
+}
+
+export async function workInterviewCommand(
+  ctx: CmdContext,
+  opts: WorkInterviewOptions,
+): Promise<CmdResult> {
+  const items = await loadItems(ctx.projectRoot);
+  const item = findItem(items, opts.id);
+  if (!item) return errorResult(`Unknown work id: ${opts.id}`);
+
+  if (!item.interview || opts.refresh) {
+    const priorAnswers = new Map(
+      (item.interview?.questions ?? [])
+        .filter((question) => question.answer)
+        .map((question) => [question.prompt, question] as const),
+    );
+    const questions = generateInterviewQuestions(item).map((question) => {
+      const prior = priorAnswers.get(question.prompt);
+      return prior
+        ? {
+            ...question,
+            answer: prior.answer,
+            answered_at: prior.answered_at,
+          }
+        : question;
+    });
+    item.interview = {
+      questions,
+      generated_at: nowIso(),
+      sealed_at: undefined,
+    };
+    item.updated_at = nowIso();
+    await saveItems(ctx.projectRoot, items);
+  }
+
+  if (opts.json) return jsonResult(item.interview);
+  const unanswered = unansweredQuestions(item);
+  return {
+    output: [
+      '# Code-KG Work Interview',
+      '',
+      formatItem(item, items),
+      '',
+      '## Questions',
+      '',
+      ...item.interview!.questions.map((question) =>
+        question.answer
+          ? `- ${question.id}: ${question.prompt}\n  answer: ${question.answer}`
+          : `- ${question.id}: ${question.prompt}`,
+      ),
+      '',
+      unanswered.length
+        ? `${unanswered.length} unanswered. Use \`code-kg work answer ${item.id} --question <id> --answer "..."\`.`
+        : `All answered. Seal with \`code-kg work seal ${item.id}\`.`,
+    ].join('\n'),
+  };
+}
+
+export async function workAnswerCommand(
+  ctx: CmdContext,
+  opts: WorkAnswerOptions,
+): Promise<CmdResult> {
+  const items = await loadItems(ctx.projectRoot);
+  const item = findItem(items, opts.id);
+  if (!item) return errorResult(`Unknown work id: ${opts.id}`);
+  if (!item.interview) {
+    item.interview = {
+      questions: generateInterviewQuestions(item),
+      generated_at: nowIso(),
+    };
+  }
+  if (item.interview.sealed_at) {
+    return errorResult(
+      `${item.id} interview is sealed. Refresh with \`work interview ${item.id} --refresh\` to reopen.`,
+    );
+  }
+
+  const key = opts.question.trim();
+  const question =
+    item.interview.questions.find((entry) => entry.id === key) ??
+    item.interview.questions.find((entry) =>
+      entry.prompt.toLowerCase().includes(key.toLowerCase()),
+    );
+  if (!question) {
+    return errorResult(
+      `Unknown question "${opts.question}". Use q1, q2, ... from work interview.`,
+    );
+  }
+  const answer = opts.answer.trim();
+  if (!answer) return errorResult('Answer text is required.');
+  question.answer = answer;
+  question.answered_at = nowIso();
+  item.updated_at = nowIso();
+  await saveItems(ctx.projectRoot, items);
+  if (opts.json) return jsonResult({ item, question });
+  const remaining = unansweredQuestions(item).length;
+  return {
+    output: [
+      '# Code-KG Work Answer',
+      '',
+      `Recorded answer for ${question.id} on ${item.id}`,
+      '',
+      remaining
+        ? `${remaining} question(s) still unanswered.`
+        : `All questions answered. Seal with: code-kg work seal ${item.id}`,
+    ].join('\n'),
+  };
+}
+
+export async function workAssumeCommand(
+  ctx: CmdContext,
+  opts: WorkAssumeOptions,
+): Promise<CmdResult> {
+  const items = await loadItems(ctx.projectRoot);
+  const item = findItem(items, opts.id);
+  if (!item) return errorResult(`Unknown work id: ${opts.id}`);
+  const text = opts.text.trim();
+  if (!text) return errorResult('Assumption text is required.');
+  if (!item.assumptions.includes(text)) item.assumptions.push(text);
+  item.updated_at = nowIso();
+  await saveItems(ctx.projectRoot, items);
+  if (opts.json) return jsonResult(item);
+  return {
+    output: [
+      '# Code-KG Work Assume',
+      '',
+      `Added assumption on ${item.id}`,
+      `- ${JSON.stringify(text)}`,
+    ].join('\n'),
+  };
+}
+
+export async function workAcceptCommand(
+  ctx: CmdContext,
+  opts: WorkAcceptOptions,
+): Promise<CmdResult> {
+  const items = await loadItems(ctx.projectRoot);
+  const item = findItem(items, opts.id);
+  if (!item) return errorResult(`Unknown work id: ${opts.id}`);
+  const criterion = opts.criterion.trim();
+  if (!criterion) return errorResult('Acceptance criterion is required.');
+  if (!item.acceptance.includes(criterion)) item.acceptance.push(criterion);
+  item.updated_at = nowIso();
+  await saveItems(ctx.projectRoot, items);
+  if (opts.json) return jsonResult(item);
+  return {
+    output: [
+      '# Code-KG Work Accept',
+      '',
+      `Added acceptance criterion on ${item.id}`,
+      `- ${JSON.stringify(criterion)}`,
+      '',
+      'Cover it later with `work verify --check "<short-name>:pass"`.',
+    ].join('\n'),
+  };
+}
+
+export async function workSealCommand(
+  ctx: CmdContext,
+  opts: WorkSealOptions,
+): Promise<CmdResult> {
+  const items = await loadItems(ctx.projectRoot);
+  const item = findItem(items, opts.id);
+  if (!item) return errorResult(`Unknown work id: ${opts.id}`);
+  if (!item.interview) {
+    item.interview = {
+      questions: generateInterviewQuestions(item),
+      generated_at: nowIso(),
+    };
+  }
+  const unanswered = unansweredQuestions(item);
+  if (unanswered.length && !opts.force) {
+    return errorResult(
+      [
+        `${item.id} still has ${unanswered.length} unanswered interview question(s):`,
+        ...unanswered.map((question) => `- ${question.id}: ${question.prompt}`),
+        'Answer them, or seal with --force.',
+      ].join('\n'),
+    );
+  }
+  if (!item.acceptance.length && !opts.force) {
+    return errorResult(
+      `${item.id} has no acceptance criteria. Add with \`work accept ${item.id} --criterion "..."\`, or seal with --force.`,
+    );
+  }
+  item.interview.sealed_at = nowIso();
+  item.updated_at = nowIso();
+  await saveItems(ctx.projectRoot, items);
+  if (opts.json) return jsonResult(item);
+  return {
+    output: [
+      '# Code-KG Work Seal',
+      '',
+      `Sealed interview for ${item.id}${opts.force ? ' (forced)' : ''}`,
+      '',
+      formatItem(item, items),
+      '',
+      `Ready to build: code-kg work start ${item.id}`,
     ].join('\n'),
   };
 }
@@ -856,12 +1396,20 @@ export async function workStartCommand(
         ? `- Continue in the isolated worktree: \`${item.worktree_path}\` (branch \`${item.worktree_branch}\`).`
         : '- Optional isolation: `code-kg work isolate <id>` or `work start <id> --worktree`.',
       '- Prefer actions/orchestration for why/when and shared services for reusable how (see code-structure skill).',
+      '- If the interview is unsealed, answer + seal before large implementation (`work interview` / `work answer` / `work seal`).',
       '- Capture before/after evidence with `code-kg work evidence pair <id> --before <path> --after <path>` before claiming done.',
+      '- Record a runtime verification (`work verify <id> --verdict pass --summary "..." --method runtime`) before close.',
       '- Do not broad-grep the repo next. Use the primed hits, then `code-kg section`, `code-kg impact`, or `code-kg ask` for follow-ups.',
       `- If you discover more work, create it with \`code-kg work create "..." --discovered-from ${item.id}\`.`,
-      `- When finished: \`code-kg work close ${item.id} --reason "..."\`, then \`code-kg check\` and \`code-kg drift\`.`,
+      `- When finished: \`code-kg work verify ${item.id} --verdict pass --summary "..."\` then \`code-kg work close ${item.id} --reason "..."\`, then \`code-kg check\` and \`code-kg drift\`.`,
       item.worktree_path
         ? `- After merge/close: \`code-kg work cleanup ${item.id}\`.`
+        : undefined,
+      item.interview && !item.interview.sealed_at
+        ? `- Interview still open (${unansweredQuestions(item).length} unanswered).`
+        : undefined,
+      item.acceptance.length
+        ? `- Acceptance criteria: ${item.acceptance.map((text) => JSON.stringify(text)).join('; ')}`
         : undefined,
     ]
       .filter(Boolean)
@@ -887,10 +1435,11 @@ export async function workPrimeCommand(
     '## Workflow',
     '',
     '1. `code-kg work ready` — pick unblocked work',
-    '2. `code-kg work start <id>` — claim + prime from the knowledge graph',
-    '3. Prefer `code-kg ask` / `search` / `impact` over raw grep while executing',
-    '4. `code-kg work create "discovered issue" --discovered-from <id>` for new work',
-    '5. `code-kg work close <id>` then `code-kg check` + `code-kg drift`',
+    '2. `code-kg work interview/answer/seal <id>` — resolve ambiguity + acceptance before coding',
+    '3. `code-kg work start <id>` — claim + prime from the knowledge graph',
+    '4. Prefer `code-kg ask` / `search` / `impact` over raw grep while executing',
+    '5. `code-kg work evidence pair` + `work verify --verdict pass` before close',
+    '6. `code-kg work close <id>` then `code-kg check` + `code-kg drift`',
     '',
     '## In progress',
     '',
