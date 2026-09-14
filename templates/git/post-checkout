@@ -1,0 +1,37 @@
+#!/bin/sh
+# Code-KG post-checkout hook
+# code-kg:managed-hook
+# After switching branches, refresh lat.md/ so agents never work against a
+# stale knowledge graph from the previous branch.
+#
+# Installed by `code-kg git-hooks install`. Advisory: does not block checkout.
+# Git passes: $1=previous HEAD, $2=new HEAD, $3=1 for branch checkout / 0 for file.
+
+if [ "$3" != "1" ]; then
+  exit 0
+fi
+
+if ! command -v code-kg >/dev/null 2>&1; then
+  exit 0
+fi
+
+repo_root=$(git rev-parse --show-toplevel)
+
+if [ ! -d "$repo_root/lat.md" ]; then
+  exit 0
+fi
+
+# No-op when HEAD did not move (e.g. checkout of the same commit).
+if [ "$1" = "$2" ]; then
+  exit 0
+fi
+
+echo "[code-kg] post-checkout: syncing knowledge graph for new branch tip..."
+
+if ! code-kg --dir "$repo_root" update; then
+  echo "[code-kg] post-checkout: update reported issues (run 'code-kg check' / 'code-kg drift')."
+  echo "[code-kg] Checkout completed; fix the knowledge graph before relying on it."
+  exit 0
+fi
+
+exit 0

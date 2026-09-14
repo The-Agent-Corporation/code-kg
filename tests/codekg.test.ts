@@ -690,17 +690,27 @@ describe('code-kg bootstrap', () => {
 
     const result = await agentsCommand(ctx(root), { action: 'install' });
     const agentsMd = await readFile(join(root, 'AGENTS.md'), 'utf-8');
+    const claudeMd = await readFile(join(root, 'CLAUDE.md'), 'utf-8');
     const hooks = JSON.parse(
       await readFile(join(root, '.codex', 'hooks.json'), 'utf-8'),
     );
 
     expect(result.isError).toBeFalsy();
     expect(result.output).toContain('installed AGENTS.md guidance');
+    expect(result.output).toContain('installed CLAUDE.md guidance');
     expect(result.output).toContain('installed Codex hook');
+    expect(result.output).toMatch(
+      /installed git (pre-commit|hooks)|git pre-commit hook skipped/,
+    );
     expect(agentsMd).toContain('<!-- code-kg:agents:start -->');
     expect(agentsMd).toContain('Before broad source reads');
     expect(agentsMd).toContain('code-kg search "<question>"');
+    expect(agentsMd).toContain('Mandatory loop');
+    expect(agentsMd).toContain('work start');
+    expect(claudeMd).toContain('<!-- code-kg:agents:start -->');
+    expect(claudeMd).toContain('Mandatory loop');
     expect(hooks.hooks.PreToolUse).toHaveLength(1);
+    expect(hooks.hooks.Stop?.length).toBeGreaterThan(0);
     expect(hooks.hooks.PreToolUse[0].matcher).toContain('Grep');
     expect(hooks.hooks.PreToolUse[0].matcher).toContain('Read');
     expect(hooks.hooks.PreToolUse[0].hooks[0].command).toContain('hook-check');
@@ -790,6 +800,7 @@ describe('code-kg bootstrap', () => {
       expect(result.output).toContain('# Code-KG Agents Status');
       expect(result.output).toContain('lat.md/: found');
       expect(result.output).toContain('AGENTS.md guidance: installed');
+      expect(result.output).toContain('CLAUDE.md guidance: installed');
       expect(result.output).toContain('Codex hook: installed');
       expect(result.output).toContain('Codex matcher:');
       expect(result.output).toContain('Grep');
@@ -817,6 +828,7 @@ describe('code-kg bootstrap', () => {
     expect(result.output).toContain('# Code-KG Agents Status');
     expect(result.output).toContain('lat.md/: missing');
     expect(result.output).toContain('AGENTS.md guidance: missing');
+    expect(result.output).toContain('CLAUDE.md guidance: missing');
     expect(result.output).toContain('Codex hook: missing');
     expect(result.output).toContain('MCP command: code-kg mcp');
   });
@@ -897,7 +909,7 @@ describe('code-kg bootstrap', () => {
     ]);
   });
 
-  it('removes AGENTS.md when uninstalling a file that only contains managed guidance', async () => {
+  it('removes AGENTS.md and CLAUDE.md when uninstalling files that only contain managed guidance', async () => {
     const root = await makeProject();
     await agentsCommand(ctx(root), { action: 'install' });
 
@@ -905,6 +917,7 @@ describe('code-kg bootstrap', () => {
 
     expect(result.isError).toBeFalsy();
     expect(existsSync(join(root, 'AGENTS.md'))).toBe(false);
+    expect(existsSync(join(root, 'CLAUDE.md'))).toBe(false);
   });
 
   it('keeps hook-check silent without hook input', async () => {
@@ -1007,7 +1020,7 @@ describe('code-kg bootstrap', () => {
     expect(contextText).toContain('raw source read');
     expect(contextText).toContain('src/index.ts');
     expect(contextText).toContain('code-kg context "src/index.ts"');
-    expect(contextText).toContain('code-kg section "<section-id>"');
+    expect(contextText).toMatch(/codekg_section|code-kg section/);
     expect(contextText).not.toContain('code-kg search "src/index.ts"');
   });
 
@@ -1198,6 +1211,7 @@ describe('code-kg bootstrap', () => {
       expect(result.output).toContain('manifest sections: generated=5');
       expect(result.output).toContain('.code-kg/cache/: ignored');
       expect(result.output).toContain('AGENTS.md guidance: installed');
+      expect(result.output).toContain('CLAUDE.md guidance: installed');
       expect(result.output).toContain('Codex hook: installed');
       expect(result.output).toContain('MCP command: code-kg mcp');
       expect(result.output).toContain('semantic search: missing');
@@ -1477,6 +1491,7 @@ describe('code-kg bootstrap', () => {
     expect(result.output).toContain('materialization-manifest.json: missing');
     expect(result.output).toContain('.code-kg/cache/: not ignored');
     expect(result.output).toContain('AGENTS.md guidance: missing');
+    expect(result.output).toContain('CLAUDE.md guidance: missing');
     expect(result.output).toContain('Codex hook: missing');
   });
 

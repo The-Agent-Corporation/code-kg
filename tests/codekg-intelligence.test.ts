@@ -450,6 +450,30 @@ describe('agent lifecycle context', () => {
     );
     expect(await readFile(manifestPath(root), 'utf8')).toBe(metadata);
   });
+
+  it('blocks Stop once when code-kg check fails', async () => {
+    const root = await fixture(true);
+    // Corrupt the manifest so check fails while the KB remains present.
+    const manifest = JSON.parse(await readFile(manifestPath(root), 'utf8'));
+    manifest.version = 99;
+    await writeFile(manifestPath(root), JSON.stringify(manifest, null, 2));
+    const first = await agentContextCommand(
+      ctx(root),
+      'stop',
+      JSON.stringify({ session_id: 'stop-block-1' }),
+    );
+    const parsed = JSON.parse(first.output);
+    expect(parsed.decision).toBe('block');
+    expect(parsed.reason).toContain('code-kg check');
+
+    const second = await agentContextCommand(
+      ctx(root),
+      'stop',
+      JSON.stringify({ session_id: 'stop-block-1', stop_hook_active: true }),
+    );
+    expect(second.output).toContain('additionalContext');
+    expect(second.output).not.toContain('"decision":"block"');
+  });
   it('installs and removes managed lifecycle hooks without deleting foreign hooks', async () => {
     const root = await fixture();
     await mkdir(join(root, '.codex'));
