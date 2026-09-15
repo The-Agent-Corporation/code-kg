@@ -15,6 +15,14 @@ If `code-kg` is not found, locate the user's Code-KG source checkout, install it
 dependencies, run `pnpm build`, then `node dist/src/codekg/cli.js install-global`
 there. Do not assume this private package is published to npm.
 
+## Role (orchestrator vs worker)
+
+If this session is a **coding worker** launched by OpenClaw (or similar), ensure
+`CODEKG_AGENT_ROLE=worker` so planning PromptSubmit hooks stay off. Orchestrators
+should use `CODEKG_AGENT_ROLE=orchestrator` and delegate sealed `code-kg work`
+items instead of implementing code themselves. Solo agents can leave the default
+`full` role (`code-kg agents install --role …` / `code-kg agents role`).
+
 ## Onboard a repo (no `lat.md/` yet)
 
 Run these from the repo root, with the user's go-ahead:

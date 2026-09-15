@@ -33,6 +33,26 @@ hook that blocks once when `code-kg check` fails or `lat.md/` is out of sync),
 and installs git `pre-commit`, `post-merge`, and `post-checkout` hooks so the
 knowledge graph refreshes on commits and whenever the current branch tip moves.
 
+### OpenClaw orchestrator + Claude Code workers
+
+When OpenClaw plans and Claude Code implements, install once then set roles
+**per process** so hooks stay appropriate:
+
+```bash
+code-kg agents install --role orchestrator
+export CODEKG_AGENT_ROLE=orchestrator          # OpenClaw
+CODEKG_AGENT_ROLE=worker claude                # coding worker
+```
+
+| Role | Host | Hook policy |
+| --- | --- | --- |
+| `orchestrator` | OpenClaw | planning search/ask/session; skip edit traces; Stop cares about open work, not lat.md sync |
+| `worker` | Claude Code | search-before-grep + edit context; Stop blocks once on check/sync; skip planning PromptSubmit |
+| `full` | solo | all hooks (default) |
+
+See `code-kg agents status`, `code-kg agents role`, and
+`plugins/openclaw-code-kg/` (`code-kg-orchestrator` skill).
+
 ## Daily Agent Workflow
 
 Use semantic search before broad source search:

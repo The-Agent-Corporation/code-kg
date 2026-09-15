@@ -1122,11 +1122,29 @@ const agents = program
 
 agents
   .command('install')
-  .description('Install managed AGENTS.md guidance and safe Codex hook')
-  .action(async () => {
+  .description(
+    'Install managed AGENTS.md/CLAUDE.md guidance, Codex hooks, and git hooks',
+  )
+  .option(
+    '--role <role>',
+    'default agent role: orchestrator | worker | full (override per process with CODEKG_AGENT_ROLE)',
+  )
+  .action(async (opts: { role?: string }) => {
     const ctx = rootOnlyContext();
     const { agentsCommand } = await import('./agents.js');
-    handleResult(await agentsCommand(ctx, { action: 'install' }));
+    const { parseAgentRole } = await import('./agent-role.js');
+    const role = parseAgentRole(opts.role);
+    if (opts.role && !role) {
+      handleResult({
+        output:
+          'Invalid --role. Use orchestrator, worker, or full.',
+        isError: true,
+      });
+      return;
+    }
+    handleResult(
+      await agentsCommand(ctx, { action: 'install', role: role ?? undefined }),
+    );
   });
 
 agents
@@ -1140,11 +1158,35 @@ agents
 
 agents
   .command('status')
-  .description('Show Code-KG agent guidance, hook, semantic, and MCP status')
+  .description('Show Code-KG agent guidance, hook, role, semantic, and MCP status')
   .action(async () => {
     const ctx = rootOnlyContext();
     const { agentsCommand } = await import('./agents.js');
     handleResult(await agentsCommand(ctx, { action: 'status' }));
+  });
+
+agents
+  .command('role')
+  .description(
+    'Show or set the default Code-KG agent role (orchestrator | worker | full)',
+  )
+  .option('--role <role>', 'set default role in .code-kg/agent-role.json')
+  .action(async (opts: { role?: string }) => {
+    const ctx = rootOnlyContext();
+    const { agentsCommand } = await import('./agents.js');
+    const { parseAgentRole } = await import('./agent-role.js');
+    const role = parseAgentRole(opts.role);
+    if (opts.role && !role) {
+      handleResult({
+        output:
+          'Invalid --role. Use orchestrator, worker, or full.',
+        isError: true,
+      });
+      return;
+    }
+    handleResult(
+      await agentsCommand(ctx, { action: 'role', role: role ?? undefined }),
+    );
   });
 
 const gitHooks = program

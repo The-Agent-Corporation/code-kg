@@ -4,6 +4,13 @@
 
 ### Added
 
+- Agent roles for orchestrator/worker/full splits: `code-kg agents install --role`,
+  `code-kg agents role`, `.code-kg/agent-role.json`, and `CODEKG_AGENT_ROLE` so
+  OpenClaw (plan/delegate) and Claude Code (implement) can share one repo without
+  planning hooks interrupting coding workers (and vice versa).
+- OpenClaw skill pack under `plugins/openclaw-code-kg/` documenting sealed-work
+  handoff with `CODEKG_AGENT_ROLE=worker` on launched Claude Code sessions.
+
 - First-run / `agents install` now writes the same managed guidance into both
   `AGENTS.md` and `CLAUDE.md` (knowledge-graph orientation + coding workflow +
   mandatory loop).

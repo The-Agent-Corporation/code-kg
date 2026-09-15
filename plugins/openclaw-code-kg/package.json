@@ -1,0 +1,11 @@
+{
+  "name": "@code-kg/openclaw-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OpenClaw skill pack for Code-KG orchestrator/worker roles",
+  "license": "MIT",
+  "openclaw": {
+    "extensions": [],
+    "skills": ["./skills"]
+  }
+}
