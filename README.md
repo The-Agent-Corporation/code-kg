@@ -59,6 +59,28 @@ once when `code-kg check` fails or `lat.md/` is out of sync with code changes.
 Git hooks keep the knowledge graph fresh on every commit and after merges or
 branch checkouts that move the tip (including pulls onto main).
 
+### OpenClaw orchestrator + Claude Code workers
+
+When an orchestrator (OpenClaw) plans and coding workers (Claude Code) implement,
+install once and set **roles per process** so the wrong hooks do not interrupt
+either side:
+
+```bash
+code-kg agents install --role orchestrator
+export CODEKG_AGENT_ROLE=orchestrator          # OpenClaw process
+CODEKG_AGENT_ROLE=worker claude                # coding worker / agent_launch env
+```
+
+| Role | Typical host | Hook policy |
+| --- | --- | --- |
+| `orchestrator` | OpenClaw | planning search/ask/session; skip edit traces; Stop cares about open work, not lat.md sync |
+| `worker` | Claude Code | search-before-grep + edit context; Stop blocks once on check/sync; skip planning PromptSubmit |
+| `full` | solo agent | all hooks (default) |
+
+Precedence: `CODEKG_AGENT_ROLE` → `.code-kg/agent-role.json` → `full`. Inspect with
+`code-kg agents status` / `code-kg agents role`. OpenClaw skill pack:
+[`plugins/openclaw-code-kg/`](plugins/openclaw-code-kg/) (`code-kg-orchestrator`).
+
 Session, prompt, and post-edit hooks provide bounded context or refresh the
 structural cache. They make no model requests and never approve knowledge.
 Run `code-kg agents install` again to upgrade managed guidance and hooks; foreign
@@ -110,6 +132,9 @@ node dist/src/codekg/cli.js semantic status
 node dist/src/codekg/cli.js semantic enable-local
 node dist/src/codekg/cli.js semantic reindex
 node dist/src/codekg/cli.js agents install
+node dist/src/codekg/cli.js agents install --role orchestrator
+node dist/src/codekg/cli.js agents role --role worker
+node dist/src/codekg/cli.js agents status
 node dist/src/codekg/cli.js work init
 node dist/src/codekg/cli.js work create "Example task" --query "entry points" --accept "ready list unlocks"
 node dist/src/codekg/cli.js work ready
@@ -146,7 +171,7 @@ For the normal local workflow, use the global binary:
 code-kg bootstrap --accept
 code-kg semantic enable-local
 code-kg semantic reindex
-code-kg agents install
+code-kg agents install                    # or --role worker / orchestrator / full
 code-kg agents status
 code-kg doctor
 code-kg drift
@@ -166,7 +191,9 @@ See [docs/USAGE.md](docs/USAGE.md) for the tested happy path and common checks.
 
 This repo is also a Claude Code plugin marketplace. The plugin wires the global
 `code-kg` binary into Claude Code as an MCP server plus hooks, and ships a
-guidance skill.
+guidance skill. For coding workers under OpenClaw, prefer
+`code-kg agents install --role worker` (or `CODEKG_AGENT_ROLE=worker`) so
+planning-only hooks stay out of the way — see OpenClaw roles above.
 
 Prerequisites (once per machine): `code-kg install-global` so `code-kg` is on
 `PATH`.
@@ -182,11 +209,12 @@ What it adds:
 
 - MCP server (`code-kg mcp`) — search, section, check, drift, confidence,
   suppress, and backlink tools in any mapped repo.
-- A PreToolUse hook that nudges toward `code-kg search` / `code-kg context`
+- Role-aware PreToolUse nudges toward `code-kg search` / `code-kg context`
   before broad grep/glob/read (silent in unmapped repos).
-- A SessionStart hook that offers to bootstrap unmapped code repos.
+- A SessionStart hook that offers to bootstrap unmapped code repos
+  (skipped for `--role worker`).
 - Bounded session orientation, prompt context, post-edit impact context, and
-  a silent stop-time structural refresh in mapped repos.
+  stop-time check/sync reminders in mapped repos (gated by agent role).
 - A guidance skill explaining the bootstrap and daily workflow.
 
 Map a repo with `code-kg bootstrap --accept` (see Daily Workflow above).
