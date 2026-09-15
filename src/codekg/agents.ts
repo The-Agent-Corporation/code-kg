@@ -10,6 +10,16 @@ import {
   installGitHooks,
   uninstallGitHooks,
 } from './git-hooks.js';
+import {
+  type AgentRole,
+  AGENT_ROLES,
+  hookPolicyFor,
+  parseAgentRole,
+  readAgentRoleConfig,
+  resolveAgentRole,
+  roleDescription,
+  writeAgentRoleConfig,
+} from './agent-role.js';
 
 const SECTION_START = '<!-- code-kg:agents:start -->';
 const SECTION_END = '<!-- code-kg:agents:end -->';
@@ -25,7 +35,9 @@ type HookCommandSelection = {
 };
 
 type AgentsOptions = {
-  action: 'install' | 'uninstall' | 'status';
+  action: 'install' | 'uninstall' | 'status' | 'role';
+  /** Default role written to .code-kg/agent-role.json on install/role. */
+  role?: AgentRole;
 };
 
 type HookCheckOptions = {
@@ -133,6 +145,17 @@ function managedAgentsSection(fallbackInvocation?: string): string {
     'Installed hooks nudge (and on Stop, may block) until you use Code-KG instead of broad grep-first workflows.',
     'Git hooks keep `lat.md/` synced on commit and after merges/checkouts that update the current branch.',
     '',
+    '### Agent roles (orchestrator vs worker)',
+    '',
+    'Repos often run an **orchestrator** (for example OpenClaw) that plans and delegates, plus **coding workers** (for example Claude Code) that implement.',
+    'Effective role = `CODEKG_AGENT_ROLE` env (per process) or `.code-kg/agent-role.json` default, else `full`.',
+    '',
+    '- **orchestrator**: plan with `search`/`ask`, drive `work interview` → `seal`, delegate sealed briefs to workers. Do **not** implement code. Hooks skip edit traces and do not Stop-block on lat.md sync; they do Stop-nudge/block on open unsealed or unverified work.',
+    '- **worker**: implement a sealed work item with `work start --worktree`, search before grep, evidence + `work verify`. Do **not** re-interview or re-plan. Hooks skip planning PromptSubmit retrieval and bootstrap offers; Stop blocks once on check/sync failures.',
+    '- **full** (solo default): all hooks and both planning + coding duties.',
+    '',
+    'OpenClaw should set `CODEKG_AGENT_ROLE=orchestrator`. When it launches Claude Code, set `CODEKG_AGENT_ROLE=worker` in that worker process.',
+    '',
   ];
   if (fallbackInvocation) {
     lines.push(
@@ -156,7 +179,8 @@ function managedAgentsSection(fallbackInvocation?: string): string {
     '### Coding workflow (multi-step work tracker)',
     '',
     '- For multi-step work, use `code-kg work` instead of markdown TODOs: `work ready`, `work interview`/`answer`/`seal`, `work start <id> --worktree`, `work verify`, `work close <id>`.',
-    '- Before executing a work item, run `code-kg work start <id> --worktree` (or `work isolate` + `work prime`) so search uses the knowledge graph and edits stay in an isolated worktree.',
+    '- Orchestrators own interview/seal/delegate/verify-close. Workers own `work start --worktree`, implementation, evidence, and a passing `work verify` before handoff.',
+    '- Before a worker executes, run `code-kg work start <id> --worktree` (or `work isolate` + `work prime`) so search uses the knowledge graph and edits stay in an isolated worktree.',
     '- Prefer action/orchestration code for why/when and shared services for reusable how; load the `code-structure` skill when extracting shared mechanics.',
     '- Capture before/after proof with `code-kg work evidence pair <id> --before <path> --after <path>` before closing; load the `evidence` and `before-and-after` skills for capture workflows.',
     '- Before `work close`, record a Reticle-style verification: `code-kg work verify <id> --verdict pass --summary "..." --method runtime` (fail blocks close; inconclusive needs `--allow-inconclusive`).',
@@ -167,7 +191,7 @@ function managedAgentsSection(fallbackInvocation?: string): string {
     '### Mandatory loop',
     '',
     '1. Orient with `code-kg search` / `ask` / `context` (not broad grep).',
-    '2. Track work with `code-kg work` (interview → seal → start --worktree).',
+    '2. Orchestrator: interview → seal → delegate. Worker: `work start --worktree` → implement.',
     '3. Prove with evidence + `work verify --verdict pass`, then `work close`.',
     '4. Keep the graph fresh: commits/merges run `code-kg update` via installed git hooks; after manual edits run `code-kg check` + `code-kg drift`.',
     SECTION_END,
@@ -460,10 +484,20 @@ async function codexHookDetails(
 
 async function agentsStatusCommand(ctx: CmdContext): Promise<CmdResult> {
   const hook = await codexHookDetails(ctx.projectRoot);
+  const role = await resolveAgentRole(ctx.projectRoot);
+  const stored = await readAgentRoleConfig(ctx.projectRoot);
+  const envRole = parseAgentRole(process.env.CODEKG_AGENT_ROLE);
   const lines = [
     '# Code-KG Agents Status',
     '',
     existsSync(ctx.latDir) ? '- lat.md/: found' : '- lat.md/: missing',
+    `- agent role (effective): ${role} — ${roleDescription(role)}`,
+    envRole
+      ? `- agent role (CODEKG_AGENT_ROLE): ${envRole}`
+      : '- agent role (CODEKG_AGENT_ROLE): unset',
+    stored
+      ? `- agent role (default file): ${stored.role}${stored.setBy ? ` (set by ${stored.setBy})` : ''}`
+      : '- agent role (default file): missing (.code-kg/agent-role.json)',
     ...(await guidanceStatusLines(ctx.projectRoot)),
   ];
 
@@ -472,7 +506,7 @@ async function agentsStatusCommand(ctx: CmdContext): Promise<CmdResult> {
     lines.push(`- Codex matcher: ${hook.matcher}`);
     lines.push(`- Codex command: ${hook.command}`);
     lines.push(
-      '- Codex Stop hook: blocks once when check fails or lat.md/ is out of sync with code changes',
+      '- Codex hooks: role-aware (orchestrator skips edit/sync-block; worker skips planning PromptSubmit)',
     );
   } else {
     lines.push('- Codex hook: missing');
@@ -481,7 +515,9 @@ async function agentsStatusCommand(ctx: CmdContext): Promise<CmdResult> {
   lines.push(...(await gitHookStatusLines(ctx.projectRoot)));
   lines.push(semanticDoctorStatus(ctx));
   lines.push('- MCP command: code-kg mcp');
-  lines.push('- Install command: code-kg agents install');
+  lines.push(
+    '- Install command: code-kg agents install [--role orchestrator|worker|full]',
+  );
   return { output: lines.join('\n') };
 }
 
@@ -491,15 +527,47 @@ export async function agentsCommand(
 ): Promise<CmdResult> {
   if (opts.action === 'status') return agentsStatusCommand(ctx);
 
+  if (opts.action === 'role') {
+    const role = opts.role ?? (await resolveAgentRole(ctx.projectRoot));
+    if (opts.role) {
+      const change = await writeAgentRoleConfig(
+        ctx.projectRoot,
+        opts.role,
+        'agents-role',
+      );
+      return {
+        output: [
+          '# Code-KG Agents Role',
+          '',
+          `- ${change}`,
+          `- effective now: ${await resolveAgentRole(ctx.projectRoot)}`,
+          `- tip: OpenClaw/Claude sessions should set CODEKG_AGENT_ROLE per process when both share this repo`,
+        ].join('\n'),
+      };
+    }
+    return {
+      output: [
+        '# Code-KG Agents Role',
+        '',
+        `- effective: ${role} — ${roleDescription(role)}`,
+        `- allowed: ${AGENT_ROLES.join(', ')}`,
+        `- set default: code-kg agents role --role <${AGENT_ROLES.join('|')}>`,
+        `- per process: CODEKG_AGENT_ROLE=orchestrator|worker|full`,
+      ].join('\n'),
+    };
+  }
+
   const changes =
     opts.action === 'install'
       ? await (async () => {
           const hookSelection = await selectHookCommand();
+          const role = opts.role ?? 'full';
           return [
             ...(await installAgentsMd(
               ctx.projectRoot,
               hookSelection.fallbackInvocation,
             )),
+            await writeAgentRoleConfig(ctx.projectRoot, role, 'agents-install'),
             await installCodexHook(ctx.projectRoot, hookSelection.hookCommand),
             ...(await installGitHooks(ctx.projectRoot)),
           ];
@@ -815,6 +883,8 @@ export async function hookCheckCommand(
   opts: HookCheckOptions = {},
 ): Promise<CmdResult> {
   if (!codeKgKnowledgeBaseInstalled(ctx)) return { output: '' };
+  const policy = hookPolicyFor(await resolveAgentRole(ctx.projectRoot));
+  if (!policy.preToolUseNudge) return { output: '' };
   const action = parseHookAction(opts.input);
   if (!action) return { output: '' };
 
@@ -850,6 +920,9 @@ export async function sessionCheckCommand(
 ): Promise<CmdResult> {
   // Already mapped: never re-offer.
   if (codeKgKnowledgeBaseInstalled(ctx)) return { output: '' };
+
+  const policy = hookPolicyFor(await resolveAgentRole(ctx.projectRoot));
+  if (!policy.sessionBootstrapOffer) return { output: '' };
 
   // Only offer in directories that look like a real codebase.
   let hasCode = false;

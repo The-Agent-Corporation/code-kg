@@ -1,0 +1,7 @@
+{
+  "id": "code-kg",
+  "name": "Code-KG",
+  "description": "Reviewable code knowledge graph for OpenClaw orchestrators that delegate coding to Claude Code workers.",
+  "version": "0.1.0",
+  "skills": ["skills"]
+}

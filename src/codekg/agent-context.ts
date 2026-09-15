@@ -9,6 +9,7 @@ import { sourceHash } from './structural.js';
 import { readJson, writeJsonAtomic } from './cache.js';
 import { codeKgCheckCommand } from './check.js';
 import { SOURCE_EXTENSIONS } from '../source-parser.js';
+import { hookPolicyFor, resolveAgentRole } from './agent-role.js';
 
 /** Minimum code change size (lines) before we consider flagging lat.md/ sync. */
 const DIFF_THRESHOLD = 5;
@@ -82,7 +83,10 @@ async function getStopStatus(ctx: CmdContext): Promise<StopStatus> {
   };
 }
 
-function formatStopReason(status: StopStatus, workSummary: string | null): string {
+function formatStopReason(
+  status: StopStatus,
+  workSummary: string | null,
+): string {
   const parts: string[] = [];
 
   const syncMsg =
@@ -147,13 +151,18 @@ async function handleStop(
     // ignore
   }
 
+  const policy = hookPolicyFor(await resolveAgentRole(ctx.projectRoot));
   const stopHookActive = payload.stop_hook_active === true;
   const status = await getStopStatus(ctx);
   const work = await workSessionSummary(ctx.projectRoot).catch(() => null);
 
-  if (!status.checkFailed && !status.needsSync) {
-    // Soft reminder when work is open but graph is healthy — do not block.
-    if (work) {
+  const syncIssue =
+    policy.stopBlockOnSync && (status.checkFailed || status.needsSync);
+  const openWorkIssue = policy.stopBlockOnOpenWork && Boolean(work);
+
+  if (!syncIssue && !openWorkIssue) {
+    // Soft reminder when work is open but this role does not block on it.
+    if (work && !policy.stopBlockOnOpenWork) {
       return {
         output: JSON.stringify({
           hookSpecificOutput: {
@@ -169,7 +178,18 @@ async function handleStop(
     return { output: '' };
   }
 
-  const reason = formatStopReason(status, work);
+  const reasonParts: string[] = [];
+  if (syncIssue) {
+    reasonParts.push(formatStopReason(status, work));
+  }
+  if (openWorkIssue && work) {
+    reasonParts.push(
+      'Open Code-KG work still needs attention (orchestrator duty):\n' +
+        work +
+        '\nSeal unfinished interviews, or verify + close completed items before ending. Do not implement code in the orchestrator — delegate sealed work to a coding worker with CODEKG_AGENT_ROLE=worker.',
+    );
+  }
+  const reason = reasonParts.join('\n\n');
 
   // Second pass — warn but do not block again (matches lat.md Stop semantics).
   if (stopHookActive) {
@@ -185,7 +205,6 @@ async function handleStop(
     };
   }
 
-  // Prefer Claude Code block decision; also include Cursor-style followup.
   const agent =
     typeof payload.agent === 'string'
       ? payload.agent
@@ -216,15 +235,28 @@ export async function agentContextCommand(
     return { output: '' };
   }
   if (!payload || typeof payload !== 'object') return { output: '' };
+  const policy = hookPolicyFor(await resolveAgentRole(ctx.projectRoot));
   try {
     if (event === 'stop') {
       return await handleStop(ctx, payload);
     }
+    if (event === 'session' && !policy.sessionContext) return { output: '' };
+    if (event === 'prompt' && !policy.promptPlanningContext)
+      return { output: '' };
+    if (event === 'edit' && !policy.editContext) return { output: '' };
+
     let output = '';
     if (event === 'session') {
       const map = (await mapCommand(ctx, { maxTokens: 600, limit: 5 })).output;
       const work = await workSessionSummary(ctx.projectRoot);
-      output = work ? [work, '', map].join('\n') : map;
+      const role = await resolveAgentRole(ctx.projectRoot);
+      const roleLine =
+        role === 'orchestrator'
+          ? 'Code-KG role: orchestrator — plan/seal/delegate only; set CODEKG_AGENT_ROLE=worker on Claude Code sessions you launch.'
+          : role === 'worker'
+            ? 'Code-KG role: worker — implement sealed work; do not re-interview or re-plan.'
+            : '';
+      output = [roleLine, work, map].filter(Boolean).join('\n\n');
     }
     if (event === 'prompt') {
       const prompt = payload.prompt;
