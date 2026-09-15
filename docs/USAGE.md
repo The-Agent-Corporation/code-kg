@@ -125,8 +125,11 @@ MCP tools mirror the same flow: `codekg_work_ready`, `codekg_work_start`,
   search or reads. Prefer `code-kg search` / `context` first.
 - **SessionStart / UserPromptSubmit / PostToolUse** (`agent-context`): inject
   bounded Code-KG context; never approve knowledge.
-- **Stop** (`agent-context stop`): blocks once when `code-kg check` fails or
-  code changed without a matching `lat.md/` update (GSD-style enforce-once).
+- **Stop** (`agent-context stop`): role-aware. Workers/full block once when
+  `code-kg check` fails or code changed without a matching `lat.md/` update.
+  Orchestrators skip sync blocks and instead Stop-nudge/block on open unsealed
+  or unverified work so planning sessions are not interrupted by coding sync
+  rules (and workers are not interrupted by planning PromptSubmit).
 - **Git hooks**: `pre-commit` runs `code-kg update` and stages KB files (blocks
   on check failure). `post-merge` / `post-checkout` refresh `lat.md/` after the
   branch tip moves so a pull onto main cannot leave the graph stale.
