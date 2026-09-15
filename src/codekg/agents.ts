@@ -6,9 +6,9 @@ import type { CmdContext, CmdResult } from '../context.js';
 import { discoverProject } from './discovery.js';
 import { semanticDoctorStatus } from './semantic.js';
 import {
-  gitHookStatusLine,
-  installGitHook,
-  uninstallGitHook,
+  gitHookStatusLines,
+  installGitHooks,
+  uninstallGitHooks,
 } from './git-hooks.js';
 
 const SECTION_START = '<!-- code-kg:agents:start -->';
@@ -122,12 +122,16 @@ async function selectHookCommand(): Promise<HookCommandSelection> {
   };
 }
 
+const GUIDANCE_FILES = ['AGENTS.md', 'CLAUDE.md'] as const;
+
 function managedAgentsSection(fallbackInvocation?: string): string {
   const lines = [
     SECTION_START,
     '## code-kg',
     '',
-    'This project may have a reviewable knowledge base in `lat.md/` and Code-KG metadata in `.code-kg/`.',
+    'This project uses Code-KG: a reviewable knowledge graph in `lat.md/` plus metadata in `.code-kg/`.',
+    'Installed hooks nudge (and on Stop, may block) until you use Code-KG instead of broad grep-first workflows.',
+    'Git hooks keep `lat.md/` synced on commit and after merges/checkouts that update the current branch.',
     '',
   ];
   if (fallbackInvocation) {
@@ -137,7 +141,8 @@ function managedAgentsSection(fallbackInvocation?: string): string {
     );
   }
   lines.push(
-    'Rules:',
+    '### Knowledge graph (orient before searching source)',
+    '',
     '- Before broad source reads, grep/glob searches, or answering codebase-structure questions, use `code-kg search "<question>"` or MCP `codekg_search` first.',
     '- Prefer `code-kg ask "<question>"` or MCP `codekg_ask` for combined knowledge and fresh source context. Use `--in <directory>` to scope a monorepo query.',
     '- Before changing a symbol or file, inspect `code-kg impact <symbol-or-file>`; use `callers`, `callees`, `skeleton`, and `map` for targeted exploration.',
@@ -147,6 +152,9 @@ function managedAgentsSection(fallbackInvocation?: string): string {
     '- Treat `lat.md/` as the primary map and raw source as the implementation detail to inspect after the relevant knowledge sections are known.',
     '- After modifying code or knowledge docs, run `code-kg check` and use `code-kg drift` to compare source and the knowledge base.',
     '- Do not manually add source backlinks; use `code-kg apply-backlinks --preview` and then `code-kg apply-backlinks --write` only for sections marked edit-safe.',
+    '',
+    '### Coding workflow (multi-step work tracker)',
+    '',
     '- For multi-step work, use `code-kg work` instead of markdown TODOs: `work ready`, `work interview`/`answer`/`seal`, `work start <id> --worktree`, `work verify`, `work close <id>`.',
     '- Before executing a work item, run `code-kg work start <id> --worktree` (or `work isolate` + `work prime`) so search uses the knowledge graph and edits stay in an isolated worktree.',
     '- Prefer action/orchestration code for why/when and shared services for reusable how; load the `code-structure` skill when extracting shared mechanics.',
@@ -155,6 +163,13 @@ function managedAgentsSection(fallbackInvocation?: string): string {
     '- Clarify ambiguous work with `work interview` / `work answer` / `work accept` / `work seal` so acceptance criteria stay separate from the build brief.',
     '- When you discover new work mid-task, create it with `code-kg work create "..." --discovered-from <id>` and keep dependencies explicit.',
     '- Run `unslop` over commit/PR prose you write for humans before posting. For code anti-patterns, load `anti-slop-code`. For UI routing across design skills, load `ui-skills-route`.',
+    '',
+    '### Mandatory loop',
+    '',
+    '1. Orient with `code-kg search` / `ask` / `context` (not broad grep).',
+    '2. Track work with `code-kg work` (interview → seal → start --worktree).',
+    '3. Prove with evidence + `work verify --verdict pass`, then `work close`.',
+    '4. Keep the graph fresh: commits/merges run `code-kg update` via installed git hooks; after manual edits run `code-kg check` + `code-kg drift`.',
     SECTION_END,
     '',
   );
@@ -193,16 +208,17 @@ function removeManagedSection(content: string): string | null {
   return next.trim() ? next : '';
 }
 
-async function installAgentsMd(
+async function installGuidanceFile(
   projectRoot: string,
+  fileName: (typeof GUIDANCE_FILES)[number],
   fallbackInvocation?: string,
 ): Promise<string> {
-  const agentsPath = join(projectRoot, 'AGENTS.md');
+  const filePath = join(projectRoot, fileName);
   const section = managedAgentsSection(fallbackInvocation);
-  const existing = await readText(agentsPath);
+  const existing = await readText(filePath);
   if (existing === null) {
-    await writeFile(agentsPath, section);
-    return 'installed AGENTS.md guidance';
+    await writeFile(filePath, section);
+    return `installed ${fileName} guidance`;
   }
 
   const replaced = replaceManagedSection(existing, section);
@@ -210,26 +226,50 @@ async function installAgentsMd(
     replaced ??
     (existing.trimEnd() ? `${existing.trimEnd()}\n\n${section}` : section);
   if (next !== existing) {
-    await writeFile(agentsPath, next);
+    await writeFile(filePath, next);
   }
   return replaced === null
-    ? 'installed AGENTS.md guidance'
-    : 'updated AGENTS.md guidance';
+    ? `installed ${fileName} guidance`
+    : `updated ${fileName} guidance`;
 }
 
-async function uninstallAgentsMd(projectRoot: string): Promise<string> {
-  const agentsPath = join(projectRoot, 'AGENTS.md');
-  const existing = await readText(agentsPath);
-  if (existing === null) return 'AGENTS.md guidance was not installed';
+async function installAgentsMd(
+  projectRoot: string,
+  fallbackInvocation?: string,
+): Promise<string[]> {
+  const results: string[] = [];
+  for (const fileName of GUIDANCE_FILES) {
+    results.push(
+      await installGuidanceFile(projectRoot, fileName, fallbackInvocation),
+    );
+  }
+  return results;
+}
+
+async function uninstallGuidanceFile(
+  projectRoot: string,
+  fileName: (typeof GUIDANCE_FILES)[number],
+): Promise<string> {
+  const filePath = join(projectRoot, fileName);
+  const existing = await readText(filePath);
+  if (existing === null) return `${fileName} guidance was not installed`;
 
   const next = removeManagedSection(existing);
-  if (next === null) return 'AGENTS.md guidance was not installed';
+  if (next === null) return `${fileName} guidance was not installed`;
   if (next === '') {
-    await rm(agentsPath);
-    return 'removed AGENTS.md guidance';
+    await rm(filePath);
+    return `removed ${fileName} guidance`;
   }
-  await writeFile(agentsPath, next);
-  return 'removed AGENTS.md guidance';
+  await writeFile(filePath, next);
+  return `removed ${fileName} guidance`;
+}
+
+async function uninstallAgentsMd(projectRoot: string): Promise<string[]> {
+  const results: string[] = [];
+  for (const fileName of GUIDANCE_FILES) {
+    results.push(await uninstallGuidanceFile(projectRoot, fileName));
+  }
+  return results;
 }
 
 function isCodeKgHook(hook: HookCommand): boolean {
@@ -372,11 +412,26 @@ async function uninstallCodexHook(projectRoot: string): Promise<string> {
   return 'removed Codex hook';
 }
 
-async function agentsGuidanceInstalled(projectRoot: string): Promise<boolean> {
+async function guidanceFileInstalled(
+  projectRoot: string,
+  fileName: (typeof GUIDANCE_FILES)[number],
+): Promise<boolean> {
   return (
-    (await readText(join(projectRoot, 'AGENTS.md')))?.includes(SECTION_START) ??
+    (await readText(join(projectRoot, fileName)))?.includes(SECTION_START) ??
     false
   );
+}
+
+async function guidanceStatusLines(projectRoot: string): Promise<string[]> {
+  const lines: string[] = [];
+  for (const fileName of GUIDANCE_FILES) {
+    lines.push(
+      (await guidanceFileInstalled(projectRoot, fileName))
+        ? `- ${fileName} guidance: installed`
+        : `- ${fileName} guidance: missing`,
+    );
+  }
+  return lines;
 }
 
 async function codexHookDetails(
@@ -409,20 +464,21 @@ async function agentsStatusCommand(ctx: CmdContext): Promise<CmdResult> {
     '# Code-KG Agents Status',
     '',
     existsSync(ctx.latDir) ? '- lat.md/: found' : '- lat.md/: missing',
-    (await agentsGuidanceInstalled(ctx.projectRoot))
-      ? '- AGENTS.md guidance: installed'
-      : '- AGENTS.md guidance: missing',
+    ...(await guidanceStatusLines(ctx.projectRoot)),
   ];
 
   if (hook.installed) {
     lines.push(`- Codex hook: installed (${hook.commandKind})`);
     lines.push(`- Codex matcher: ${hook.matcher}`);
     lines.push(`- Codex command: ${hook.command}`);
+    lines.push(
+      '- Codex Stop hook: blocks once when check fails or lat.md/ is out of sync with code changes',
+    );
   } else {
     lines.push('- Codex hook: missing');
   }
 
-  lines.push(await gitHookStatusLine(ctx.projectRoot));
+  lines.push(...(await gitHookStatusLines(ctx.projectRoot)));
   lines.push(semanticDoctorStatus(ctx));
   lines.push('- MCP command: code-kg mcp');
   lines.push('- Install command: code-kg agents install');
@@ -440,18 +496,18 @@ export async function agentsCommand(
       ? await (async () => {
           const hookSelection = await selectHookCommand();
           return [
-            await installAgentsMd(
+            ...(await installAgentsMd(
               ctx.projectRoot,
               hookSelection.fallbackInvocation,
-            ),
+            )),
             await installCodexHook(ctx.projectRoot, hookSelection.hookCommand),
-            await installGitHook(ctx.projectRoot),
+            ...(await installGitHooks(ctx.projectRoot)),
           ];
         })()
       : [
-          await uninstallAgentsMd(ctx.projectRoot),
+          ...(await uninstallAgentsMd(ctx.projectRoot)),
           await uninstallCodexHook(ctx.projectRoot),
-          await uninstallGitHook(ctx.projectRoot),
+          ...(await uninstallGitHooks(ctx.projectRoot)),
         ];
 
   return {
@@ -730,16 +786,19 @@ function suggestedSearchCommand(query: string | undefined): string {
 }
 
 function hookAdditionalContext(action: HookAction): string {
+  const workflow =
+    'Mandatory Code-KG loop: `search`/`ask`/`context` → for multi-step work use `work interview`/`seal`/`start --worktree` → `work evidence` + `work verify --verdict pass` → `work close`. Do not finish with a failing `code-kg check` or unsynced `lat.md/`.';
+
   if (action.kind === 'read') {
     const target = action.target ? ` of \`${action.target}\`` : '';
     const contextCommand = action.target
       ? `code-kg context "${escapeSearchQuery(action.target)}"`
       : 'code-kg context <file-or-symbol>';
-    return `Code-KG: this repo has a reviewable knowledge graph. Before raw source read${target}, run \`${contextCommand}\` to see relevant sections, relationships, and tests. Use \`code-kg section "<section-id>"\` when you already have a section id.`;
+    return `Code-KG REQUIRED: this repo has a reviewable knowledge graph. Before raw source read${target}, run \`${contextCommand}\` (or MCP \`codekg_section\`) first. Prefer graph context over opening files cold. ${workflow}`;
   }
 
   const searchCommand = suggestedSearchCommand(action.query);
-  return `Code-KG: this repo has a reviewable knowledge graph. Before broad raw-source search, run \`${searchCommand}\` or MCP \`codekg_search\` with backend \`auto-semantic\`, then use \`code-kg section "<section-id>"\` before opening raw files.`;
+  return `Code-KG REQUIRED: this repo has a reviewable knowledge graph. Before broad raw-source search (grep/glob/find), run \`${searchCommand}\` or MCP \`codekg_search\` with backend \`auto-semantic\`, then \`code-kg section "<section-id>"\` before opening raw files. Treat grep-first exploration as a last resort after Code-KG. ${workflow}`;
 }
 
 function hookNudgeOutput(action: HookAction): string {

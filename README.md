@@ -49,18 +49,18 @@ anchors. `source_node_ids` can support drift and coverage for overview sections,
 but source-editing features must use only `source_spans` on sections marked with
 `source_anchor_policy: "edit-safe"`.
 
-The agent guidance slice installs a managed `AGENTS.md` section plus a safe
-Codex lifecycle hooks. The guidance tells coding agents to query Code-KG
-before broad source reads or grep-style exploration; the hook inspects Bash
-tool context plus structured Grep, Glob, Read, LS, read_file, and
-list_directory payloads where the host supports them. It adds a non-blocking
-reminder before broad raw-source search commands such as `rg`, `grep`, `find`,
-or `git grep`; when it can infer the search pattern, it suggests a concrete
-`code-kg search "<query>" --backend auto-semantic` command instead of a generic
-placeholder.
+The agent guidance slice installs a managed section into both `AGENTS.md` and
+`CLAUDE.md`, plus safe Codex lifecycle hooks and git
+`pre-commit` / `post-merge` / `post-checkout` hooks. The guidance covers the
+original Code-KG intent (search/ask/context before broad grep) and the coding
+workflow (`work interview` → `seal` → `start --worktree` → evidence → verify →
+close). PreToolUse hooks nudge before raw-source search or reads; Stop blocks
+once when `code-kg check` fails or `lat.md/` is out of sync with code changes.
+Git hooks keep the knowledge graph fresh on every commit and after merges or
+branch checkouts that move the tip (including pulls onto main).
 
-Session, prompt, post-edit, and stop hooks now provide bounded context or refresh
-the structural cache. They make no model requests and never approve knowledge.
+Session, prompt, and post-edit hooks provide bounded context or refresh the
+structural cache. They make no model requests and never approve knowledge.
 Run `code-kg agents install` again to upgrade managed guidance and hooks; foreign
 hook entries are preserved. The Claude plugin includes the same lifecycle events.
 

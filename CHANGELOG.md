@@ -4,6 +4,15 @@
 
 ### Added
 
+- First-run / `agents install` now writes the same managed guidance into both
+  `AGENTS.md` and `CLAUDE.md` (knowledge-graph orientation + coding workflow +
+  mandatory loop).
+- Git hooks install set expands to `pre-commit`, `post-merge`, and
+  `post-checkout` so `lat.md/` refreshes on commit and whenever the current
+  branch tip moves (pulls/merges onto main included).
+- Stop lifecycle hook blocks once when `code-kg check` fails or code changes are
+  out of sync with `lat.md/` (GSD-style enforce-once); PreToolUse nudges are
+  stronger about search-first + work-tracker usage.
 - Reticle-style `code-kg work verify` with pass/fail/inconclusive verdicts; `work close` now requires a passing verification unless `--force` / `--allow-inconclusive`.
 - Ouroboros-style interview loop: `work interview`, `work answer`, `work assume`, `work accept`, `work seal` (auto-interview on create; acceptance stays separate from the build brief).
 - Caliper-shaped skill eval harness (`evals/skills/*.eval.yaml`, `pnpm test:skill-evals`) for structural packaging + ablation notes.

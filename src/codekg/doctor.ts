@@ -109,9 +109,20 @@ async function latCacheIgnored(projectRoot: string): Promise<boolean> {
   );
 }
 
-async function agentsGuidanceInstalled(projectRoot: string): Promise<boolean> {
-  const content = await readText(join(projectRoot, 'AGENTS.md'));
-  return content?.includes(AGENTS_MARKER) ?? false;
+const GUIDANCE_FILES = ['AGENTS.md', 'CLAUDE.md'] as const;
+
+async function guidanceStatusLines(projectRoot: string): Promise<string[]> {
+  const lines: string[] = [];
+  for (const fileName of GUIDANCE_FILES) {
+    const content = await readText(join(projectRoot, fileName));
+    const installed = content?.includes(AGENTS_MARKER) ?? false;
+    lines.push(
+      installed
+        ? `- ${fileName} guidance: installed`
+        : `- ${fileName} guidance: missing`,
+    );
+  }
+  return lines;
 }
 
 async function codexHookStatus(projectRoot: string): Promise<string> {
@@ -185,13 +196,12 @@ export async function doctorCommand(ctx: CmdContext): Promise<CmdResult> {
       ? '- lat.md/.cache/: ignored'
       : '- lat.md/.cache/: not ignored',
   );
-  lines.push(
-    (await agentsGuidanceInstalled(ctx.projectRoot))
-      ? '- AGENTS.md guidance: installed'
-      : '- AGENTS.md guidance: missing',
-  );
+  lines.push(...(await guidanceStatusLines(ctx.projectRoot)));
   lines.push(await codexHookStatus(ctx.projectRoot));
   lines.push(await gitHookStatusLine(ctx.projectRoot));
+  lines.push(
+    '- Enforcement: PreToolUse nudges search-first; Stop blocks once on check/sync failures; git pre-commit/post-merge/post-checkout keep lat.md/ fresh',
+  );
   lines.push('- MCP command: code-kg mcp');
   lines.push(
     '- Drift: run `code-kg drift` after source or architecture changes',
