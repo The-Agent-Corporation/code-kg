@@ -43,7 +43,7 @@
     "prepare": "git config core.hooksPath .githooks || true",
     "build": "tsc && node scripts/copy-vendor-assets.mjs",
     "pretest": "pnpm build",
-    "test": "vitest run",
+    "test": "vitest run && node --test plugins/openclaw-code-kg/tests/bridge.test.mjs",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write 'src/**/*.ts'",

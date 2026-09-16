@@ -4,16 +4,18 @@
 # After git pull / merge, refresh lat.md/ so the knowledge graph matches the
 # branch tip you just landed on (especially main/trunk updates).
 #
-# Installed by `code-kg git-hooks install`. Advisory: does not block the merge.
+# Installed by `code-kg git-hooks install`. Failures are reported; Git may already have completed the merge.
 
 if ! command -v code-kg >/dev/null 2>&1; then
-  exit 0
+  echo "[code-kg] Required CLI missing; knowledge synchronization failed." >&2
+  exit 1
 fi
 
 repo_root=$(git rev-parse --show-toplevel)
 
-if [ ! -d "$repo_root/lat.md" ]; then
-  exit 0
+if [ ! -d "$repo_root/lat.md" ] || [ ! -f "$repo_root/.code-kg/materialization-manifest.json" ]; then
+  echo "[code-kg] Required knowledge setup missing; synchronization failed." >&2
+  exit 1
 fi
 
 echo "[code-kg] post-merge: syncing knowledge graph with updated branch..."
@@ -21,7 +23,7 @@ echo "[code-kg] post-merge: syncing knowledge graph with updated branch..."
 if ! code-kg --dir "$repo_root" update; then
   echo "[code-kg] post-merge: update reported issues (run 'code-kg check' / 'code-kg drift')."
   echo "[code-kg] Merge completed; fix the knowledge graph before relying on it."
-  exit 0
+  exit 1
 fi
 
 exit 0

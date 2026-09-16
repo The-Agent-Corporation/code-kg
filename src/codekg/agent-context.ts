@@ -144,11 +144,22 @@ async function handleStop(
   ctx: CmdContext,
   payload: Record<string, unknown>,
 ): Promise<CmdResult> {
-  // Always refresh structural cache; never let refresh failures block stop twice.
+  // Freshness failure is unknown, never a clean Stop check. Keep the existing
+  // one-block/second-pass policy, but retain the failure in both responses.
+  let refreshFailure: string | undefined;
   try {
-    await freshGraph(ctx.projectRoot);
-  } catch {
-    // ignore
+    const graph = await freshGraph(ctx.projectRoot, { writeCache: false });
+    if (graph.analysis.parse_errors.length) {
+      throw new Error(
+        'Structural extraction reported errors: ' +
+          graph.analysis.parse_errors.join('; '),
+      );
+    }
+  } catch (error) {
+    refreshFailure =
+      'Code-KG structural refresh failed; freshness is unverified. ' +
+      (error instanceof Error ? error.message : String(error)).slice(0, 1200) +
+      '\nRepair the refresh failure and rerun Code-KG before claiming completion.';
   }
 
   const policy = hookPolicyFor(await resolveAgentRole(ctx.projectRoot));
@@ -160,9 +171,9 @@ async function handleStop(
     policy.stopBlockOnSync && (status.checkFailed || status.needsSync);
   const openWorkIssue = policy.stopBlockOnOpenWork && Boolean(work);
 
-  if (!syncIssue && !openWorkIssue) {
+  if (!refreshFailure && !syncIssue && !openWorkIssue) {
     // Soft reminder when work is open but this role does not block on it.
-    if (work && !policy.stopBlockOnOpenWork) {
+    if (work && !policy.stopBlockOnOpenWork && !stopHookActive) {
       return {
         output: JSON.stringify({
           hookSpecificOutput: {
@@ -179,6 +190,7 @@ async function handleStop(
   }
 
   const reasonParts: string[] = [];
+  if (refreshFailure) reasonParts.push(refreshFailure);
   if (syncIssue) {
     reasonParts.push(formatStopReason(status, work));
   }
@@ -191,19 +203,28 @@ async function handleStop(
   }
   const reason = reasonParts.join('\n\n');
 
-  // Second pass — warn but do not block again (matches lat.md Stop semantics).
-  if (stopHookActive) {
-    return {
-      output: JSON.stringify({
-        hookSpecificOutput: {
-          hookEventName: 'Stop',
-          additionalContext:
-            'Code-KG: previous Stop block was acknowledged, but issues remain:\n' +
-            reason,
-        },
-      }),
-    };
-  }
+  // Keep the unresolved reason as evidence without injecting the same prompt
+  // forever. Claude can continue on additionalContext even without a block.
+  const receiptKey = sourceHash(
+    String(payload.session_id ?? 'anonymous'),
+  ).slice(7, 23);
+  await writeJsonAtomic(
+    join(ctx.projectRoot, '.code-kg/cache', `stop-status-${receiptKey}.json`),
+    {
+      checkedAt: new Date().toISOString(),
+      stopHookActive,
+      unresolved: true,
+      reason,
+    },
+  ).catch((error) => {
+    // A diagnostic write failure must never erase the actual Stop decision.
+    process.stderr.write(
+      'Code-KG could not persist unresolved Stop evidence: ' +
+        String(error) +
+        '\n',
+    );
+  });
+  if (stopHookActive) return { output: '' };
 
   const agent =
     typeof payload.agent === 'string'

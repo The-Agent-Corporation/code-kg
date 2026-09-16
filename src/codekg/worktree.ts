@@ -1,7 +1,7 @@
-import { existsSync } from 'node:fs';
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { existsSync, realpathSync } from 'node:fs';
+import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, relative, resolve } from 'node:path';
-import { execFile } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import { createHash, randomBytes } from 'node:crypto';
 
@@ -27,8 +27,104 @@ function slugify(input: string): string {
     .slice(0, 48);
 }
 
+/** Resolve from Git metadata, never a caller-provided store override. */
+export function canonicalProjectRoot(projectRoot: string): string {
+  const root = realpathSync(projectRoot);
+  let common: string;
+  try {
+    common = execFileSync(
+      'git',
+      ['rev-parse', '--path-format=absolute', '--git-common-dir'],
+      { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
+    ).trim();
+  } catch {
+    return root; // Standalone, non-Git knowledge projects remain supported.
+  }
+  common = realpathSync(common);
+  return common.endsWith('/.git') ? dirname(common) : common;
+}
+
+export type WorktreeAdoption = WorktreeInfo & {
+  head: string;
+  base: string;
+  indexSha256: string;
+  sessionId: string;
+};
+
+/** Observe only: adoption must never checkout, reset, fetch, stage, or prune. */
+export async function inspectWorktreeForAdoption(options: {
+  projectRoot: string;
+  path: string;
+  branch: string;
+  base: string;
+  sessionId: string;
+}): Promise<WorktreeAdoption> {
+  const path = realpathSync(resolve(options.projectRoot, options.path));
+  const common = async (cwd: string) =>
+    realpathSync(
+      (
+        await git(cwd, [
+          'rev-parse',
+          '--path-format=absolute',
+          '--git-common-dir',
+        ])
+      ).stdout.trim(),
+    );
+  if ((await common(path)) !== (await common(options.projectRoot))) {
+    throw new Error('Cannot adopt a worktree from another repository.');
+  }
+  const top = realpathSync(
+    (await git(path, ['rev-parse', '--show-toplevel'])).stdout.trim(),
+  );
+  if (top !== path) throw new Error('Adoption path must be the worktree root.');
+  const branch = (
+    await git(path, ['symbolic-ref', '--short', 'HEAD'])
+  ).stdout.trim();
+  if (branch !== options.branch)
+    throw new Error('Worktree branch does not match the preserved branch.');
+  const sessionId = options.sessionId.trim();
+  if (!sessionId) throw new Error('Preserved session identity is required.');
+  const head = (await git(path, ['rev-parse', 'HEAD'])).stdout.trim();
+  const base = (
+    await git(path, ['rev-parse', '--verify', `${options.base}^{commit}`])
+  ).stdout.trim();
+  await git(path, ['merge-base', '--is-ancestor', base, head]);
+  const index = (
+    await git(path, [
+      'rev-parse',
+      '--path-format=absolute',
+      '--git-path',
+      'index',
+    ])
+  ).stdout.trim();
+  const indexSha256 = createHash('sha256')
+    .update(await readFile(index))
+    .digest('hex');
+  if (
+    (await git(path, ['symbolic-ref', '--short', 'HEAD'])).stdout.trim() !==
+      branch ||
+    (await git(path, ['rev-parse', 'HEAD'])).stdout.trim() !== head ||
+    createHash('sha256')
+      .update(await readFile(index))
+      .digest('hex') !== indexSha256
+  ) {
+    throw new Error(
+      'Worktree identity/index changed during adoption; retry after concurrent Git activity ends.',
+    );
+  }
+  return {
+    path,
+    branch,
+    taskName: path.split('/').pop()!,
+    head,
+    base,
+    indexSha256,
+    sessionId,
+  };
+}
+
 export function worktreesRoot(projectRoot: string): string {
-  return join(projectRoot, '.code-kg', 'worktrees');
+  return join(canonicalProjectRoot(projectRoot), '.code-kg', 'worktrees');
 }
 
 export async function ensureWorktreesIgnored(
@@ -108,7 +204,7 @@ export async function createIsolatedWorktree(options: {
 
   if (existsSync(path)) {
     throw new Error(
-      `Worktree already exists at ${relative(options.projectRoot, path)}. Choose a different task or run work cleanup.`,
+      `Worktree already exists at ${relative(options.projectRoot, path)}. Use work adopt to reconcile the preserved checkout, or choose a different task.`,
     );
   }
 
@@ -131,14 +227,62 @@ export async function createIsolatedWorktree(options: {
     }
   }
 
+  // Git normally runs post-checkout before an uncommitted knowledge graph can
+  // be seeded. Defer checkout, populate this NEW tree, then run the full hook
+  // with its normal arguments. No hook configuration is disabled or replaced.
   await git(options.projectRoot, [
     'worktree',
     'add',
+    '--no-checkout',
     path,
     '-b',
     branch,
     base,
   ]);
+  try {
+    await git(path, ['read-tree', '--reset', '-u', 'HEAD']);
+    const canonical = canonicalProjectRoot(options.projectRoot);
+    for (const entry of ['lat.md', '.code-kg/materialization-manifest.json']) {
+      const source = join(canonical, entry);
+      const destination = join(path, entry);
+      if (!existsSync(destination) && existsSync(source)) {
+        await mkdir(dirname(destination), { recursive: true });
+        await cp(source, destination, {
+          recursive: true,
+          force: false,
+          errorOnExist: true,
+          filter: (entryPath) => !entryPath.split('/').includes('.cache'),
+        });
+      }
+    }
+    const head = (await git(path, ['rev-parse', 'HEAD'])).stdout.trim();
+    let requiredHook = false;
+    try {
+      const configured = (
+        await git(path, ['config', '--get', 'core.hooksPath'])
+      ).stdout.trim();
+      const hooksPath = resolve(path, configured);
+      requiredHook =
+        hooksPath.endsWith('/code-kg-composed-hooks') ||
+        existsSync(join(hooksPath, 'composition.json'));
+    } catch {
+      /* Ordinary repositories may have no configured hooks. */
+    }
+    await git(path, [
+      'hook',
+      'run',
+      ...(requiredHook ? [] : ['--ignore-missing']),
+      'post-checkout',
+      '--',
+      '0'.repeat(head.length),
+      head,
+      '1',
+    ]);
+  } catch (error) {
+    throw new Error(
+      `Worktree creation did not qualify: ${path} (${branch}) is preserved for inspection/adoption; no cleanup was performed. ${(error as Error).message}`,
+    );
+  }
 
   return { path, branch, taskName };
 }
@@ -219,7 +363,13 @@ export async function listOpenPrOverlaps(options: {
 }
 
 export function evidenceDir(projectRoot: string, workId: string): string {
-  return join(projectRoot, '.code-kg', 'work', 'evidence', workId);
+  return join(
+    canonicalProjectRoot(projectRoot),
+    '.code-kg',
+    'work',
+    'evidence',
+    workId,
+  );
 }
 
 export function stableEvidenceName(label: string, ext: string): string {

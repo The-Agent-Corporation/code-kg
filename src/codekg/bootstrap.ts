@@ -867,7 +867,7 @@ export async function createBootstrapPlan(
 ): Promise<BootstrapPlan> {
   const root = resolve(rootArg);
   const discovery = await discoverProject(root);
-  const graph = await extractProjectGraph(root, discovery);
+  const graph = await extractProjectGraph(root, discovery, { cache: true });
   const specFiles = await codeRefSpecFiles(root);
   const files: BootstrapFile[] = [
     {

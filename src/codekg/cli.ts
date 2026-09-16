@@ -4,11 +4,12 @@ if (!process.argv.includes('--verbose')) {
   process.noDeprecation = true;
 }
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Command, InvalidArgumentError } from 'commander';
 import { plainStyler, type CmdContext, type CmdResult } from '../context.js';
+import type { WorkAuthority, WorkCommandContext } from './work.js';
 import type { CodeKgSearchBackend } from './search.js';
 import { resolveContext } from '../cli/context.js';
 import {
@@ -123,13 +124,16 @@ async function runCheck(root: string): Promise<CmdResult> {
   });
 }
 
-function rootOnlyContext(): CmdContext {
-  const root = resolve(program.opts().dir ?? process.cwd());
+function rootOnlyContext(): WorkCommandContext {
+  const root = resolve(
+    program.opts().dir ?? launchBinding?.projectRoot ?? process.cwd(),
+  );
   return {
     latDir: join(root, 'lat.md'),
     projectRoot: root,
     styler: plainStyler,
     mode: 'cli',
+    workAuthority: launchBinding?.workAuthority,
   };
 }
 
@@ -537,7 +541,6 @@ program
     );
   });
 
-
 const work = program
   .command('work')
   .description(
@@ -560,13 +563,43 @@ work
   .option('-t, --type <type>', 'task, bug, feature, epic, or chore', 'task')
   .option('-p, --priority <n>', 'priority 0 (highest) to 4', (v) => Number(v))
   .option('--parent <id>', 'parent work id')
-  .option('--dep <id>', 'blocking dependency id', (v, acc: string[]) => [...acc, v], [])
+  .option(
+    '--dep <id>',
+    'blocking dependency id',
+    (v, acc: string[]) => [...acc, v],
+    [],
+  )
   .option('--discovered-from <id>', 'provenance parent work id')
-  .option('--query <text>', 'knowledge query to run on start', (v, acc: string[]) => [...acc, v], [])
-  .option('--section <id>', 'linked knowledge section id', (v, acc: string[]) => [...acc, v], [])
-  .option('--source <path>', 'linked source path', (v, acc: string[]) => [...acc, v], [])
-  .option('--assumption <text>', 'recorded assumption', (v, acc: string[]) => [...acc, v], [])
-  .option('--accept <text>', 'acceptance criterion', (v, acc: string[]) => [...acc, v], [])
+  .option(
+    '--query <text>',
+    'knowledge query to run on start',
+    (v, acc: string[]) => [...acc, v],
+    [],
+  )
+  .option(
+    '--section <id>',
+    'linked knowledge section id',
+    (v, acc: string[]) => [...acc, v],
+    [],
+  )
+  .option(
+    '--source <path>',
+    'linked source path',
+    (v, acc: string[]) => [...acc, v],
+    [],
+  )
+  .option(
+    '--assumption <text>',
+    'recorded assumption',
+    (v, acc: string[]) => [...acc, v],
+    [],
+  )
+  .option(
+    '--accept <text>',
+    'acceptance criterion',
+    (v, acc: string[]) => [...acc, v],
+    [],
+  )
   .option('--no-interview', 'skip auto interview questions on create')
   .option('--json', 'emit JSON')
   .action(
@@ -613,7 +646,11 @@ work
 work
   .command('list')
   .description('List work items')
-  .option('--status <status>', 'open, in_progress, blocked, closed, or all', 'all')
+  .option(
+    '--status <status>',
+    'open, in_progress, blocked, closed, or all',
+    'all',
+  )
   .option('--json', 'emit JSON')
   .action(async (opts: { status?: string; json?: boolean }) => {
     const { workListCommand } = await import('./work.js');
@@ -636,7 +673,9 @@ work
   .option('--json', 'emit JSON')
   .action(async (id: string, opts: { json?: boolean }) => {
     const { workShowCommand } = await import('./work.js');
-    handleResult(await workShowCommand(rootOnlyContext(), { id, json: opts.json }));
+    handleResult(
+      await workShowCommand(rootOnlyContext(), { id, json: opts.json }),
+    );
   });
 
 work
@@ -666,9 +705,24 @@ work
   .option('-p, --priority <n>', 'priority 0-4', (v) => Number(v))
   .option('--status <status>', 'open, in_progress, blocked, or closed')
   .option('--assignee <name>', 'assignee label')
-  .option('--query <text>', 'add a knowledge query', (v, acc: string[]) => [...acc, v], [])
-  .option('--section <id>', 'add a section id', (v, acc: string[]) => [...acc, v], [])
-  .option('--source <path>', 'add a source path', (v, acc: string[]) => [...acc, v], [])
+  .option(
+    '--query <text>',
+    'add a knowledge query',
+    (v, acc: string[]) => [...acc, v],
+    [],
+  )
+  .option(
+    '--section <id>',
+    'add a section id',
+    (v, acc: string[]) => [...acc, v],
+    [],
+  )
+  .option(
+    '--source <path>',
+    'add a source path',
+    (v, acc: string[]) => [...acc, v],
+    [],
+  )
   .option('--json', 'emit JSON')
   .action(
     async (
@@ -745,10 +799,7 @@ work
     'Record a Reticle-style runtime/check verdict before closing work',
   )
   .argument('<id>', 'work id')
-  .requiredOption(
-    '--verdict <verdict>',
-    'pass, fail, or inconclusive',
-  )
+  .requiredOption('--verdict <verdict>', 'pass, fail, or inconclusive')
   .requiredOption('--summary <text>', 'what was checked and what happened')
   .option('--method <text>', 'runtime, test, manual, reticle, ...', 'manual')
   .option(
@@ -797,24 +848,25 @@ work
   .argument('<id>', 'work id')
   .option('--refresh', 'regenerate questions (keeps matching prior answers)')
   .option('--json', 'emit JSON')
-  .action(
-    async (id: string, opts: { refresh?: boolean; json?: boolean }) => {
-      const { workInterviewCommand } = await import('./work.js');
-      handleResult(
-        await workInterviewCommand(rootOnlyContext(), {
-          id,
-          refresh: opts.refresh,
-          json: opts.json,
-        }),
-      );
-    },
-  );
+  .action(async (id: string, opts: { refresh?: boolean; json?: boolean }) => {
+    const { workInterviewCommand } = await import('./work.js');
+    handleResult(
+      await workInterviewCommand(rootOnlyContext(), {
+        id,
+        refresh: opts.refresh,
+        json: opts.json,
+      }),
+    );
+  });
 
 work
   .command('answer')
   .description('Answer an interview question on a work item')
   .argument('<id>', 'work id')
-  .requiredOption('--question <id-or-text>', 'question id (q1) or prompt snippet')
+  .requiredOption(
+    '--question <id-or-text>',
+    'question id (q1) or prompt snippet',
+  )
   .requiredOption('--answer <text>', 'answer text')
   .option('--json', 'emit JSON')
   .action(
@@ -925,7 +977,10 @@ work
   .argument('<id>', 'work id')
   .option('--assignee <name>', 'assignee label')
   .option('--worktree', 'create an isolated git worktree before priming')
-  .option('--force-scope', 'ignore open-PR overlap warnings when using --worktree')
+  .option(
+    '--force-scope',
+    'ignore open-PR overlap warnings when using --worktree',
+  )
   .option('--max-tokens <n>', 'knowledge context budget', (v) => Number(v))
   .option('--json', 'emit JSON')
   .action(
@@ -973,6 +1028,36 @@ work
   );
 
 work
+  .command('adopt')
+  .description(
+    'Attach an existing same-repository worktree without changing its branch or index',
+  )
+  .argument('<id>', 'work id')
+  .requiredOption('--path <path>', 'existing worktree root')
+  .requiredOption('--branch <branch>', 'expected preserved branch')
+  .requiredOption(
+    '--base <ref>',
+    'required ancestor (verified locally; does not fetch)',
+  )
+  .requiredOption('--session-id <id>', 'preserved coding session identity')
+  .option('--json', 'emit JSON')
+  .action(
+    async (
+      id: string,
+      opts: {
+        path: string;
+        branch: string;
+        base: string;
+        sessionId: string;
+        json?: boolean;
+      },
+    ) => {
+      const { workAdoptCommand } = await import('./work.js');
+      handleResult(await workAdoptCommand(rootOnlyContext(), { id, ...opts }));
+    },
+  );
+
+work
   .command('cleanup')
   .description('Remove the isolated worktree/branch for a work item')
   .argument('<id>', 'work id')
@@ -997,10 +1082,7 @@ workEvidence
   .command('attach')
   .description('Copy a file into work evidence storage and link it')
   .argument('<id>', 'work id')
-  .requiredOption(
-    '--kind <kind>',
-    'before, after, pair, recording, or note',
-  )
+  .requiredOption('--kind <kind>', 'before, after, pair, recording, or note')
   .requiredOption('--path <path>', 'evidence file path')
   .option('--label <text>', 'short label')
   .option('--paired-with <evidence-id>', 'related evidence id')
@@ -1022,12 +1104,7 @@ workEvidence
       handleResult(
         await workEvidenceAttachCommand(rootOnlyContext(), {
           id,
-          kind: opts.kind as
-            | 'before'
-            | 'after'
-            | 'pair'
-            | 'recording'
-            | 'note',
+          kind: opts.kind as 'before' | 'after' | 'pair' | 'recording' | 'note',
           path: opts.path,
           label: opts.label,
           pairedWith: opts.pairedWith,
@@ -1115,7 +1192,6 @@ work
     handleResult(await workMemoriesCommand(rootOnlyContext(), opts));
   });
 
-
 const agents = program
   .command('agents')
   .description('Install or remove Code-KG guidance for coding agents');
@@ -1136,8 +1212,7 @@ agents
     const role = parseAgentRole(opts.role);
     if (opts.role && !role) {
       handleResult({
-        output:
-          'Invalid --role. Use orchestrator, worker, or full.',
+        output: 'Invalid --role. Use orchestrator, worker, or full.',
         isError: true,
       });
       return;
@@ -1158,7 +1233,9 @@ agents
 
 agents
   .command('status')
-  .description('Show Code-KG agent guidance, hook, role, semantic, and MCP status')
+  .description(
+    'Show Code-KG agent guidance, hook, role, semantic, and MCP status',
+  )
   .action(async () => {
     const ctx = rootOnlyContext();
     const { agentsCommand } = await import('./agents.js');
@@ -1178,8 +1255,7 @@ agents
     const role = parseAgentRole(opts.role);
     if (opts.role && !role) {
       handleResult({
-        output:
-          'Invalid --role. Use orchestrator, worker, or full.',
+        output: 'Invalid --role. Use orchestrator, worker, or full.',
         isError: true,
       });
       return;
@@ -1265,7 +1341,7 @@ program
   .description('Start the MCP server')
   .action(async () => {
     const { startCodeKgMcpServer } = await import('./mcp.js');
-    await startCodeKgMcpServer();
+    await startCodeKgMcpServer(launchBinding);
   });
 
 program
@@ -1410,4 +1486,53 @@ program
     handleResult(await grepCommand(rootOnlyContext(), pattern, opts));
   });
 
-await program.parseAsync();
+export type CodeKgLaunchBinding = {
+  projectRoot: string;
+  workAuthority: WorkAuthority;
+};
+let launchBinding: CodeKgLaunchBinding | undefined;
+let launched = false;
+
+/** Single-process CLI entry for a trusted, fixed session launcher. Never read actor/role from argv or env. */
+export async function runCodeKgCli(
+  binding?: CodeKgLaunchBinding,
+  argv = process.argv,
+): Promise<void> {
+  if (launched)
+    throw new Error(
+      'CLI launch bindings cannot be replaced in a running process.',
+    );
+  launched = true;
+  if (binding) {
+    launchBinding = {
+      projectRoot: realpathSync(binding.projectRoot),
+      workAuthority: Object.freeze({ ...binding.workAuthority }),
+    };
+    program.setOptionValue('dir', launchBinding.projectRoot);
+    program.hook('preAction', (_root, command) => {
+      let current: Command | null = command;
+      let boundOperation = false;
+      while (current) {
+        if (current.name() === 'work' || current.name() === 'mcp')
+          boundOperation = true;
+        current = current.parent;
+      }
+      if (
+        boundOperation &&
+        realpathSync(resolve(program.opts().dir)) !== launchBinding!.projectRoot
+      ) {
+        throw new Error(
+          'A bound work/MCP operation cannot override its registered project root.',
+        );
+      }
+    });
+  }
+  await program.parseAsync(argv);
+}
+
+if (
+  process.argv[1] &&
+  realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))
+) {
+  await runCodeKgCli();
+}

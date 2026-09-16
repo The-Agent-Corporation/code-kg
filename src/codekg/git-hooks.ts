@@ -1,7 +1,14 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { chmod, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import {
+  access,
+  chmod,
+  mkdir,
+  readFile,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
-import { isAbsolute, join, resolve } from 'node:path';
+import { isAbsolute, join, relative, resolve } from 'node:path';
 import type { CmdContext, CmdResult } from '../context.js';
 import { findTemplatesDir } from '../cli/templates.js';
 
@@ -9,6 +16,7 @@ import { findTemplatesDir } from '../cli/templates.js';
 const MANAGED_MARKER = '# code-kg:managed-hook';
 const LEGACY_MARKER = '# Code-KG pre-commit hook';
 const HOOK_MODE = 0o755;
+const COMPOSED_MARKER = '# code-kg:composed-hook-v1';
 
 /** Managed git hooks installed by Code-KG. */
 export const MANAGED_GIT_HOOKS = [
@@ -79,6 +87,13 @@ async function installOneGitHook(
   const hookPath = join(hooksDir, name);
   const existing = await readText(hookPath);
 
+  if (existing?.includes(COMPOSED_MARKER)) {
+    // Reinstall only the Code-KG half, never the final repository guard.
+    await writeFile(`${hookPath}.code-kg`, loadHookTemplate(name));
+    await chmod(`${hookPath}.code-kg`, HOOK_MODE);
+    return `updated git ${name} hook (composition preserved)`;
+  }
+
   if (existing !== null && !isManagedHook(existing) && !opts.force) {
     return `git ${name} hook left untouched (a non-Code-KG ${name} hook already exists; re-run with --force to replace it)`;
   }
@@ -102,6 +117,9 @@ async function uninstallOneGitHook(
   const hookPath = join(hooksDir, name);
   const existing = await readText(hookPath);
   if (existing === null) return `git ${name} hook was not installed`;
+  if (existing.includes(COMPOSED_MARKER)) {
+    return `left composed ${name} hook intact (restore original core.hooksPath explicitly before uninstalling)`;
+  }
   if (!isManagedHook(existing)) {
     return `left non-Code-KG ${name} hook untouched`;
   }
@@ -130,7 +148,9 @@ export async function installGitHook(
   opts: { force?: boolean } = {},
 ): Promise<string> {
   const results = await installGitHooks(projectRoot, opts);
-  const skipped = results.every((line) => line.includes('not a git repository'));
+  const skipped = results.every((line) =>
+    line.includes('not a git repository'),
+  );
   if (skipped) return 'git hooks skipped (not a git repository)';
   const installed = results.filter((line) =>
     /^(installed|updated|replaced) /.test(line),
@@ -263,4 +283,116 @@ export async function gitHooksCommand(
       ...changes.map((change) => `- ${change}`),
     ].join('\n'),
   };
+}
+
+function quoteShell(value: string): string {
+  return "'" + value.replace(/'/g, "'\\''") + "'";
+}
+
+/**
+ * Explicit composition for a checkout-owned final staged guard. Dispatchers
+ * live in common Git metadata, so branch checkout cannot replace enforcement.
+ * The original hooks directory and checkout-owned guard are never modified.
+ */
+export async function installComposedGitHooks(
+  projectRoot: string,
+  opts: { finalPreCommit: string },
+): Promise<string[]> {
+  const root = execFileSync('git', ['rev-parse', '--show-toplevel'], {
+    cwd: projectRoot,
+    encoding: 'utf8',
+  }).trim();
+  const guard = relative(root, resolve(root, opts.finalPreCommit));
+  if (!guard || isAbsolute(opts.finalPreCommit) || guard.startsWith('..')) {
+    throw new Error('Final pre-commit guard must be a checkout-relative path');
+  }
+  await access(join(root, guard), 1);
+  const common = execFileSync('git', ['rev-parse', '--git-common-dir'], {
+    cwd: root,
+    encoding: 'utf8',
+  }).trim();
+  const destination = resolve(root, common, 'code-kg-composed-hooks');
+  const active = resolveHooksDir(root);
+  if (!active) throw new Error('Cannot resolve active Git hooks');
+  const manifestPath = join(destination, 'composition.json');
+  const previous = await readText(manifestPath);
+  let originalHooks = active;
+  if (previous) {
+    const saved = JSON.parse(previous) as {
+      finalPreCommit: string;
+      originalHooks: string;
+    };
+    if (saved.finalPreCommit !== guard)
+      throw new Error('Existing composition uses a different final guard');
+    originalHooks = saved.originalHooks;
+    if (active !== destination && active !== originalHooks)
+      throw new Error('Active hooks changed since composition installation');
+  } else {
+    if (active === destination)
+      throw new Error('Composition manifest is missing');
+    const existingPre = await readText(join(active, 'pre-commit'));
+    if (
+      existingPre &&
+      !isManagedHook(existingPre) &&
+      resolve(active, 'pre-commit') !== join(root, guard)
+    ) {
+      throw new Error(
+        'Active foreign pre-commit differs from requested final guard; refusing to discard it',
+      );
+    }
+  }
+  await mkdir(destination, { recursive: true });
+  for (const name of MANAGED_GIT_HOOKS) {
+    const sidecar = join(destination, `${name}.code-kg`);
+    await writeFile(sidecar, loadHookTemplate(name));
+    await chmod(sidecar, HOOK_MODE);
+    const lines = [
+      '#!/bin/sh',
+      MANAGED_MARKER,
+      COMPOSED_MARKER,
+      'set -eu',
+      'repo_root=$(git rev-parse --show-toplevel)',
+      'cd "$repo_root"',
+      `${quoteShell(sidecar)} "$@"`,
+    ];
+    if (name === 'pre-commit') {
+      lines.push(
+        `guard="$repo_root"/${quoteShell(guard)}`,
+        '[ -x "$guard" ] || { echo "[code-kg] Final repository guard missing or not executable" >&2; exit 1; }',
+        'exec "$guard" "$@"',
+      );
+    } else {
+      const original = join(originalHooks, name);
+      const text = await readText(original);
+      if (text && !isManagedHook(text)) {
+        await access(original, 1);
+        // A tracked original follows the current branch, not the install checkout.
+        const rel = relative(root, original);
+        const command =
+          !rel.startsWith('..') && !isAbsolute(rel)
+            ? `"$repo_root"/${quoteShell(rel)}`
+            : quoteShell(original);
+        lines.push(`exec ${command} "$@"`);
+      }
+    }
+    await writeFile(join(destination, name), lines.join('\n') + '\n');
+    await chmod(join(destination, name), HOOK_MODE);
+  }
+  await writeFile(
+    manifestPath,
+    JSON.stringify(
+      { version: 1, finalPreCommit: guard, originalHooks },
+      null,
+      2,
+    ) + '\n',
+  );
+  execFileSync('git', ['config', '--local', 'core.hooksPath', destination], {
+    cwd: root,
+  });
+  if (resolveHooksDir(root) !== destination)
+    throw new Error('A worktree-specific hooksPath overrides the composition');
+  return [
+    `installed composed git hooks in ${destination}`,
+    `final staged guard: ${guard}`,
+  ];
 }

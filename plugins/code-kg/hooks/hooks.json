@@ -18,12 +18,12 @@
           {
             "type": "command",
             "command": "code-kg session-check",
-            "timeout": 15
+            "timeout": 30
           },
           {
             "type": "command",
             "command": "code-kg agent-context session",
-            "timeout": 15
+            "timeout": 30
           }
         ]
       }
@@ -34,7 +34,7 @@
           {
             "type": "command",
             "command": "code-kg agent-context prompt",
-            "timeout": 15
+            "timeout": 30
           }
         ]
       }
@@ -46,7 +46,7 @@
           {
             "type": "command",
             "command": "code-kg agent-context edit",
-            "timeout": 15
+            "timeout": 45
           }
         ]
       }
@@ -57,7 +57,7 @@
           {
             "type": "command",
             "command": "code-kg agent-context stop",
-            "timeout": 15
+            "timeout": 45
           }
         ]
       }

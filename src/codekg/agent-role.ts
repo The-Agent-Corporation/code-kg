@@ -20,9 +20,7 @@ export type AgentRoleConfig = {
 };
 
 export function isAgentRole(value: unknown): value is AgentRole {
-  return (
-    value === 'orchestrator' || value === 'worker' || value === 'full'
-  );
+  return value === 'orchestrator' || value === 'worker' || value === 'full';
 }
 
 export function parseAgentRole(value: string | undefined): AgentRole | null {

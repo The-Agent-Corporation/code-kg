@@ -1,10 +1,21 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash, randomBytes } from 'node:crypto';
 import { copyFileSync, existsSync } from 'node:fs';
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
-import { basename, dirname, join, relative, resolve } from 'node:path';
+import { mkdir, open, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import {
+  basename,
+  dirname,
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+} from 'node:path';
 import type { CmdContext, CmdResult } from '../context.js';
 import { askCommand } from './query.js';
 import {
+  canonicalProjectRoot,
+  inspectWorktreeForAdoption,
+  type WorktreeAdoption,
   createIsolatedWorktree,
   evidenceDir,
   listOpenPrOverlaps,
@@ -25,7 +36,12 @@ export type WorkDep = {
   kind: WorkDepKind;
 };
 
-export type WorkEvidenceKind = 'before' | 'after' | 'pair' | 'recording' | 'note';
+export type WorkEvidenceKind =
+  | 'before'
+  | 'after'
+  | 'pair'
+  | 'recording'
+  | 'note';
 
 export type WorkEvidence = {
   id: string;
@@ -54,6 +70,9 @@ export type WorkVerification = {
   checks: WorkCheckResult[];
   evidence_ids: string[];
   created_at: string;
+  actor?: string;
+  role?: WorkAuthority['role'];
+  sealed_revision?: string;
 };
 
 export type WorkInterviewQuestion = {
@@ -68,6 +87,7 @@ export type WorkInterview = {
   questions: WorkInterviewQuestion[];
   generated_at: string;
   sealed_at?: string;
+  revision?: string;
 };
 
 export type WorkItem = {
@@ -86,6 +106,10 @@ export type WorkItem = {
   context_cache?: string;
   worktree_path?: string;
   worktree_branch?: string;
+  worktree_adoption?: WorktreeAdoption;
+  closed_by?: string;
+  seal_override_by?: string;
+  close_override_by?: string;
   evidence: WorkEvidence[];
   assumptions: string[];
   acceptance: string[];
@@ -267,7 +291,7 @@ const WORK_STATUSES: WorkStatus[] = [
 ];
 
 function workDir(projectRoot: string): string {
-  return join(projectRoot, '.code-kg', 'work');
+  return join(canonicalProjectRoot(projectRoot), '.code-kg', 'work');
 }
 
 function itemsPath(projectRoot: string): string {
@@ -303,7 +327,9 @@ async function writeTextAtomic(path: string, content: string): Promise<void> {
 
 async function readJsonl<T>(path: string): Promise<T[]> {
   try {
-    const raw = await readFile(path, 'utf8');
+    const raw =
+      transactionContext.getStore()?.pending.get(path) ??
+      (await readFile(path, 'utf8'));
     return raw
       .split('\n')
       .map((line) => line.trim())
@@ -320,16 +346,33 @@ async function writeJsonl<T>(path: string, rows: T[]): Promise<void> {
     rows.length === 0
       ? ''
       : `${rows.map((row) => JSON.stringify(row)).join('\n')}\n`;
-  await writeTextAtomic(path, body);
+  const transaction = transactionContext.getStore();
+  if (transaction) transaction.pending.set(path, body);
+  else await writeTextAtomic(path, body);
 }
 
 export async function ensureWorkStore(projectRoot: string): Promise<void> {
-  await mkdir(workDir(projectRoot), { recursive: true });
-  if (!existsSync(itemsPath(projectRoot))) {
-    await writeTextAtomic(itemsPath(projectRoot), '');
+  const canonical = workDir(projectRoot);
+  const local = join(resolve(projectRoot), '.code-kg', 'work');
+  if (canonical !== local) {
+    for (const name of ['items.jsonl', 'memories.jsonl']) {
+      try {
+        if ((await readFile(join(local, name), 'utf8')).trim())
+          throw new Error(
+            `Independent worktree work store found at ${local}; explicit reconciliation is required before using the shared store.`,
+          );
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      }
+    }
   }
-  if (!existsSync(memoriesPath(projectRoot))) {
-    await writeTextAtomic(memoriesPath(projectRoot), '');
+  await mkdir(canonical, { recursive: true });
+  for (const path of [itemsPath(projectRoot), memoriesPath(projectRoot)]) {
+    try {
+      await (await open(path, 'wx')).close();
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    }
   }
 }
 
@@ -345,6 +388,18 @@ async function loadItems(projectRoot: string): Promise<WorkItem[]> {
     item.assumptions ??= [];
     item.acceptance ??= [];
     item.verifications ??= [];
+    if (item.worktree_path && !isAbsolute(item.worktree_path))
+      item.worktree_path = resolve(
+        canonicalProjectRoot(projectRoot),
+        item.worktree_path,
+      );
+    for (const evidence of item.evidence) {
+      if (evidence.kind !== 'pair' && !isAbsolute(evidence.path))
+        evidence.path = resolve(
+          canonicalProjectRoot(projectRoot),
+          evidence.path,
+        );
+    }
   }
   return items;
 }
@@ -427,7 +482,9 @@ function formatItem(item: WorkItem, items: WorkItem[]): string {
     lines.push(`- sources: ${item.source_paths.join(', ')}`);
   }
   if (item.worktree_path) {
-    lines.push(`- worktree: ${item.worktree_path} (${item.worktree_branch ?? 'branch?'})`);
+    lines.push(
+      `- worktree: ${item.worktree_path} (${item.worktree_branch ?? 'branch?'})`,
+    );
   }
   if (item.evidence?.length) {
     lines.push(
@@ -532,7 +589,9 @@ function generateInterviewQuestions(item: WorkItem): WorkInterviewQuestion[] {
 }
 
 function unansweredQuestions(item: WorkItem): WorkInterviewQuestion[] {
-  return (item.interview?.questions ?? []).filter((question) => !question.answer);
+  return (item.interview?.questions ?? []).filter(
+    (question) => !question.answer,
+  );
 }
 
 function formatItemList(
@@ -589,7 +648,7 @@ function errorResult(message: string): CmdResult {
   return { output: `# Code-KG Work\n\n${message}`, isError: true };
 }
 
-export async function workInitCommand(ctx: CmdContext): Promise<CmdResult> {
+async function workInitCommandImpl(ctx: CmdContext): Promise<CmdResult> {
   await ensureWorkStore(ctx.projectRoot);
   return {
     output: [
@@ -605,7 +664,7 @@ export async function workInitCommand(ctx: CmdContext): Promise<CmdResult> {
   };
 }
 
-export async function workCreateCommand(
+async function workCreateCommandImpl(
   ctx: CmdContext,
   opts: WorkCreateOptions,
 ): Promise<CmdResult> {
@@ -764,13 +823,15 @@ export async function workShowCommand(
   return { output: ['# Code-KG Work', '', formatItem(item, items)].join('\n') };
 }
 
-export async function workClaimCommand(
+async function workClaimCommandImpl(
   ctx: CmdContext,
   opts: WorkClaimOptions,
 ): Promise<CmdResult> {
   const items = await loadItems(ctx.projectRoot);
   const item = findItem(items, opts.id);
   if (!item) return errorResult(`Unknown work id: ${opts.id}`);
+  if (!item.interview?.sealed_at)
+    return errorResult(`${item.id} must be sealed before execution.`);
   if (item.status === 'closed') {
     return errorResult(
       `${item.id} is closed; reopen with work update --status open.`,
@@ -783,7 +844,10 @@ export async function workClaimCommand(
     );
   }
   item.status = 'in_progress';
-  item.assignee = opts.assignee?.trim() || item.assignee || 'agent';
+  item.assignee =
+    (ctx as WorkCommandContext).workAuthority?.role === 'worker'
+      ? (ctx as WorkCommandContext).workAuthority!.actor
+      : opts.assignee?.trim() || item.assignee || 'agent';
   item.updated_at = nowIso();
   await saveItems(ctx.projectRoot, items);
   if (opts.json) return jsonResult(item);
@@ -802,13 +866,31 @@ export async function workClaimCommand(
   };
 }
 
-export async function workUpdateCommand(
+async function workUpdateCommandImpl(
   ctx: CmdContext,
   opts: WorkUpdateOptions,
 ): Promise<CmdResult> {
   const items = await loadItems(ctx.projectRoot);
   const item = findItem(items, opts.id);
   if (!item) return errorResult(`Unknown work id: ${opts.id}`);
+
+  if (opts.status === 'closed' || opts.status === 'in_progress') {
+    return errorResult(
+      'Use work close or work start for guarded execution transitions.',
+    );
+  }
+  if (
+    item.interview?.sealed_at &&
+    (opts.title !== undefined ||
+      opts.description !== undefined ||
+      opts.addQuery?.length ||
+      opts.addSection?.length ||
+      opts.addSource?.length)
+  ) {
+    return errorResult(
+      `${item.id} is sealed; reopen its interview before changing the contract.`,
+    );
+  }
 
   try {
     if (opts.title !== undefined) {
@@ -870,7 +952,7 @@ export async function workUpdateCommand(
   };
 }
 
-export async function workCloseCommand(
+async function workCloseCommandImpl(
   ctx: CmdContext,
   opts: WorkCloseOptions,
 ): Promise<CmdResult> {
@@ -878,6 +960,10 @@ export async function workCloseCommand(
   const item = findItem(items, opts.id);
   if (!item) return errorResult(`Unknown work id: ${opts.id}`);
 
+  if (!opts.force && item.status !== 'in_progress')
+    return errorResult('Start or claim work before closing it.');
+  if (!opts.force && !item.interview?.sealed_at)
+    return errorResult('Seal work before closing it.');
   if (!opts.force) {
     const latest = latestVerification(item);
     if (!latest) {
@@ -889,6 +975,13 @@ export async function workCloseCommand(
         ].join('\n'),
       );
     }
+    if (
+      item.interview?.revision &&
+      latest.sealed_revision !== item.interview.revision
+    )
+      return errorResult(
+        'Verification belongs to a different sealed revision.',
+      );
     if (latest.verdict === 'fail') {
       return errorResult(
         [
@@ -908,6 +1001,10 @@ export async function workCloseCommand(
   }
 
   item.status = 'closed';
+  item.closed_by =
+    (ctx as WorkCommandContext).workAuthority?.actor ?? 'local-operator';
+  if (opts.force || opts.allowInconclusive)
+    item.close_override_by = item.closed_by;
   item.closed_at = nowIso();
   item.updated_at = item.closed_at;
   if (opts.reason?.trim()) item.close_reason = opts.reason.trim();
@@ -916,7 +1013,11 @@ export async function workCloseCommand(
 
   const latest = latestVerification(item);
   const warnings: string[] = [];
-  if (!item.evidence.some((entry) => entry.kind === 'pair' || entry.kind === 'after')) {
+  if (
+    !item.evidence.some(
+      (entry) => entry.kind === 'pair' || entry.kind === 'after',
+    )
+  ) {
     warnings.push(
       '- No before/after evidence attached; consider `work evidence pair` next time.',
     );
@@ -924,7 +1025,11 @@ export async function workCloseCommand(
   if (item.acceptance.length && latest) {
     const covered = new Set(latest.checks.map((check) => check.name));
     const missing = item.acceptance.filter(
-      (criterion) => ![...covered].some((name) => criterion.includes(name) || name.includes(criterion.slice(0, 24))),
+      (criterion) =>
+        ![...covered].some(
+          (name) =>
+            criterion.includes(name) || name.includes(criterion.slice(0, 24)),
+        ),
     );
     if (missing.length) {
       warnings.push(
@@ -953,13 +1058,15 @@ export async function workCloseCommand(
   };
 }
 
-export async function workVerifyCommand(
+async function workVerifyCommandImpl(
   ctx: CmdContext,
   opts: WorkVerifyOptions,
 ): Promise<CmdResult> {
   const items = await loadItems(ctx.projectRoot);
   const item = findItem(items, opts.id);
   if (!item) return errorResult(`Unknown work id: ${opts.id}`);
+  if (item.status !== 'in_progress')
+    return errorResult('Start or claim work before recording verification.');
   const summary = opts.summary.trim();
   if (!summary) return errorResult('Verification --summary is required.');
 
@@ -1003,6 +1110,9 @@ export async function workVerifyCommand(
     checks,
     evidence_ids: evidenceIds,
     created_at: nowIso(),
+    actor: (ctx as WorkCommandContext).workAuthority?.actor,
+    role: (ctx as WorkCommandContext).workAuthority?.role,
+    sealed_revision: item.interview?.revision,
   };
   item.verifications.push(verification);
   item.updated_at = nowIso();
@@ -1032,7 +1142,7 @@ export async function workVerifyCommand(
   };
 }
 
-export async function workInterviewCommand(
+async function workInterviewCommandImpl(
   ctx: CmdContext,
   opts: WorkInterviewOptions,
 ): Promise<CmdResult> {
@@ -1041,6 +1151,10 @@ export async function workInterviewCommand(
   if (!item) return errorResult(`Unknown work id: ${opts.id}`);
 
   if (!item.interview || opts.refresh) {
+    if (opts.refresh && item.status !== 'open')
+      return errorResult(
+        'Reopen work to open status before refreshing its interview.',
+      );
     const priorAnswers = new Map(
       (item.interview?.questions ?? [])
         .filter((question) => question.answer)
@@ -1088,7 +1202,7 @@ export async function workInterviewCommand(
   };
 }
 
-export async function workAnswerCommand(
+async function workAnswerCommandImpl(
   ctx: CmdContext,
   opts: WorkAnswerOptions,
 ): Promise<CmdResult> {
@@ -1139,13 +1253,17 @@ export async function workAnswerCommand(
   };
 }
 
-export async function workAssumeCommand(
+async function workAssumeCommandImpl(
   ctx: CmdContext,
   opts: WorkAssumeOptions,
 ): Promise<CmdResult> {
   const items = await loadItems(ctx.projectRoot);
   const item = findItem(items, opts.id);
   if (!item) return errorResult(`Unknown work id: ${opts.id}`);
+  if (item.interview?.sealed_at)
+    return errorResult(
+      `${item.id} is sealed; reopen its interview before changing the contract.`,
+    );
   const text = opts.text.trim();
   if (!text) return errorResult('Assumption text is required.');
   if (!item.assumptions.includes(text)) item.assumptions.push(text);
@@ -1162,13 +1280,17 @@ export async function workAssumeCommand(
   };
 }
 
-export async function workAcceptCommand(
+async function workAcceptCommandImpl(
   ctx: CmdContext,
   opts: WorkAcceptOptions,
 ): Promise<CmdResult> {
   const items = await loadItems(ctx.projectRoot);
   const item = findItem(items, opts.id);
   if (!item) return errorResult(`Unknown work id: ${opts.id}`);
+  if (item.interview?.sealed_at)
+    return errorResult(
+      `${item.id} is sealed; reopen its interview before changing the contract.`,
+    );
   const criterion = opts.criterion.trim();
   if (!criterion) return errorResult('Acceptance criterion is required.');
   if (!item.acceptance.includes(criterion)) item.acceptance.push(criterion);
@@ -1187,7 +1309,7 @@ export async function workAcceptCommand(
   };
 }
 
-export async function workSealCommand(
+async function workSealCommandImpl(
   ctx: CmdContext,
   opts: WorkSealOptions,
 ): Promise<CmdResult> {
@@ -1215,7 +1337,30 @@ export async function workSealCommand(
       `${item.id} has no acceptance criteria. Add with \`work accept ${item.id} --criterion "..."\`, or seal with --force.`,
     );
   }
+  if (item.interview.sealed_at)
+    return opts.json
+      ? jsonResult(item)
+      : { output: `Already sealed: ${item.id}` };
   item.interview.sealed_at = nowIso();
+  item.interview.revision = createHash('sha256')
+    .update(
+      JSON.stringify({
+        title: item.title,
+        description: item.description,
+        acceptance: item.acceptance,
+        assumptions: item.assumptions,
+        deps: item.deps,
+        questions: item.interview.questions,
+        queries: item.queries,
+        sources: item.source_paths,
+        sections: item.section_ids,
+        sealed_at: item.interview.sealed_at,
+      }),
+    )
+    .digest('hex');
+  if (opts.force)
+    item.seal_override_by =
+      (ctx as WorkCommandContext).workAuthority?.actor ?? 'local-operator';
   item.updated_at = nowIso();
   await saveItems(ctx.projectRoot, items);
   if (opts.json) return jsonResult(item);
@@ -1232,13 +1377,17 @@ export async function workSealCommand(
   };
 }
 
-export async function workDepCommand(
+async function workDepCommandImpl(
   ctx: CmdContext,
   opts: WorkDepOptions,
 ): Promise<CmdResult> {
   const items = await loadItems(ctx.projectRoot);
   const item = findItem(items, opts.id);
   if (!item) return errorResult(`Unknown work id: ${opts.id}`);
+  if (item.interview?.sealed_at)
+    return errorResult(
+      `${item.id} is sealed; reopen its interview before changing the contract.`,
+    );
 
   const links: WorkDep[] = [];
   if (opts.blocks) links.push({ id: opts.blocks, kind: 'blocks' });
@@ -1339,7 +1488,7 @@ async function knowledgeContextForItem(
   return { usedGraph: true, text: chunks.join('\n\n') };
 }
 
-export async function workStartCommand(
+async function workStartCommandImpl(
   ctx: CmdContext,
   opts: WorkStartOptions,
 ): Promise<CmdResult> {
@@ -1493,7 +1642,7 @@ export async function workPrimeCommand(
   return { output: lines.join('\n') };
 }
 
-export async function workRememberCommand(
+async function workRememberCommandImpl(
   ctx: CmdContext,
   opts: WorkRememberOptions,
 ): Promise<CmdResult> {
@@ -1561,25 +1710,39 @@ export async function workSessionSummary(
   if (!ready.length && !inProgress.length) return null;
   return [
     'Code-KG work tracker:',
-    ...inProgress
-      .slice(0, 3)
-      .map((item) => {
-        const tree = item.worktree_path ? ` @ ${item.worktree_path}` : '';
-        return `- in_progress ${item.id}: ${item.title}${tree}`;
-      }),
+    ...inProgress.slice(0, 3).map((item) => {
+      const tree = item.worktree_path ? ` @ ${item.worktree_path}` : '';
+      return `- in_progress ${item.id}: ${item.title}${tree}`;
+    }),
     ...ready.slice(0, 5).map((item) => `- ready ${item.id}: ${item.title}`),
     'Use `code-kg work prime` or `code-kg work start <id> --worktree` before broad source search.',
   ].join('\n');
 }
 
-export async function workIsolateCommand(
+async function workIsolateCommandImpl(
   ctx: CmdContext,
   opts: WorkIsolateOptions,
 ): Promise<CmdResult> {
   const items = await loadItems(ctx.projectRoot);
   const item = findItem(items, opts.id);
   if (!item) return errorResult(`Unknown work id: ${opts.id}`);
-  if (item.worktree_path && existsSync(resolve(ctx.projectRoot, item.worktree_path))) {
+  if (!item.interview?.sealed_at)
+    return errorResult(`${item.id} must be sealed before execution.`);
+  if (
+    item.worktree_path &&
+    existsSync(
+      resolve(canonicalProjectRoot(ctx.projectRoot), item.worktree_path),
+    )
+  ) {
+    if (item.worktree_adoption) {
+      await inspectWorktreeForAdoption({
+        projectRoot: ctx.projectRoot,
+        path: item.worktree_path,
+        branch: item.worktree_branch!,
+        base: item.worktree_adoption.base,
+        sessionId: item.worktree_adoption.sessionId,
+      });
+    }
     if (opts.json) return jsonResult(item);
     return {
       output: [
@@ -1614,7 +1777,7 @@ export async function workIsolateCommand(
       workId: item.id,
       title: item.title,
     });
-    item.worktree_path = relative(ctx.projectRoot, tree.path);
+    item.worktree_path = tree.path;
     item.worktree_branch = tree.branch;
     item.updated_at = nowIso();
     await saveItems(ctx.projectRoot, items);
@@ -1636,7 +1799,7 @@ export async function workIsolateCommand(
   }
 }
 
-export async function workCleanupCommand(
+async function workCleanupCommandImpl(
   ctx: CmdContext,
   opts: WorkCleanupOptions,
 ): Promise<CmdResult> {
@@ -1649,7 +1812,10 @@ export async function workCleanupCommand(
   try {
     await removeIsolatedWorktree({
       projectRoot: ctx.projectRoot,
-      worktreePath: item.worktree_path ?? '',
+      worktreePath: resolve(
+        canonicalProjectRoot(ctx.projectRoot),
+        item.worktree_path ?? '',
+      ),
       branch: item.worktree_branch,
       force: opts.force,
     });
@@ -1690,11 +1856,11 @@ async function copyEvidenceFile(
   copyFileSync(absoluteSource, absoluteDest);
   return {
     abs: absoluteDest,
-    rel: relative(projectRoot, absoluteDest),
+    rel: absoluteDest,
   };
 }
 
-export async function workEvidenceAttachCommand(
+async function workEvidenceAttachCommandImpl(
   ctx: CmdContext,
   opts: WorkEvidenceAttachOptions,
 ): Promise<CmdResult> {
@@ -1739,7 +1905,7 @@ export async function workEvidenceAttachCommand(
   }
 }
 
-export async function workEvidencePairCommand(
+async function workEvidencePairCommandImpl(
   ctx: CmdContext,
   opts: WorkEvidencePairOptions,
 ): Promise<CmdResult> {
@@ -1844,4 +2010,320 @@ export async function workEvidenceListCommand(
       ),
     ].join('\n'),
   };
+}
+
+export type WorkAuthority = {
+  actor: string;
+  role: 'worker' | 'reviewer' | 'operator';
+  workId?: string;
+  sealedRevision?: string;
+};
+/** Supply only from a trusted host/broker, never MCP arguments or model-set env. */
+export type WorkCommandContext = CmdContext & { workAuthority?: WorkAuthority };
+export type WorkAdoptOptions = WorkIdOptions & {
+  path: string;
+  branch: string;
+  base: string;
+  sessionId: string;
+};
+
+async function workAdoptCommandImpl(
+  ctx: CmdContext,
+  opts: WorkAdoptOptions,
+): Promise<CmdResult> {
+  const items = await loadItems(ctx.projectRoot);
+  const item = findItem(items, opts.id);
+  if (!item) return errorResult(`Unknown work id: ${opts.id}`);
+  if (!item.interview?.sealed_at)
+    return errorResult('Seal the assignment before adopting its worktree.');
+  const tree = await inspectWorktreeForAdoption({
+    ...opts,
+    projectRoot: ctx.projectRoot,
+  });
+  if (
+    items.some(
+      (other) =>
+        other.id !== item.id &&
+        other.worktree_path &&
+        resolve(canonicalProjectRoot(ctx.projectRoot), other.worktree_path) ===
+          tree.path,
+    )
+  ) {
+    return errorResult(
+      'This worktree is already assigned to another work item.',
+    );
+  }
+  if (
+    item.worktree_path &&
+    (resolve(canonicalProjectRoot(ctx.projectRoot), item.worktree_path) !==
+      tree.path ||
+      item.worktree_branch !== tree.branch)
+  )
+    return errorResult(
+      'Adoption cannot replace a preserved worktree association.',
+    );
+  if (
+    item.worktree_adoption &&
+    item.worktree_adoption.sessionId !== tree.sessionId
+  ) {
+    return errorResult(
+      'Adoption cannot replace the preserved session identity.',
+    );
+  }
+  item.worktree_path = tree.path;
+  item.worktree_branch = tree.branch;
+  item.worktree_adoption ??= tree;
+  item.updated_at = nowIso();
+  await saveItems(ctx.projectRoot, items);
+  return opts.json
+    ? jsonResult({ item, worktree: tree })
+    : {
+        output: `Adopted ${tree.path} (${tree.branch}) for ${item.id}; index and session preserved.`,
+      };
+}
+
+const transactionContext = new AsyncLocalStorage<{
+  dir: string;
+  pending: Map<string, string>;
+}>();
+async function admission(
+  ctx: WorkCommandContext,
+  operation: string,
+  opts: Record<string, unknown>,
+): Promise<string | undefined> {
+  let required = false;
+  try {
+    const policy = JSON.parse(
+      await readFile(join(workDir(ctx.projectRoot), 'admission.json'), 'utf8'),
+    );
+    if (policy.requireAuthority !== true)
+      return 'Invalid admission policy: requireAuthority must be true.';
+    required = true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
+  if (!required) return;
+  const actor = ctx.workAuthority;
+  if (
+    !actor?.actor?.trim() ||
+    !['worker', 'reviewer', 'operator'].includes(actor.role)
+  )
+    return 'Trusted host work authority is required.';
+  if (
+    (opts.force || opts.forceScope || opts.allowInconclusive) &&
+    actor.role !== 'operator'
+  )
+    return 'Only the operator may authorize an attributed override.';
+  if (actor.role === 'operator') return;
+  if (operation === 'Cleanup')
+    return 'Only the operator may authorize destructive worktree cleanup.';
+  if (actor.role === 'worker') {
+    if (
+      !['Claim', 'Start', 'Verify', 'EvidenceAttach', 'EvidencePair'].includes(
+        operation,
+      )
+    )
+      return 'Worker cannot change the assignment, close work, or manage worktrees.';
+    const item = findItem(
+      await loadItems(ctx.projectRoot),
+      String(opts.id ?? ''),
+    );
+    if (
+      !item ||
+      actor.workId !== item.id ||
+      !item.interview?.revision ||
+      actor.sealedRevision !== item.interview.revision
+    )
+      return 'Worker assignment or sealed revision does not match.';
+    if (item.assignee && item.assignee !== actor.actor)
+      return 'Worker actor does not match the assignment.';
+    if (opts.assignee && opts.assignee !== actor.actor)
+      return 'Worker cannot claim as a different actor.';
+    if (item.status === 'closed')
+      return 'Closed work cannot receive worker mutations.';
+    if (
+      !['Claim', 'Start'].includes(operation) &&
+      item.status !== 'in_progress'
+    )
+      return 'Start or claim the assigned work before submitting worker results or evidence.';
+  }
+  if (operation === 'Close') {
+    const item = findItem(
+      await loadItems(ctx.projectRoot),
+      String(opts.id ?? ''),
+    );
+    const verification = item && latestVerification(item);
+    if (
+      !verification ||
+      verification.actor !== actor.actor ||
+      verification.role !== 'reviewer' ||
+      verification.sealed_revision !== item?.interview?.revision
+    )
+      return 'Independent reviewer verification of the current sealed revision is required.';
+    if (item?.assignee === actor.actor)
+      return 'Closure requires an independent reviewer.';
+    if (
+      !item?.interview?.revision ||
+      actor.sealedRevision !== item.interview.revision ||
+      actor.workId !== item.id
+    )
+      return 'Reviewer must be bound to the current sealed assignment.';
+  }
+}
+
+function transactional<O>(
+  operation: string,
+  fn: (ctx: CmdContext, opts: O) => Promise<CmdResult>,
+) {
+  return async (ctx: WorkCommandContext, opts: O): Promise<CmdResult> => {
+    const dir = workDir(ctx.projectRoot);
+    const run = async () => {
+      const rejection = await admission(
+        ctx,
+        operation,
+        (opts ?? {}) as Record<string, unknown>,
+      );
+      if (rejection) return errorResult(rejection);
+      return fn(ctx, opts);
+    };
+    try {
+      if (transactionContext.getStore()?.dir === dir) return await run();
+      await mkdir(dir, { recursive: true });
+      const lock = join(dir, 'transaction.lock');
+      const deadline = Date.now() + 30_000;
+      for (;;) {
+        try {
+          await mkdir(lock);
+          break;
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+          if (Date.now() >= deadline)
+            throw new Error(
+              `Work transaction lock is busy: ${lock}. A crashed owner requires operator inspection; locks are never stolen.`,
+            );
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        }
+      }
+      try {
+        await writeFile(
+          join(lock, 'owner.json'),
+          JSON.stringify({ pid: process.pid, created_at: nowIso() }),
+        );
+        const transaction = { dir, pending: new Map<string, string>() };
+        const result = await transactionContext.run(transaction, run);
+        // A nested operation may have staged writes before a later refusal.
+        // Publish only successful command state; evidence files may be orphaned, never accepted.
+        if (!result.isError) {
+          for (const [path, body] of transaction.pending)
+            await writeTextAtomic(path, body);
+        }
+        return result;
+      } finally {
+        await rm(lock, { recursive: true });
+      }
+    } catch (error) {
+      return errorResult((error as Error).message);
+    }
+  };
+}
+
+export async function workInitCommand(
+  ctx: WorkCommandContext,
+): Promise<CmdResult> {
+  return transactional('Init', workInitCommandImpl)(ctx, undefined);
+}
+
+export const workCreateCommand = transactional('Create', workCreateCommandImpl);
+
+export const workClaimCommand = transactional('Claim', workClaimCommandImpl);
+
+export const workUpdateCommand = transactional('Update', workUpdateCommandImpl);
+
+export const workCloseCommand = transactional('Close', workCloseCommandImpl);
+
+export const workVerifyCommand = transactional('Verify', workVerifyCommandImpl);
+
+export const workInterviewCommand = transactional(
+  'Interview',
+  workInterviewCommandImpl,
+);
+
+export const workAnswerCommand = transactional('Answer', workAnswerCommandImpl);
+
+export const workAssumeCommand = transactional('Assume', workAssumeCommandImpl);
+
+export const workAcceptCommand = transactional('Accept', workAcceptCommandImpl);
+
+export const workSealCommand = transactional('Seal', workSealCommandImpl);
+
+export const workDepCommand = transactional('Dep', workDepCommandImpl);
+
+export const workStartCommand = transactional('Start', workStartCommandImpl);
+
+export const workRememberCommand = transactional(
+  'Remember',
+  workRememberCommandImpl,
+);
+
+export const workIsolateCommand = transactional(
+  'Isolate',
+  workIsolateCommandImpl,
+);
+
+export const workCleanupCommand = transactional(
+  'Cleanup',
+  workCleanupCommandImpl,
+);
+
+export const workEvidenceAttachCommand = transactional(
+  'EvidenceAttach',
+  workEvidenceAttachCommandImpl,
+);
+
+export const workEvidencePairCommand = transactional(
+  'EvidencePair',
+  workEvidencePairCommandImpl,
+);
+
+export const workAdoptCommand = transactional('Adopt', workAdoptCommandImpl);
+
+/** Host ingress: authority is an out-of-band context field, not part of request arguments. */
+export async function workCommandWithAuthority(
+  ctx: WorkCommandContext,
+  request: { operation: string; options?: Record<string, unknown> },
+): Promise<CmdResult> {
+  const commands: Record<
+    string,
+    (ctx: WorkCommandContext, opts: any) => Promise<CmdResult>
+  > = {
+    init: workInitCommand,
+    create: workCreateCommand,
+    claim: workClaimCommand,
+    update: workUpdateCommand,
+    close: workCloseCommand,
+    verify: workVerifyCommand,
+    interview: workInterviewCommand,
+    answer: workAnswerCommand,
+    assume: workAssumeCommand,
+    accept: workAcceptCommand,
+    seal: workSealCommand,
+    dep: workDepCommand,
+    start: workStartCommand,
+    remember: workRememberCommand,
+    isolate: workIsolateCommand,
+    cleanup: workCleanupCommand,
+    adopt: workAdoptCommand,
+    evidence_attach: workEvidenceAttachCommand,
+    evidence_pair: workEvidencePairCommand,
+    list: workListCommand,
+    ready: workReadyCommand,
+    show: workShowCommand,
+    prime: workPrimeCommand,
+    memories: workMemoriesCommand,
+    evidence_list: workEvidenceListCommand,
+  };
+  const command = commands[request.operation];
+  if (!Object.hasOwn(commands, request.operation) || !command)
+    return errorResult('Unknown work operation.');
+  return command(ctx, request.options ?? {});
 }

@@ -76,30 +76,29 @@ function tryExec(
   cwd: string,
 ): Promise<string | null> {
   return new Promise((resolve) => {
-    execFile(cmd, args, { cwd, maxBuffer: 50 * 1024 * 1024 }, (err, out) => {
-      if (err) {
-        // Exit code 1 with no stderr typically means "no matches" for grep/rg
-        const exitCode = (
-          err as NodeJS.ErrnoException & { code?: string | number }
-        ).code;
-        if (exitCode === 'ENOENT') {
-          resolve(null); // command not found
+    execFile(
+      cmd,
+      args,
+      { cwd, maxBuffer: 50 * 1024 * 1024 },
+      (err, out, stderr) => {
+        if (err) {
+          // Exit code 1 with no stderr typically means "no matches" for grep/rg
+          const exitCode = (err as { code?: string | number }).code;
+          if (exitCode === 'ENOENT') {
+            resolve(null); // command not found
+            return;
+          }
+          // rg/grep exit 1 = no matches (not an error)
+          if (exitCode === 1 && out === '' && stderr === '') {
+            resolve('');
+            return;
+          }
+          resolve(null);
           return;
         }
-        // rg/grep exit 1 = no matches (not an error)
-        if (
-          'status' in err &&
-          (err as { status?: number }).status === 1 &&
-          out === ''
-        ) {
-          resolve('');
-          return;
-        }
-        resolve(null);
-        return;
-      }
-      resolve(out);
-    });
+        resolve(out);
+      },
+    );
   });
 }
 

@@ -81,6 +81,13 @@ function ctx(root: string): CmdContext {
   };
 }
 
+async function sealFixture(c: CmdContext, id: string) {
+  const interview = JSON.parse((await workInterviewCommand(c, { id, json: true })).output);
+  for (const question of interview.questions) await workAnswerCommand(c, { id, question: question.id, answer: 'Fixture contract is explicit.' });
+  await workAcceptCommand(c, { id, criterion: 'The tested fixture behavior holds.' });
+  expect((await workSealCommand(c, { id })).isError).toBeFalsy();
+}
+
 function firstText(result: Awaited<ReturnType<Client['callTool']>>): string {
   return (result.content as { type: string; text: string }[])[0].text;
 }
@@ -118,6 +125,8 @@ describe('code-kg work tracker', () => {
     expect(readyIds).toContain(parentId);
     expect(readyIds).not.toContain(blockedId);
 
+    await sealFixture(c, parentId);
+    await sealFixture(c, blockedId);
     const claimBlocked = await workClaimCommand(c, { id: blockedId });
     expect(claimBlocked.isError).toBe(true);
     expect(claimBlocked.output).toContain('blocked');
@@ -179,6 +188,7 @@ describe('code-kg work tracker', () => {
     const discoveredId = JSON.parse(discovered.output).id as string;
     await workDepCommand(c, { id: discoveredId, related: id });
 
+    await sealFixture(c, id);
     const started = await workStartCommand(c, { id, json: true });
     expect(started.isError).toBeFalsy();
     const payload = JSON.parse(started.output) as {
@@ -248,6 +258,7 @@ describe('code-kg work tracker', () => {
     });
     const sealed = await workSealCommand(c, { id, json: true });
     expect(JSON.parse(sealed.output).interview.sealed_at).toBeTruthy();
+    expect((await workClaimCommand(c, { id })).isError).toBeFalsy();
 
     const failClose = await workCloseCommand(c, { id, reason: 'nope' });
     expect(failClose.isError).toBe(true);
@@ -322,6 +333,7 @@ describe('code-kg work tracker', () => {
     });
     const id = JSON.parse(created.output).id as string;
 
+    await sealFixture(c, id);
     const isolated = await workIsolateCommand(c, { id, json: true });
     expect(isolated.isError).toBeFalsy();
     const payload = JSON.parse(isolated.output) as {

@@ -1,7 +1,135 @@
 {
   "id": "code-kg",
   "name": "Code-KG",
-  "description": "Reviewable code knowledge graph for OpenClaw orchestrators that delegate coding to Claude Code workers.",
-  "version": "0.1.0",
-  "skills": ["skills"]
+  "description": "Full Code-KG workflow, retrieval, work lifecycle and native hook enforcement for Roscoe supervision.",
+  "version": "0.2.2",
+  "activation": {
+    "onStartup": true
+  },
+  "contracts": {
+    "tools": [
+      "codekg_cli",
+      "codekg_mcp",
+      "codekg_work",
+      "codekg_bridge_status"
+    ]
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "repository",
+      "codekgRoot",
+      "agentId",
+      "sessionPrefixes",
+      "companionPath",
+      "companionSha256"
+    ],
+    "properties": {
+      "repository": {
+        "type": "string",
+        "minLength": 1
+      },
+      "codekgRoot": {
+        "type": "string",
+        "minLength": 1
+      },
+      "agentId": {
+        "type": "string",
+        "enum": [
+          "roscoe-supervisor"
+        ]
+      },
+      "sessionPrefixes": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "string",
+          "pattern": "^agent:roscoe-supervisor:"
+        }
+      },
+      "timeoutMs": {
+        "type": "integer",
+        "minimum": 100,
+        "maximum": 10000,
+        "default": 10000,
+        "description": "Legacy pre-tool process budget only; lifecycle budgets are operation-specific."
+      },
+      "commandTimeoutMs": {
+        "type": "integer",
+        "minimum": 1000,
+        "maximum": 300000,
+        "default": 120000
+      },
+      "workBindings": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "sealedRevision"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "sealedRevision": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "companionPath": {
+        "type": "string",
+        "minLength": 1
+      },
+      "companionSha256": {
+        "type": "string",
+        "pattern": "^[a-f0-9]{64}$"
+      },
+      "hookTimeouts": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "pre": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 10000,
+            "default": 10000
+          },
+          "sessionCheck": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 10000,
+            "default": 10000
+          },
+          "session": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 30000,
+            "default": 30000
+          },
+          "prompt": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 30000,
+            "default": 30000
+          },
+          "edit": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 45000,
+            "default": 45000
+          },
+          "stop": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 45000,
+            "default": 45000
+          }
+        }
+      }
+    }
+  }
 }

@@ -429,14 +429,13 @@ export async function extractProjectGraph(
     file.search_text = content.slice(0, 16000);
     const nodes = [module, file];
     const edges = [edge(module.id, file.id, 'contains', path)];
+    // Preserve exact source slices without re-splitting a large file per symbol.
+    const sourceLines = content.split('\n');
     for (const symbol of extracted?.legacy ?? []) {
       const node = symbolNode(path, symbol);
       node.signature = symbol.signature;
       node.body_hash = sourceHash(
-        content
-          .split('\n')
-          .slice(symbol.startLine - 1, symbol.endLine)
-          .join('\n'),
+        sourceLines.slice(symbol.startLine - 1, symbol.endLine).join('\n'),
       );
       nodes.push(node);
       edges.push(edge(file.id, node.id, 'contains', path, symbol.startLine));

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readFile, realpath } from 'node:fs/promises';
+import { readFile, realpath, rm } from 'node:fs/promises';
 import { dirname, join, relative } from 'node:path';
 import {
   parseSourceSymbols,
@@ -75,6 +75,14 @@ export function extractionStats(root: string) {
   return stats.get(root) ?? { parsed: 0, reused: 0 };
 }
 
+export async function resetExtractionCache(root: string): Promise<void> {
+  memory.delete(root);
+  await rm(join(root, '.code-kg/cache/extraction-v1.json'), { force: true });
+}
+export function recordGraphCacheHit(root: string, files: number): void {
+  stats.set(root, { parsed: 0, reused: files });
+}
+
 export function sourceHash(text: string): string {
   return 'sha256:' + createHash('sha256').update(text).digest('hex');
 }
@@ -90,6 +98,13 @@ export async function extractStructural(
     await import('../vendor/graft/graph/generic.js');
   const { resolveEdges } = await import('../vendor/graft/graph/resolve.js');
   const cachePath = join(root, '.code-kg/cache/extraction-v1.json');
+  // All writers (including bootstrap/update) share runtime-bound provenance.
+  const provenance = persist ? await import('./fresh-cache.js') : null;
+  const runtime = provenance
+    ? await provenance.implementationFingerprint()
+    : null;
+  if (provenance && runtime)
+    await provenance.qualifyExtractionRuntime(root, runtime);
   const disk = persist ? await readJson<ExtractionCache>(cachePath) : null;
   const prior = memory.get(root) ?? disk;
   const old =
@@ -185,6 +200,9 @@ export async function extractStructural(
       disk.extractor !== EXTRACTOR_VERSION)
   )
     await writeJsonAtomic(cachePath, cache);
+  if (provenance && runtime && errors.length === 0) {
+    await provenance.recordExtractionRuntime(root, runtime);
+  }
   return {
     files: new Map(Object.entries(files)),
     contents,

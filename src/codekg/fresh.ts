@@ -3,23 +3,37 @@ import { mkdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { extractProjectGraph, writeGraphCache } from './graph.js';
 import type { ProjectGraph } from './types.js';
+import { recordGraphCacheHit } from './structural.js';
+import {
+  collectFreshInputs,
+  readFreshCache,
+  writeFreshCache,
+} from './fresh-cache.js';
 
 const active = new Map<string, Promise<ProjectGraph>>();
 
-export async function freshGraph(root: string): Promise<ProjectGraph> {
+export async function freshGraph(
+  root: string,
+  options: { writeCache?: boolean } = {},
+): Promise<ProjectGraph> {
   root = resolve(root);
-  const pending = active.get(root);
+  const writeCache = options.writeCache !== false;
+  const key = JSON.stringify([root, writeCache]);
+  const pending = active.get(key);
   if (pending) return pending;
-  const operation = refresh(root);
-  active.set(root, operation);
+  const operation = refresh(root, writeCache);
+  active.set(key, operation);
   try {
     return await operation;
   } finally {
-    active.delete(root);
+    active.delete(key);
   }
 }
 
-async function refresh(root: string): Promise<ProjectGraph> {
+async function refresh(
+  root: string,
+  writeCache: boolean,
+): Promise<ProjectGraph> {
   const directory = join(root, '.code-kg/cache');
   await mkdir(directory, { recursive: true });
   const lock = join(directory, 'refresh.lock');
@@ -51,8 +65,25 @@ async function refresh(root: string): Promise<ProjectGraph> {
     }
   }
   try {
+    // Key collection failures refuse reuse and flow to a real refresh. A cache
+    // miss must never turn an unavailable/escaping source into a clean graph.
+    const inputs = await collectFreshInputs(root).catch(() => null);
+    const cached = inputs ? await readFreshCache(root, inputs) : null;
+    if (cached) {
+      recordGraphCacheHit(root, Object.keys(inputs!.sourceHashes).length);
+      if (writeCache) await writeGraphCache(root, cached);
+      return cached;
+    }
     const graph = await extractProjectGraph(root, undefined, { cache: true });
-    await writeGraphCache(root, graph);
+    if (inputs && !graph.analysis.parse_errors.length) {
+      const after = await collectFreshInputs(root).catch(() => null);
+      if (after?.key === inputs.key) {
+        await writeFreshCache(root, inputs, graph);
+      }
+    }
+    // Lifecycle checks consume the freshly computed graph directly; the full
+    // diagnostic JSON is optional. All input and graph validation still runs.
+    if (writeCache) await writeGraphCache(root, graph);
     return graph;
   } finally {
     await handle.close();

@@ -471,7 +471,7 @@ describe('agent lifecycle context', () => {
       'stop',
       JSON.stringify({ session_id: 'stop-block-1', stop_hook_active: true }),
     );
-    expect(second.output).toContain('additionalContext');
+    expect(second.output).toBe(''); // Acknowledged Stop must not reinject feedback.
     expect(second.output).not.toContain('"decision":"block"');
   });
   it('installs and removes managed lifecycle hooks without deleting foreign hooks', async () => {

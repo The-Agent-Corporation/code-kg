@@ -26,6 +26,9 @@ import { contextCommand } from './context.js';
 import { changedCommand } from './changed.js';
 import { gapsCommand } from './gaps.js';
 import {
+  workAdoptCommand,
+  type WorkCommandContext,
+  type WorkAuthority,
   workAcceptCommand,
   workAnswerCommand,
   workAssumeCommand,
@@ -87,7 +90,7 @@ function toMcp(result: CmdResult, opts?: BudgetOptions) {
   return result.isError ? { content, isError: true } : { content };
 }
 
-export function createCodeKgMcpServer(ctx: CmdContext): McpServer {
+export function createCodeKgMcpServer(ctx: WorkCommandContext): McpServer {
   const server = new McpServer({
     name: 'code-kg',
     version: '0.1.0',
@@ -437,6 +440,29 @@ export function createCodeKgMcpServer(ctx: CmdContext): McpServer {
       ),
   );
   server.tool(
+    'codekg_work_adopt',
+    'Adopt an existing same-repository worktree; observe branch, ancestry, index and preserved session without modifying them',
+    {
+      id: z.string(),
+      path: z.string(),
+      branch: z.string(),
+      base: z.string(),
+      session_id: z.string(),
+      json: z.boolean().optional(),
+    },
+    async ({ id, path, branch, base, session_id, json }) =>
+      toMcp(
+        await workAdoptCommand(ctx, {
+          id,
+          path,
+          branch,
+          base,
+          sessionId: session_id,
+          json,
+        }),
+      ),
+  );
+  server.tool(
     'codekg_work_close',
     'Close a finished work item (requires pass verification unless force)',
     {
@@ -558,9 +584,12 @@ export function createCodeKgMcpServer(ctx: CmdContext): McpServer {
   return server;
 }
 
-export async function startCodeKgMcpServer(): Promise<void> {
+export async function startCodeKgMcpServer(binding?: {
+  projectRoot: string;
+  workAuthority: WorkAuthority;
+}): Promise<void> {
   const latDir =
-    findLatticeDir() ??
+    (binding ? join(binding.projectRoot, 'lat.md') : findLatticeDir()) ??
     (existsSync(workspacePath(process.cwd()))
       ? join(process.cwd(), 'lat.md')
       : null);
@@ -569,11 +598,12 @@ export async function startCodeKgMcpServer(): Promise<void> {
     process.exit(1);
   }
   const projectRoot = dirname(latDir);
-  const ctx: CmdContext = {
+  const ctx: WorkCommandContext = {
     latDir,
     projectRoot,
     styler: plainStyler,
     mode: 'mcp',
+    workAuthority: binding?.workAuthority,
   };
 
   const server = createCodeKgMcpServer(ctx);

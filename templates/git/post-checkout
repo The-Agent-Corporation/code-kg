@@ -4,7 +4,7 @@
 # After switching branches, refresh lat.md/ so agents never work against a
 # stale knowledge graph from the previous branch.
 #
-# Installed by `code-kg git-hooks install`. Advisory: does not block checkout.
+# Installed by `code-kg git-hooks install`. Failures are reported; Git may already have changed HEAD.
 # Git passes: $1=previous HEAD, $2=new HEAD, $3=1 for branch checkout / 0 for file.
 
 if [ "$3" != "1" ]; then
@@ -12,13 +12,15 @@ if [ "$3" != "1" ]; then
 fi
 
 if ! command -v code-kg >/dev/null 2>&1; then
-  exit 0
+  echo "[code-kg] Required CLI missing; knowledge synchronization failed." >&2
+  exit 1
 fi
 
 repo_root=$(git rev-parse --show-toplevel)
 
-if [ ! -d "$repo_root/lat.md" ]; then
-  exit 0
+if [ ! -d "$repo_root/lat.md" ] || [ ! -f "$repo_root/.code-kg/materialization-manifest.json" ]; then
+  echo "[code-kg] Required knowledge setup missing; synchronization failed." >&2
+  exit 1
 fi
 
 # No-op when HEAD did not move (e.g. checkout of the same commit).
@@ -31,7 +33,7 @@ echo "[code-kg] post-checkout: syncing knowledge graph for new branch tip..."
 if ! code-kg --dir "$repo_root" update; then
   echo "[code-kg] post-checkout: update reported issues (run 'code-kg check' / 'code-kg drift')."
   echo "[code-kg] Checkout completed; fix the knowledge graph before relying on it."
-  exit 0
+  exit 1
 fi
 
 exit 0

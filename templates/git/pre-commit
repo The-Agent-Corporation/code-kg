@@ -8,16 +8,18 @@
 # Installed by `code-kg git-hooks install`. Re-running install updates it in
 # place. Bypass for a single commit with:  git commit --no-verify
 
-# Nothing to do if the code-kg CLI isn't on PATH.
+# An installed guard must fail visibly when its runtime is unavailable.
 if ! command -v code-kg >/dev/null 2>&1; then
-  exit 0
+  echo "[code-kg] Required CLI or knowledge setup is missing; commit refused." >&2
+  exit 1
 fi
 
-repo_root=$(git rev-parse --show-toplevel)
+repo_root=$(git rev-parse --show-toplevel) || exit 1
 
 # Only act in repos that actually have a Code-KG knowledge base.
-if [ ! -d "$repo_root/lat.md" ]; then
-  exit 0
+if [ ! -d "$repo_root/lat.md" ] || [ ! -f "$repo_root/.code-kg/materialization-manifest.json" ]; then
+  echo "[code-kg] Required CLI or knowledge setup is missing; commit refused." >&2
+  exit 1
 fi
 
 echo "[code-kg] syncing knowledge graph (materialize + semantic reindex + check + drift)..."
@@ -32,7 +34,10 @@ if ! code-kg --dir "$repo_root" update; then
 fi
 
 # Stage the regenerated, tracked knowledge-base files into this commit.
-git -C "$repo_root" add lat.md ".code-kg/materialization-manifest.json" 2>/dev/null
+if ! git -C "$repo_root" add lat.md ".code-kg/materialization-manifest.json"; then
+  echo "[code-kg] Staging knowledge files failed; commit refused." >&2
+  exit 1
+fi
 
 # Sections you hand-edited are never overwritten — instead a candidate lands in
 # merge-proposals/ for manual review. Surface that so it isn't missed.

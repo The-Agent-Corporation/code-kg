@@ -1,7 +1,7 @@
 {
   "name": "code-kg",
   "description": "Persistent, reviewable code knowledge graph for AI agents",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": { "name": "The-Agent-Corporation" },
   "repository": "https://github.com/The-Agent-Corporation/code-kg",
   "license": "MIT"
