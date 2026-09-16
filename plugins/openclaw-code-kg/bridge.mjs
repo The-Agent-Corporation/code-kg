@@ -64,25 +64,39 @@ export function parseHookOutput(output) {
   };
 }
 
+const STDERR_TAIL = 4000;
+// Diagnostics returned to the model must never carry credential-shaped material.
+export function redactSecrets(text) {
+  return String(text)
+    .replace(/(?:sk|rk|pk)-[A-Za-z0-9_-]{8,}/g, '[redacted]')
+    .replace(/Bearer\s+\S+/gi, 'Bearer [redacted]')
+    .replace(/\b[A-Za-z0-9_-]{40,}\b/g, '[redacted]');
+}
+
 export function runProcess(binary, argv, options) {
   return new Promise((resolve, reject) => {
     if (options.signal?.aborted) return reject(new Error('Code-KG cancelled'));
     if (Buffer.byteLength(options.input ?? '') > LIMIT) return reject(new Error('Code-KG input exceeds limit'));
     const child = spawn(binary, argv, { cwd: options.cwd, env: options.env, shell: false, stdio: ['pipe', 'pipe', 'pipe'] });
-    let output = '', bytes = 0, settled = false;
+    let output = '', stderr = '', bytes = 0, settled = false;
     const finish = (error) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
       options.signal?.removeEventListener('abort', cancel);
-      if (error) { child.kill('SIGKILL'); reject(error); } else resolve(output);
+      if (error) {
+        child.kill('SIGKILL');
+        // Only broker (tool) calls opt in; hook subprocess stderr is never surfaced.
+        if (options.captureStderr && stderr.trim()) { error.stderr = stderr.trim(); error.message += `: ${redactSecrets(stderr.trim())}`; }
+        reject(error);
+      } else resolve(output);
     };
     const cancel = () => finish(new Error('Code-KG cancelled'));
     const timer = setTimeout(() => finish(Object.assign(new Error('Code-KG process timeout'), { code: 'CODEKG_TIMEOUT' })), options.timeoutMs);
     options.signal?.addEventListener('abort', cancel, { once: true });
     child.stdout.on('data', chunk => { bytes += chunk.length; if (bytes > LIMIT) finish(new Error('Code-KG output exceeds limit')); else output += chunk; });
     // Drain stderr without leaking provider credentials or untrusted input into logs.
-    child.stderr.on('data', chunk => { bytes += chunk.length; if (bytes > LIMIT) finish(new Error('Code-KG output exceeds limit')); });
+    child.stderr.on('data', chunk => { bytes += chunk.length; if (bytes > LIMIT) finish(new Error('Code-KG output exceeds limit')); else if (options.captureStderr) stderr = (stderr + chunk).slice(-STDERR_TAIL); });
     child.on('error', () => finish(new Error('Code-KG process unavailable')));
     child.on('close', code => finish(code === 0 ? undefined : new Error(`Code-KG process exited unsuccessfully (${code})`)));
     child.stdin.on('error', () => {});
@@ -242,7 +256,7 @@ export function createBridge(api, dependencies = {}) {
     const binding = config.workBindings?.find(x => x.id === requestedId);
     const authority = { actor: `${config.agentId}:${ctx.sessionId}`, role: 'reviewer', ...(binding ? { workId: binding.id, sealedRevision: binding.sealedRevision } : {}) };
     if (createHash('sha256').update(readFileSync(config.companionPath)).digest('hex') !== config.companionSha256) throw new Error('Code-KG companion digest mismatch');
-    const response = await invoke(process.execPath, [config.companionPath], { cwd: config.repository, env: env(), timeoutMs: config.commandTimeoutMs ?? 120000, signal: ctx.abortSignal, input: JSON.stringify({ ...request, codekgRoot: config.codekgRoot, repository: config.repository, authority }) });
+    const response = await invoke(process.execPath, [config.companionPath], { cwd: config.repository, env: env(), timeoutMs: config.commandTimeoutMs ?? 120000, signal: ctx.abortSignal, captureStderr: true, input: JSON.stringify({ ...request, codekgRoot: config.codekgRoot, repository: config.repository, authority }) });
     return request.kind === 'cli' ? response : JSON.parse(response);
   };
   const toolFactory = (ctx) => {
@@ -263,9 +277,24 @@ export function createBridge(api, dependencies = {}) {
           const result = await broker(name === 'codekg_mcp' ? { kind: 'mcp', name: params.name, arguments: params.arguments } : { kind: 'work', command: params.command, options: params.options }, toolCtx);
           if (Array.isArray(result.content)) return result;
           return textResult(result.output ?? JSON.stringify(result), result.isError === true);
-        } catch { return textResult(`Code-KG ${name} failed; check command arguments, scoped admission and installation.`, true); }
+        } catch (error) {
+          // The real reason (CLI error text, admission refusal, digest mismatch) is the model's next action.
+          const reason = redactSecrets(error?.message ?? String(error)).slice(0, 1500);
+          return textResult(`Code-KG ${name} failed: ${reason}`, true);
+        }
       },
     }));
   };
   return { beforePrompt, beforeTool, afterTool, finalize, toolFactory, counters, allowed };
+}
+
+// Hooks and tool factories may be handed different api objects (or even different
+// module instances) by the host; the session/run state they share must be process-wide.
+const SHARED = Symbol.for('code-kg.openclaw.bridge.registry');
+export function sharedBridge(api, dependencies = {}) {
+  const registry = (globalThis[SHARED] ??= new Map());
+  const key = createHash('sha256').update(JSON.stringify(api.pluginConfig ?? null)).digest('hex');
+  let bridge = registry.get(key);
+  if (!bridge) { bridge = createBridge(api, dependencies); registry.set(key, bridge); }
+  return bridge;
 }

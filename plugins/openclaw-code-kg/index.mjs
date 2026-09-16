@@ -1,14 +1,10 @@
 import { defineToolPlugin } from 'openclaw/plugin-sdk/tool-plugin';
 import manifest from './openclaw.plugin.json' with { type: 'json' };
-import { createBridge, validateConfig, hostHookBudgets } from './bridge.mjs';
+import { sharedBridge, validateConfig, hostHookBudgets } from './bridge.mjs';
 import { TOOL_NAMES, toolMetadata } from './definitions.mjs';
 
-const bridges = new WeakMap();
-const getBridge = (api) => {
-  let bridge = bridges.get(api);
-  if (!bridge) { bridge = createBridge(api); bridges.set(api, bridge); }
-  return bridge;
-};
+// One bridge per plugin configuration, shared by hook registration and tool factories.
+const getBridge = (api) => sharedBridge(api);
 const entry = defineToolPlugin({
   id: 'code-kg',
   name: 'Code-KG',

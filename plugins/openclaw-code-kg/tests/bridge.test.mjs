@@ -5,7 +5,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { NATIVE_RELAY_PROCESS_TIMEOUT_MS, createBridge, translateTool, parseHookOutput, runProcess, validateConfig, hostHookBudgets } from '../bridge.mjs';
+import { NATIVE_RELAY_PROCESS_TIMEOUT_MS, createBridge, sharedBridge, redactSecrets, translateTool, parseHookOutput, runProcess, validateConfig, hostHookBudgets } from '../bridge.mjs';
 
 // A linked checkout shares its canonical build; directory depth is not identity.
 const source = process.env.CODEKG_TEST_ROOT ?? dirname(resolve(import.meta.dirname,
@@ -221,4 +221,32 @@ test('companion digest tampering refuses broker execution', async () => {
   const tool = bridge.toolFactory(ctx).find(t => t.name === 'codekg_mcp');
   assert.equal((await tool.execute('bad-digest', {})).isError, true);
   assert.equal(dep.calls.length, 0);
+});
+
+test('hook receipts and counters are shared between hook registration and tool factories', async () => {
+  const dep = mock(async () => hookContext('graph first'));
+  const shared = { ...config, repository: root, timeoutMs: 9999 };
+  const hooks = sharedBridge({ pluginConfig: shared, logger: { error() {} } }, dep);
+  const tools = sharedBridge({ pluginConfig: { ...shared }, logger: { error() {} } });
+  assert.equal(hooks, tools);
+  assert.notEqual(hooks, sharedBridge({ pluginConfig: { ...shared, timeoutMs: 9998 }, logger: { error() {} } }, dep));
+  const probe = { ...ctx, sessionId: 'shared-session', runId: 'shared-run' };
+  assert.equal((await hooks.beforeTool({ toolName: 'exec', params: { cmd: 'rg x' } }, probe)).block, true);
+  const status = JSON.parse((await tools.toolFactory(probe).find(t => t.name === 'codekg_bridge_status').execute('s', {})).content[0].text);
+  assert.equal(status.processCounters.pre, 1);
+  assert.equal(status.processCounters.denied, 1);
+  assert.deepEqual(status.session.events.map(e => e.stage), ['pre']);
+});
+
+test('tool failures report the real reason with secrets redacted; hook stderr stays private', async () => {
+  const dep = mock(async (_argv, opts) => { if (opts.captureStderr) throw new Error('No graph context found for "README.md". token sk-abcdefghijklmnop'); return ''; });
+  const bridge = createBridge(api(), dep);
+  const result = await bridge.toolFactory(ctx).find(t => t.name === 'codekg_cli').execute('ctx', { argv: ['context', 'README.md'] });
+  assert.equal(result.isError, true);
+  assert.match(result.content[0].text, /No graph context found for "README.md"/);
+  assert.doesNotMatch(result.content[0].text, /sk-abcdefghijklmnop/);
+  assert.equal(redactSecrets('Bearer abc.def'), 'Bearer [redacted]');
+  const opts = { cwd: root, env: process.env, timeoutMs: 5000, input: '' };
+  await assert.rejects(runProcess(process.execPath, ['-e', 'console.error("real reason"); process.exit(1)'], { ...opts, captureStderr: true }), /unsuccessfully \(1\): real reason/);
+  await assert.rejects(runProcess(process.execPath, ['-e', 'console.error("hidden"); process.exit(1)'], opts), error => /unsuccessfully \(1\)$/.test(error.message));
 });

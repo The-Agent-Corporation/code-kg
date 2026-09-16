@@ -2,7 +2,7 @@
   "id": "code-kg",
   "name": "Code-KG",
   "description": "Full Code-KG workflow, retrieval, work lifecycle and native hook enforcement for Roscoe supervision.",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "activation": {
     "onStartup": true
   },

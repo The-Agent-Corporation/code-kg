@@ -62,6 +62,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       const request = JSON.parse(raw);
       const result = await dispatch(request);
       if (request.kind !== 'cli') process.stdout.write(JSON.stringify(result));
-    } catch { process.stderr.write('Code-KG broker failed; check installation and command schema.'); process.exitCode = 1; }
+    } catch (error) {
+      // Surface the actual reason; the bridge redacts before returning it to the model.
+      process.stderr.write(`Code-KG broker failed: ${error?.message ?? String(error)}`);
+      process.exitCode = 1;
+    }
   })();
 }
