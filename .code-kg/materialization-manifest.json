@@ -2,7 +2,7 @@
   "version": 1,
   "tool_version": "0.1.0",
   "project_root": ".",
-  "generated_at": "2026-09-16T15:30:03.623Z",
+  "generated_at": "2026-09-16T16:58:10.499Z",
   "sections": {
     "lat": {
       "stable_id": "lat",
@@ -17,7 +17,7 @@
       "source_spans": [],
       "generated_hash": "sha256:0fdd0134a9303f04cdb10082778c9a15c9fd851fa4defbca3439027e28bec692",
       "current_hash": "sha256:0fdd0134a9303f04cdb10082778c9a15c9fd851fa4defbca3439027e28bec692",
-      "last_seen_graph_hash": "sha256:4f19ec22872f6f5ff369a326f03e5b9352e044c77ec861f3a97890521cd75fba"
+      "last_seen_graph_hash": "sha256:4f16ea87b5f65e9623b69ade008c52aa4e63a51bb85b53287a9184fb164252b9"
     },
     "architecture": {
       "stable_id": "architecture",
@@ -193,9 +193,11 @@
         "symbol_plugins_openclaw_code_kg_bridge_mjs_nativetool_function_5742fd63",
         "symbol_plugins_openclaw_code_kg_bridge_mjs_object_function_b48371e5",
         "symbol_plugins_openclaw_code_kg_bridge_mjs_parsehookoutput_function_f08cb318",
+        "symbol_plugins_openclaw_code_kg_bridge_mjs_redactsecrets_function_40c8c5f7",
         "symbol_plugins_openclaw_code_kg_bridge_mjs_runprocess_cancel_function_ee9222bf",
         "symbol_plugins_openclaw_code_kg_bridge_mjs_runprocess_finish_function_0bcb677f",
         "symbol_plugins_openclaw_code_kg_bridge_mjs_runprocess_function_a745192d",
+        "symbol_plugins_openclaw_code_kg_bridge_mjs_sharedbridge_function_85af6fb5",
         "symbol_plugins_openclaw_code_kg_bridge_mjs_textresult_function_578e5c75",
         "symbol_plugins_openclaw_code_kg_bridge_mjs_translatetool_function_fbe7bf79",
         "symbol_plugins_openclaw_code_kg_bridge_mjs_validateconfig_function_164bd3b9",
@@ -209,6 +211,9 @@
         "symbol_plugins_openclaw_code_kg_runner_mjs_dispatch_start_method_f0cfd6ff",
         "symbol_plugins_openclaw_code_kg_tests_bridge_test_mjs_api_error_method_b233ca17",
         "symbol_plugins_openclaw_code_kg_tests_bridge_test_mjs_api_function_ef378709",
+        "symbol_plugins_openclaw_code_kg_tests_bridge_test_mjs_error_2_method_3f0b752b",
+        "symbol_plugins_openclaw_code_kg_tests_bridge_test_mjs_error_3_method_e122583e",
+        "symbol_plugins_openclaw_code_kg_tests_bridge_test_mjs_error_method_b93def6c",
         "symbol_plugins_openclaw_code_kg_tests_bridge_test_mjs_hookcontext_function_849cd47a",
         "symbol_plugins_openclaw_code_kg_tests_bridge_test_mjs_mock_function_fa5a8497",
         "symbol_scripts_lat_llm_key_helper_py_main_function_13388f38",
@@ -1367,18 +1372,18 @@
         "symbol_tests_search_test_ts_replaydir_const_812ea5f1"
       ],
       "source_spans": [],
-      "generated_hash": "sha256:b0053e6eb80f41f897d646cb31ffe8fcb4327e807a2c74d8ac3888768799f4ec",
-      "current_hash": "sha256:b0053e6eb80f41f897d646cb31ffe8fcb4327e807a2c74d8ac3888768799f4ec",
-      "last_seen_graph_hash": "sha256:4f19ec22872f6f5ff369a326f03e5b9352e044c77ec861f3a97890521cd75fba",
+      "generated_hash": "sha256:88bae87b93c2255a99579d80ce6ad02a99793b495515957753231663a0d8e11c",
+      "current_hash": "sha256:88bae87b93c2255a99579d80ce6ad02a99793b495515957753231663a0d8e11c",
+      "last_seen_graph_hash": "sha256:4f16ea87b5f65e9623b69ade008c52aa4e63a51bb85b53287a9184fb164252b9",
       "source_hashes": {
         "integration/graph-hash-witness.mjs": "sha256:63af353a482e510babb135af1438ae6337bd7289dcc3541a2b1dd82081065bf0",
         "integration/verify-installed-worker-mcp.mjs": "sha256:0a5f24e614c943ac2e86faf88aea5fc8a6a197b1a4c8764c1bd0df95f3d1af01",
         "integration/verify-roscoe-git-guards.mjs": "sha256:0f69a395764b00b337b2d5c06bddfe38fe16e66c97c3a0e47ad4c9c7d2a4857e",
-        "plugins/openclaw-code-kg/bridge.mjs": "sha256:4777ec07b848fa2ed8e3069a646fa9d78fef66ae2dad2cd68b7c637cff5ab0e1",
+        "plugins/openclaw-code-kg/bridge.mjs": "sha256:7e9999c889bdf0508e22a67479a0e27c03e125588f02fe670798f9fa77f9eebb",
         "plugins/openclaw-code-kg/definitions.mjs": "sha256:349474fc46dfcffd51b0291f4af10401e60bd07c702424651eebd8f43399c3c4",
-        "plugins/openclaw-code-kg/index.mjs": "sha256:4e9ff58157890b2457b3ac546592cdcbcaefaea19191bfe10fe45e444cf40a70",
-        "plugins/openclaw-code-kg/runner.mjs": "sha256:a423907259e6ab425d8f0acbbc788c3e87bf25ebed9e81c3ca1837088ff03aef",
-        "plugins/openclaw-code-kg/tests/bridge.test.mjs": "sha256:e17a1decfb32aac3dc2f7eb34b6d94370b8865cc9bf5c26721202ed15aad33ad",
+        "plugins/openclaw-code-kg/index.mjs": "sha256:da780df9265d5facfa599812ae04e399289fc4fa1cbc9eef3759906702170927",
+        "plugins/openclaw-code-kg/runner.mjs": "sha256:50961c8ad6769e7635c2461eb2f47d38a61f945e71e93f1205f316424adb07f7",
+        "plugins/openclaw-code-kg/tests/bridge.test.mjs": "sha256:b822e130f992b6e92ca0f5d54f91d277f7ace4b324f9d9a9741b5c053db24bcb",
         "scripts/cook-test-rag.ts": "sha256:6709c2e93d7de698e0b557bf59029c1b46fade8108aec4d4dbdd499a4ae3e38f",
         "scripts/copy-vendor-assets.mjs": "sha256:379284aa90c7397b7a32513db483ca7c0db85b4d327852be1f4a924267c24c2d",
         "scripts/lat-llm-key-helper.py": "sha256:6bfb1ba7b59f4f912f11ba5b9a3264c9f9869a9506785e1290abeb2fe3767ed6",
@@ -1528,7 +1533,7 @@
       "source_spans": [],
       "generated_hash": "sha256:f066af83e7d934ee788589c0d8fe177beab89a77040e945791ca4417358dda66",
       "current_hash": "sha256:f066af83e7d934ee788589c0d8fe177beab89a77040e945791ca4417358dda66",
-      "last_seen_graph_hash": "sha256:4f19ec22872f6f5ff369a326f03e5b9352e044c77ec861f3a97890521cd75fba"
+      "last_seen_graph_hash": "sha256:4f16ea87b5f65e9623b69ade008c52aa4e63a51bb85b53287a9184fb164252b9"
     },
     "confidence": {
       "stable_id": "confidence",
@@ -1543,7 +1548,7 @@
       "source_spans": [],
       "generated_hash": "sha256:ea881ed52ef1d84ccd03f0bab9674be79a44ead2692635a188371da9389c6c1e",
       "current_hash": "sha256:ea881ed52ef1d84ccd03f0bab9674be79a44ead2692635a188371da9389c6c1e",
-      "last_seen_graph_hash": "sha256:4f19ec22872f6f5ff369a326f03e5b9352e044c77ec861f3a97890521cd75fba"
+      "last_seen_graph_hash": "sha256:4f16ea87b5f65e9623b69ade008c52aa4e63a51bb85b53287a9184fb164252b9"
     },
     "tests.tests": {
       "stable_id": "tests.tests",
@@ -1556,9 +1561,9 @@
       "source_anchor_policy": "coverage-only",
       "source_node_ids": [],
       "source_spans": [],
-      "generated_hash": "sha256:e5a759080eda0284e4f3b0aed88b41db288032f166f09040580effef3330885f",
-      "current_hash": "sha256:e5a759080eda0284e4f3b0aed88b41db288032f166f09040580effef3330885f",
-      "last_seen_graph_hash": "sha256:4f19ec22872f6f5ff369a326f03e5b9352e044c77ec861f3a97890521cd75fba"
+      "generated_hash": "sha256:fb6808eb17d95dc0735939a4efeac331c8f1c2d008572d594db50109bad22650",
+      "current_hash": "sha256:fb6808eb17d95dc0735939a4efeac331c8f1c2d008572d594db50109bad22650",
+      "last_seen_graph_hash": "sha256:4f16ea87b5f65e9623b69ade008c52aa4e63a51bb85b53287a9184fb164252b9"
     },
     "tests.check-code-refs": {
       "stable_id": "tests.check-code-refs",
@@ -1573,7 +1578,7 @@
       "source_spans": [],
       "generated_hash": "sha256:4aa70399cf37aa0391940034376a28fb1f2e925c86f09b0845248fc92820d20b",
       "current_hash": "sha256:4aa70399cf37aa0391940034376a28fb1f2e925c86f09b0845248fc92820d20b",
-      "last_seen_graph_hash": "sha256:4f19ec22872f6f5ff369a326f03e5b9352e044c77ec861f3a97890521cd75fba"
+      "last_seen_graph_hash": "sha256:4f16ea87b5f65e9623b69ade008c52aa4e63a51bb85b53287a9184fb164252b9"
     },
     "tests.check-index": {
       "stable_id": "tests.check-index",
@@ -1588,7 +1593,7 @@
       "source_spans": [],
       "generated_hash": "sha256:d29c890157cb6818d5e3f4edcfcbe2bdc3224f973b17e63a9a0b881163d00e0b",
       "current_hash": "sha256:d29c890157cb6818d5e3f4edcfcbe2bdc3224f973b17e63a9a0b881163d00e0b",
-      "last_seen_graph_hash": "sha256:4f19ec22872f6f5ff369a326f03e5b9352e044c77ec861f3a97890521cd75fba"
+      "last_seen_graph_hash": "sha256:4f16ea87b5f65e9623b69ade008c52aa4e63a51bb85b53287a9184fb164252b9"
     },
     "tests.check-md": {
       "stable_id": "tests.check-md",
@@ -1603,7 +1608,7 @@
       "source_spans": [],
       "generated_hash": "sha256:db290ff8ef61a321a08c4a4ed5cdfb679a854b2e56f1c24ac87816216885b08d",
       "current_hash": "sha256:db290ff8ef61a321a08c4a4ed5cdfb679a854b2e56f1c24ac87816216885b08d",
-      "last_seen_graph_hash": "sha256:4f19ec22872f6f5ff369a326f03e5b9352e044c77ec861f3a97890521cd75fba"
+      "last_seen_graph_hash": "sha256:4f16ea87b5f65e9623b69ade008c52aa4e63a51bb85b53287a9184fb164252b9"
     },
     "tests.check-sections": {
       "stable_id": "tests.check-sections",
@@ -1618,7 +1623,7 @@
       "source_spans": [],
       "generated_hash": "sha256:d2aeaaa456c6665e627e2ad21d31bc85ae34c9625abbd525c3bd57c89ab4756e",
       "current_hash": "sha256:d2aeaaa456c6665e627e2ad21d31bc85ae34c9625abbd525c3bd57c89ab4756e",
-      "last_seen_graph_hash": "sha256:4f19ec22872f6f5ff369a326f03e5b9352e044c77ec861f3a97890521cd75fba"
+      "last_seen_graph_hash": "sha256:4f16ea87b5f65e9623b69ade008c52aa4e63a51bb85b53287a9184fb164252b9"
     },
     "tests.expand": {
       "stable_id": "tests.expand",
@@ -1633,7 +1638,7 @@
       "source_spans": [],
       "generated_hash": "sha256:020c640f3499289fdd0474c2b230e71399f71b9dd7fd348621917ee886b1fc76",
       "current_hash": "sha256:020c640f3499289fdd0474c2b230e71399f71b9dd7fd348621917ee886b1fc76",
-      "last_seen_graph_hash": "sha256:4f19ec22872f6f5ff369a326f03e5b9352e044c77ec861f3a97890521cd75fba"
+      "last_seen_graph_hash": "sha256:4f16ea87b5f65e9623b69ade008c52aa4e63a51bb85b53287a9184fb164252b9"
     },
     "tests.hook": {
       "stable_id": "tests.hook",
@@ -1648,7 +1653,7 @@
       "source_spans": [],
       "generated_hash": "sha256:b6d87e3463e49f5b65df6b68ac6aec4fb4c085ff59c3affdcc1a6993b8c0541e",
       "current_hash": "sha256:b6d87e3463e49f5b65df6b68ac6aec4fb4c085ff59c3affdcc1a6993b8c0541e",
-      "last_seen_graph_hash": "sha256:4f19ec22872f6f5ff369a326f03e5b9352e044c77ec861f3a97890521cd75fba"
+      "last_seen_graph_hash": "sha256:4f16ea87b5f65e9623b69ade008c52aa4e63a51bb85b53287a9184fb164252b9"
     },
     "tests.locate": {
       "stable_id": "tests.locate",
@@ -1663,7 +1668,7 @@
       "source_spans": [],
       "generated_hash": "sha256:0f25b1daaa52dadf94331d72bbfe460a47db0340ab448a350a2102be4416b216",
       "current_hash": "sha256:0f25b1daaa52dadf94331d72bbfe460a47db0340ab448a350a2102be4416b216",
-      "last_seen_graph_hash": "sha256:4f19ec22872f6f5ff369a326f03e5b9352e044c77ec861f3a97890521cd75fba"
+      "last_seen_graph_hash": "sha256:4f16ea87b5f65e9623b69ade008c52aa4e63a51bb85b53287a9184fb164252b9"
     },
     "tests.mcp": {
       "stable_id": "tests.mcp",
@@ -1678,7 +1683,7 @@
       "source_spans": [],
       "generated_hash": "sha256:deb7d5cd74d405b6e2e1b997771ba7dcec173b1c44f74736188f46c8d06aaa0e",
       "current_hash": "sha256:deb7d5cd74d405b6e2e1b997771ba7dcec173b1c44f74736188f46c8d06aaa0e",
-      "last_seen_graph_hash": "sha256:4f19ec22872f6f5ff369a326f03e5b9352e044c77ec861f3a97890521cd75fba"
+      "last_seen_graph_hash": "sha256:4f16ea87b5f65e9623b69ade008c52aa4e63a51bb85b53287a9184fb164252b9"
     },
     "tests.ref-extraction": {
       "stable_id": "tests.ref-extraction",
@@ -1693,7 +1698,7 @@
       "source_spans": [],
       "generated_hash": "sha256:751df5f69f0892543d3406b1f5ad4e2582c4d8268f585750da92cc5db5720b40",
       "current_hash": "sha256:751df5f69f0892543d3406b1f5ad4e2582c4d8268f585750da92cc5db5720b40",
-      "last_seen_graph_hash": "sha256:4f19ec22872f6f5ff369a326f03e5b9352e044c77ec861f3a97890521cd75fba"
+      "last_seen_graph_hash": "sha256:4f16ea87b5f65e9623b69ade008c52aa4e63a51bb85b53287a9184fb164252b9"
     },
     "tests.ref-resolution": {
       "stable_id": "tests.ref-resolution",
@@ -1708,7 +1713,7 @@
       "source_spans": [],
       "generated_hash": "sha256:8a086cb246aa59a602c79e68caa3616a1dd15f4927e477fccaa19c79b285b16c",
       "current_hash": "sha256:8a086cb246aa59a602c79e68caa3616a1dd15f4927e477fccaa19c79b285b16c",
-      "last_seen_graph_hash": "sha256:4f19ec22872f6f5ff369a326f03e5b9352e044c77ec861f3a97890521cd75fba"
+      "last_seen_graph_hash": "sha256:4f16ea87b5f65e9623b69ade008c52aa4e63a51bb85b53287a9184fb164252b9"
     },
     "tests.refs-e2e": {
       "stable_id": "tests.refs-e2e",
@@ -1723,7 +1728,7 @@
       "source_spans": [],
       "generated_hash": "sha256:16b183dcd6d3d2155dd1988a72b6dc84d3d29378b6039592de7db2ad3662142f",
       "current_hash": "sha256:16b183dcd6d3d2155dd1988a72b6dc84d3d29378b6039592de7db2ad3662142f",
-      "last_seen_graph_hash": "sha256:4f19ec22872f6f5ff369a326f03e5b9352e044c77ec861f3a97890521cd75fba"
+      "last_seen_graph_hash": "sha256:4f16ea87b5f65e9623b69ade008c52aa4e63a51bb85b53287a9184fb164252b9"
     },
     "tests.search": {
       "stable_id": "tests.search",
@@ -1738,7 +1743,7 @@
       "source_spans": [],
       "generated_hash": "sha256:aa320b571b20467ffb95ff00d23aaf4758594d22ce2b4dd0ea550918f74107a5",
       "current_hash": "sha256:aa320b571b20467ffb95ff00d23aaf4758594d22ce2b4dd0ea550918f74107a5",
-      "last_seen_graph_hash": "sha256:4f19ec22872f6f5ff369a326f03e5b9352e044c77ec861f3a97890521cd75fba"
+      "last_seen_graph_hash": "sha256:4f16ea87b5f65e9623b69ade008c52aa4e63a51bb85b53287a9184fb164252b9"
     },
     "tests.section": {
       "stable_id": "tests.section",
@@ -1753,7 +1758,7 @@
       "source_spans": [],
       "generated_hash": "sha256:737472fc0e3c740c2a9672114f892c62aae24a84eebe0880248e1d10529a35ed",
       "current_hash": "sha256:737472fc0e3c740c2a9672114f892c62aae24a84eebe0880248e1d10529a35ed",
-      "last_seen_graph_hash": "sha256:4f19ec22872f6f5ff369a326f03e5b9352e044c77ec861f3a97890521cd75fba"
+      "last_seen_graph_hash": "sha256:4f16ea87b5f65e9623b69ade008c52aa4e63a51bb85b53287a9184fb164252b9"
     },
     "tests.section-parsing": {
       "stable_id": "tests.section-parsing",
@@ -1768,7 +1773,7 @@
       "source_spans": [],
       "generated_hash": "sha256:bdb107aee1e0a11d387aa411d42b93f5548c03f18e6fa52856b311cdbefa7c90",
       "current_hash": "sha256:bdb107aee1e0a11d387aa411d42b93f5548c03f18e6fa52856b311cdbefa7c90",
-      "last_seen_graph_hash": "sha256:4f19ec22872f6f5ff369a326f03e5b9352e044c77ec861f3a97890521cd75fba"
+      "last_seen_graph_hash": "sha256:4f16ea87b5f65e9623b69ade008c52aa4e63a51bb85b53287a9184fb164252b9"
     },
     "tests.section-preview": {
       "stable_id": "tests.section-preview",
@@ -1783,7 +1788,7 @@
       "source_spans": [],
       "generated_hash": "sha256:f6489db95ab6038be2750127ad290a7fdf6d834cb296af5dcd1c293678205ecb",
       "current_hash": "sha256:f6489db95ab6038be2750127ad290a7fdf6d834cb296af5dcd1c293678205ecb",
-      "last_seen_graph_hash": "sha256:4f19ec22872f6f5ff369a326f03e5b9352e044c77ec861f3a97890521cd75fba"
+      "last_seen_graph_hash": "sha256:4f16ea87b5f65e9623b69ade008c52aa4e63a51bb85b53287a9184fb164252b9"
     },
     "tests.ts-fallback": {
       "stable_id": "tests.ts-fallback",
@@ -1798,7 +1803,7 @@
       "source_spans": [],
       "generated_hash": "sha256:2eb50b1b8bfd84f431336a70c30ca6a3b883e6af3922068119836026fc517ee1",
       "current_hash": "sha256:2eb50b1b8bfd84f431336a70c30ca6a3b883e6af3922068119836026fc517ee1",
-      "last_seen_graph_hash": "sha256:4f19ec22872f6f5ff369a326f03e5b9352e044c77ec861f3a97890521cd75fba"
+      "last_seen_graph_hash": "sha256:4f16ea87b5f65e9623b69ade008c52aa4e63a51bb85b53287a9184fb164252b9"
     }
   },
   "relationships": {},

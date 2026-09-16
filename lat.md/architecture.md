@@ -36,7 +36,7 @@ The initial inventory groups files by broad category so later extraction can foc
 
 ## Structural Graph
 
-Code-KG extracted a deterministic structural graph with 1336 nodes, 3237 edges, 7 communities using the multi-language-directory-fallback analysis path.
+Code-KG extracted a deterministic structural graph with 1341 nodes, 3247 edges, 7 communities using the multi-language-directory-fallback analysis path.
 
 ## Communities
 
@@ -44,7 +44,7 @@ Directory-based communities provide the first subsystem map until graph clusteri
 
 - src: 74 files, 916 symbols, cohesion 0.89
 - tests: 41 files, 203 symbols, cohesion 0.51
-- plugins: 5 files, 42 symbols, cohesion 0.98
+- plugins: 5 files, 47 symbols, cohesion 0.99
 - templates: 2 files, 27 symbols, cohesion 1
 - scripts: 5 files, 8 symbols, cohesion 0.91
 - integration: 3 files, 2 symbols, cohesion 0.64
@@ -253,9 +253,9 @@ Source file `integration/verify-roscoe-git-guards.mjs` contains source symbols. 
 
 ### plugins/openclaw-code-kg/bridge.mjs
 
-Source file `plugins/openclaw-code-kg/bridge.mjs` contains source symbols. Key symbols: `nativeTool`, `hostHookBudgets`, and 28 more.
+Source file `plugins/openclaw-code-kg/bridge.mjs` contains source symbols. Key symbols: `nativeTool`, `hostHookBudgets`, and 30 more.
 
-- Symbols: `nativeTool (function)`, `hostHookBudgets (function)`, `object (function)`, `textResult (function)`, `validateConfig (function)`, `translateTool (function)`, `parseHookOutput (function)`, `runProcess (function)`, and 22 more
+- Symbols: `nativeTool (function)`, `hostHookBudgets (function)`, `object (function)`, `textResult (function)`, `validateConfig (function)`, `translateTool (function)`, `parseHookOutput (function)`, `redactSecrets (function)`, and 24 more
 - Imports: `plugins/openclaw-code-kg/definitions.mjs`
 - Imported by: `plugins/openclaw-code-kg/index.mjs`, `plugins/openclaw-code-kg/tests/bridge.test.mjs`
 

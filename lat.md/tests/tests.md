@@ -34,9 +34,9 @@ These generated highlights come from deterministic file, symbol, and import extr
 
 ### plugins/openclaw-code-kg/tests/bridge.test.mjs
 
-Test file `plugins/openclaw-code-kg/tests/bridge.test.mjs` contains tests and validation symbols. Key symbols: `hookContext`, `api`, and 2 more.
+Test file `plugins/openclaw-code-kg/tests/bridge.test.mjs` contains tests and validation symbols. Key symbols: `hookContext`, `api`, and 5 more.
 
-- Symbols: `hookContext (function)`, `api (function)`, `api#error (method)`, `mock (function)`
+- Symbols: `hookContext (function)`, `api (function)`, `api#error (method)`, `mock (function)`, `error (method)`, `error~2 (method)`, `error~3 (method)`
 - Imports: `plugins/openclaw-code-kg/bridge.mjs`
 - Imported by: none detected
 
