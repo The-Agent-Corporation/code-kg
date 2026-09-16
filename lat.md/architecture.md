@@ -28,7 +28,7 @@ No parsed entrypoint files were available for first-hop dependency flow during b
 The initial inventory groups files by broad category so later extraction can focus on high-value paths.
 
 - Code files: 111
-- Test files: 20
+- Test files: 21
 - Documentation files: 87
 - Config files: 3
 - Asset files: 2
@@ -36,14 +36,14 @@ The initial inventory groups files by broad category so later extraction can foc
 
 ## Structural Graph
 
-Code-KG extracted a deterministic structural graph with 1341 nodes, 3247 edges, 7 communities using the multi-language-directory-fallback analysis path.
+Code-KG extracted a deterministic structural graph with 1344 nodes, 3254 edges, 7 communities using the multi-language-directory-fallback analysis path.
 
 ## Communities
 
 Directory-based communities provide the first subsystem map until graph clustering is available.
 
-- src: 74 files, 916 symbols, cohesion 0.89
-- tests: 41 files, 203 symbols, cohesion 0.51
+- src: 74 files, 917 symbols, cohesion 0.89
+- tests: 42 files, 204 symbols, cohesion 0.51
 - plugins: 5 files, 47 symbols, cohesion 0.99
 - templates: 2 files, 27 symbols, cohesion 1
 - scripts: 5 files, 8 symbols, cohesion 0.91

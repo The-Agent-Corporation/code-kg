@@ -192,6 +192,14 @@ Test file `tests/search.test.ts` contains tests and validation symbols. Key symb
 - Imports: `src/config.ts`, `src/search/db.ts`, `src/search/index.ts`, `src/search/provider.ts`, `src/search/search.ts`, `tests/rag-replay-server.ts`
 - Imported by: none detected
 
+### tests/walk-symlinks.test.ts
+
+Test file `tests/walk-symlinks.test.ts` contains tests and validation symbols. Key symbols: `root`.
+
+- Symbols: `root (const)`
+- Imports: `src/walk.ts`
+- Imported by: none detected
+
 ## Test Coverage Links
 
 Test coverage links map inferred test relationships from test imports to source files so agents can find validation paths.

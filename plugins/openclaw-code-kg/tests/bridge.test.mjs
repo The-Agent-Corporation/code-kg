@@ -1,7 +1,7 @@
 import test from 'node:test';
 import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -11,7 +11,8 @@ import { NATIVE_RELAY_PROCESS_TIMEOUT_MS, createBridge, sharedBridge, redactSecr
 const source = process.env.CODEKG_TEST_ROOT ?? dirname(resolve(import.meta.dirname,
   execFileSync('git', ['-C', import.meta.dirname, 'rev-parse', '--git-common-dir'], { encoding: 'utf8' }).trim(),
 ));
-const root = mkdtempSync(join(tmpdir(), 'codekg-bridge-'));
+// The bridge realpaths config.repository; macOS tmpdir is a symlink (/var → /private/var).
+const root = realpathSync(mkdtempSync(join(tmpdir(), 'codekg-bridge-')));
 const ctx = { agentId: 'roscoe-supervisor', sessionKey: 'agent:roscoe-supervisor:main', sessionId: 'fixture-session', runId: 'run-1' };
 const hookContext = (text) => JSON.stringify({ hookSpecificOutput: { additionalContext: text } });
 const companionPath = resolve(import.meta.dirname, '../runner.mjs');

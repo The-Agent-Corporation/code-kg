@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash, randomBytes } from 'node:crypto';
-import { copyFileSync, existsSync } from 'node:fs';
+import { copyFileSync, existsSync, realpathSync } from 'node:fs';
 import { mkdir, open, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import {
   basename,
@@ -353,7 +353,10 @@ async function writeJsonl<T>(path: string, rows: T[]): Promise<void> {
 
 export async function ensureWorkStore(projectRoot: string): Promise<void> {
   const canonical = workDir(projectRoot);
-  const local = join(resolve(projectRoot), '.code-kg', 'work');
+  // Compare resolved paths: canonicalProjectRoot() realpaths, and on macOS
+  // tmp/var paths are symlinks, so an unresolved local path would be misread
+  // as an independent worktree store.
+  const local = join(realpathSync(resolve(projectRoot)), '.code-kg', 'work');
   if (canonical !== local) {
     for (const name of ['items.jsonl', 'memories.jsonl']) {
       try {
