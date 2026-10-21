@@ -15,14 +15,6 @@ If `code-kg` is not found, locate the user's Code-KG source checkout, install it
 dependencies, run `pnpm build`, then `node dist/src/codekg/cli.js install-global`
 there. Do not assume this private package is published to npm.
 
-## Role (orchestrator vs worker)
-
-If this session is a **coding worker** launched by OpenClaw (or similar), ensure
-`CODEKG_AGENT_ROLE=worker` so planning PromptSubmit hooks stay off. Orchestrators
-should use `CODEKG_AGENT_ROLE=orchestrator` and delegate sealed `code-kg work`
-items instead of implementing code themselves. Solo agents can leave the default
-`full` role (`code-kg agents install --role …` / `code-kg agents role`).
-
 ## Onboard a repo (no `lat.md/` yet)
 
 Run these from the repo root, with the user's go-ahead:
@@ -67,33 +59,6 @@ code-kg doctor                  # readiness report
   `codekg_gaps`, and `codekg_workspace_ask`.
 - **CLI via Bash** for everything not exposed over MCP: `bootstrap`, `doctor`,
   `semantic`, `context`, `gaps`, `changed`, `update`.
-
-
-## Multi-step work tracking
-
-For multi-step or multi-session tasks, use the Code-KG work tracker instead of
-markdown TODOs. It is dependency-aware (Beads-style) and primes each task from
-the knowledge graph so agents search `lat.md` before grepping source.
-
-```bash
-code-kg work create "Add export html" --query "export pipeline" --priority 1 --accept "html export opens in browser"
-code-kg work ready
-code-kg work interview <id> && code-kg work seal <id>
-code-kg work start <id> --worktree   # isolate + claim + graph prime
-code-kg work evidence pair <id> --before before.png --after after.png
-code-kg work verify <id> --verdict pass --summary "export renders" --method runtime
-code-kg work create "Fix edge case" --discovered-from <id>
-code-kg work close <id> --reason "shipped"
-code-kg work cleanup <id>            # remove worktree after merge/close
-code-kg work prime                   # session orientation
-```
-
-Also load project skills when relevant: `code-structure`, `evidence`,
-`before-and-after`, `unslop`, `anti-slop-code`, and `ui-skills-route`.
-
-MCP equivalents: `codekg_work_ready`, `codekg_work_start`, `codekg_work_prime`,
-`codekg_work_verify`, `codekg_work_interview`, `codekg_work_seal`,
-`codekg_work_create`, `codekg_work_claim`, `codekg_work_close`, `codekg_work_show`.
 
 ## Edit-safe contract
 

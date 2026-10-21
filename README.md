@@ -49,40 +49,18 @@ anchors. `source_node_ids` can support drift and coverage for overview sections,
 but source-editing features must use only `source_spans` on sections marked with
 `source_anchor_policy: "edit-safe"`.
 
-The agent guidance slice installs a managed section into both `AGENTS.md` and
-`CLAUDE.md`, plus safe Codex lifecycle hooks and git
-`pre-commit` / `post-merge` / `post-checkout` hooks. The guidance covers the
-original Code-KG intent (search/ask/context before broad grep) and the coding
-workflow (`work interview` → `seal` → `start --worktree` → evidence → verify →
-close). PreToolUse hooks nudge before raw-source search or reads; Stop blocks
-once when `code-kg check` fails or `lat.md/` is out of sync with code changes.
-Git hooks keep the knowledge graph fresh on every commit and after merges or
-branch checkouts that move the tip (including pulls onto main).
+The agent guidance slice installs a managed `AGENTS.md` section plus a safe
+Codex lifecycle hooks. The guidance tells coding agents to query Code-KG
+before broad source reads or grep-style exploration; the hook inspects Bash
+tool context plus structured Grep, Glob, Read, LS, read_file, and
+list_directory payloads where the host supports them. It adds a non-blocking
+reminder before broad raw-source search commands such as `rg`, `grep`, `find`,
+or `git grep`; when it can infer the search pattern, it suggests a concrete
+`code-kg search "<query>" --backend auto-semantic` command instead of a generic
+placeholder.
 
-### OpenClaw orchestrator + Claude Code workers
-
-When an orchestrator (OpenClaw) plans and coding workers (Claude Code) implement,
-install once and set **roles per process** so the wrong hooks do not interrupt
-either side:
-
-```bash
-code-kg agents install --role orchestrator
-export CODEKG_AGENT_ROLE=orchestrator          # OpenClaw process
-CODEKG_AGENT_ROLE=worker claude                # coding worker / agent_launch env
-```
-
-| Role | Typical host | Hook policy |
-| --- | --- | --- |
-| `orchestrator` | OpenClaw | planning search/ask/session; skip edit traces; Stop cares about open work, not lat.md sync |
-| `worker` | Claude Code | search-before-grep + edit context; Stop blocks once on check/sync; skip planning PromptSubmit |
-| `full` | solo agent | all hooks (default) |
-
-Precedence: `CODEKG_AGENT_ROLE` → `.code-kg/agent-role.json` → `full`. Inspect with
-`code-kg agents status` / `code-kg agents role`. OpenClaw skill pack:
-[`plugins/openclaw-code-kg/`](plugins/openclaw-code-kg/) (`code-kg-orchestrator`).
-
-Session, prompt, and post-edit hooks provide bounded context or refresh the
-structural cache. They make no model requests and never approve knowledge.
+Session, prompt, post-edit, and stop hooks now provide bounded context or refresh
+the structural cache. They make no model requests and never approve knowledge.
 Run `code-kg agents install` again to upgrade managed guidance and hooks; foreign
 hook entries are preserved. The Claude plugin includes the same lifecycle events.
 
@@ -132,22 +110,6 @@ node dist/src/codekg/cli.js semantic status
 node dist/src/codekg/cli.js semantic enable-local
 node dist/src/codekg/cli.js semantic reindex
 node dist/src/codekg/cli.js agents install
-node dist/src/codekg/cli.js agents install --role orchestrator
-node dist/src/codekg/cli.js agents role --role worker
-node dist/src/codekg/cli.js agents status
-node dist/src/codekg/cli.js work init
-node dist/src/codekg/cli.js work create "Example task" --query "entry points" --accept "ready list unlocks"
-node dist/src/codekg/cli.js work ready
-node dist/src/codekg/cli.js work interview <id>
-node dist/src/codekg/cli.js work answer <id> --question q1 --answer "..."
-node dist/src/codekg/cli.js work seal <id>
-node dist/src/codekg/cli.js work start <id> --worktree
-node dist/src/codekg/cli.js work isolate <id>
-node dist/src/codekg/cli.js work evidence pair <id> --before before.png --after after.png
-node dist/src/codekg/cli.js work verify <id> --verdict pass --summary "runtime check ok" --method runtime
-node dist/src/codekg/cli.js work cleanup <id>
-node dist/src/codekg/cli.js work prime
-node dist/src/codekg/cli.js work close <id> --reason "done"
 node dist/src/codekg/cli.js agents status
 node dist/src/codekg/cli.js agents uninstall
 node dist/src/codekg/cli.js hook-check
@@ -157,12 +119,6 @@ node dist/src/codekg/cli.js mcp
 
 The package exposes `code-kg` as its binary after build or package install.
 
-Skill packaging checks (Caliper-shaped, no LLM spend):
-
-```bash
-pnpm test:skill-evals
-```
-
 ## Daily Workflow
 
 For the normal local workflow, use the global binary:
@@ -171,7 +127,7 @@ For the normal local workflow, use the global binary:
 code-kg bootstrap --accept
 code-kg semantic enable-local
 code-kg semantic reindex
-code-kg agents install                    # or --role worker / orchestrator / full
+code-kg agents install
 code-kg agents status
 code-kg doctor
 code-kg drift
@@ -179,21 +135,14 @@ code-kg drift
 
 After that, use `code-kg ask "<question>"` before
 broad source searches, `code-kg context <file-or-symbol>` before opening raw
-source files, and `code-kg changed` / `code-kg update` around code changes.
-For multi-step agent work, use `code-kg work` (Beads/GSD-style tracking primed
-by the knowledge graph) instead of markdown TODOs: `work interview`/`seal`,
-`work start <id> --worktree`, `work evidence pair`, `work verify`, `work close <id>`.
-Load the `code-structure`, `evidence`, `before-and-after`, `unslop`,
-`anti-slop-code`, and `ui-skills-route` skills for the rest of the delivery loop.
-See [docs/USAGE.md](docs/USAGE.md) for the tested happy path and common checks.
+source files, and `code-kg changed` / `code-kg update` around code changes. See
+[docs/USAGE.md](docs/USAGE.md) for the tested happy path and common checks.
 
 ## Use as a Claude Code Plugin
 
 This repo is also a Claude Code plugin marketplace. The plugin wires the global
 `code-kg` binary into Claude Code as an MCP server plus hooks, and ships a
-guidance skill. For coding workers under OpenClaw, prefer
-`code-kg agents install --role worker` (or `CODEKG_AGENT_ROLE=worker`) so
-planning-only hooks stay out of the way — see OpenClaw roles above.
+guidance skill.
 
 Prerequisites (once per machine): `code-kg install-global` so `code-kg` is on
 `PATH`.
@@ -209,12 +158,11 @@ What it adds:
 
 - MCP server (`code-kg mcp`) — search, section, check, drift, confidence,
   suppress, and backlink tools in any mapped repo.
-- Role-aware PreToolUse nudges toward `code-kg search` / `code-kg context`
+- A PreToolUse hook that nudges toward `code-kg search` / `code-kg context`
   before broad grep/glob/read (silent in unmapped repos).
-- A SessionStart hook that offers to bootstrap unmapped code repos
-  (skipped for `--role worker`).
+- A SessionStart hook that offers to bootstrap unmapped code repos.
 - Bounded session orientation, prompt context, post-edit impact context, and
-  stop-time check/sync reminders in mapped repos (gated by agent role).
+  a silent stop-time structural refresh in mapped repos.
 - A guidance skill explaining the bootstrap and daily workflow.
 
 Map a repo with `code-kg bootstrap --accept` (see Daily Workflow above).
