@@ -1,7 +1,32 @@
-/** Shared limits for generated lat.md section prose. */
+/** Budgets for short display previews and complete source explanations. */
 
 /** Max characters for a section's leading paragraph (excluding [[wiki links]]). */
 export const LEADING_PARAGRAPH_MAX = 250;
+
+/** Preview generation is separate from the full source-description budget. */
+export const PREVIEW_MAX_TOKENS = 512;
+
+export function sourceSummaryMaxTokens(): number {
+  const value = process.env.CODEKG_SUMMARY_MAX_TOKENS?.trim();
+  const tokens = value ? Number(value) : 2048;
+  if (!Number.isInteger(tokens) || tokens < 512 || tokens > 16384)
+    throw new Error(
+      'CODEKG_SUMMARY_MAX_TOKENS must be an integer between 512 and 16384.',
+    );
+  return tokens;
+}
+
+/** A display excerpt only; the complete description is retained separately. */
+export function descriptionPreview(description: string): string {
+  const opening = description
+    .split(/\r?\n\s*\r?\n/, 1)[0]
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (bodyTextLength(opening) <= LEADING_PARAGRAPH_MAX) return opening;
+  const excerpt = opening.slice(0, LEADING_PARAGRAPH_MAX - 1);
+  const boundary = Math.max(excerpt.lastIndexOf(' '), excerpt.lastIndexOf(','));
+  return (boundary > 40 ? excerpt.slice(0, boundary) : excerpt).trimEnd() + '…';
+}
 
 /** Count body text length excluding `[[...]]` wiki link markers and content. */
 export function bodyTextLength(body: string): number {

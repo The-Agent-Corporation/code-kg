@@ -105,7 +105,26 @@ not forwarded to arbitrary custom servers. Choosing a remote endpoint explicitly
 sends the selected source excerpts there; local operation requires a local endpoint.
 
 Descriptions carry `status: inferred`, model configuration, and a source hash in
-`.code-kg/cache/meaning-v1.json`. They are not accepted architectural knowledge.
+`.code-kg/cache/meaning-v2.json`. They are not accepted architectural knowledge.
+Each entry retains the complete `summary` plus a separate short `preview` for
+display. Legacy version-1 descriptions may have been clipped and are not reused;
+regenerate them with the source enrichment command.
+
+The model is asked for a brief opening preview followed by a complete explanation,
+typically 150-300 words for ordinary files, with more detail for complex modules
+and less for simple files. This is a coverage target, not a hard word limit.
+Descriptions are never silently cut at a character boundary. Only the separate
+display preview may be shortened, with an ellipsis marking the excerpt.
+
+Source generation defaults to 2048 output tokens. Set
+`CODEKG_SUMMARY_MAX_TOKENS` to an integer from 512 through 16384 when a model or
+workload needs a different budget. Changing it invalidates the description cache.
+A network response must report `finish_reason: stop`; truncated, filtered, empty,
+or unknown completion states fail visibly and are not cached as complete.
+The generation budget may include model reasoning; choose model settings and a
+budget that leave room for the final explanation. Inferred descriptions still
+need factual review even when the response completed normally.
+
 Requests receive at most the first 24,000 source characters, explicitly labeled
 partial when truncated. The default limit is 20 attempted file requests per run;
 successful calls are checkpointed for reuse. Changing the selected model regenerates
@@ -120,6 +139,14 @@ output. These rules address the stale-summary failure observed in the comparison
 The existing paragraph enrichment command remains separate. It now only rewrites
 untouched generated manifest-owned files, skips curated/edited/authored prose, and
 checks for concurrent file changes before writing.
+
+Its 250-character leading paragraph is a search preview. Subsequent paragraphs
+retain detailed knowledge and are included in semantic section indexing. Preview
+enrichment rejects overlong, multi-paragraph, or incomplete responses rather than
+clipping them; the original paragraph and subsequent details are preserved when
+generation fails. A partial failure returns an error even if other previews were
+updated. The text retrieval budget limits agent output separately from retained
+knowledge.
 
 ## Review and Freshness
 

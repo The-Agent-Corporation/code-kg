@@ -333,6 +333,125 @@ describe('agent retrieval', () => {
     expect(result.isError).toBe(true);
     expect((await currentMeanings(root, await freshGraph(root))).size).toBe(0);
   });
+  it('retains detailed descriptions past 1800 characters and exposes a separate brief preview', async () => {
+    const root = await fixture();
+    const summary =
+      'Calculates numeric results.\n\n' +
+      'A deliberately detailed source explanation. '.repeat(55) +
+      'TailEvidenceToken: exceptions propagate to the caller.';
+    const result = await enrichSourcesCommand(ctx(root), {
+      generate: async () => summary,
+    });
+    expect(result.isError).toBe(false);
+    const meaning = (await currentMeanings(root, await freshGraph(root))).get(
+      'src/math.ts',
+    )!;
+    expect(meaning.summary).toBe(summary);
+    expect(meaning).toHaveProperty('preview', 'Calculates numeric results.');
+    expect(
+      (await ask(root, 'TailEvidenceToken', { semantic: false })).hits.some(
+        (hit) => hit.text.includes('exceptions propagate to the caller.'),
+      ),
+    ).toBe(true);
+  });
+  it('does not treat legacy possibly clipped descriptions as current', async () => {
+    const root = await fixture();
+    const graph = await freshGraph(root);
+    await writeJsonAtomic(join(root, '.code-kg/cache/meaning-v1.json'), {
+      version: 1,
+      entries: {
+        'src/math.ts': {
+          file: 'src/math.ts',
+          source_hash: graph.source_hashes!['src/math.ts'],
+          summary: 'Legacy explanation with potentially missing details.',
+          model: 'injected|injected|source-v1',
+          status: 'inferred',
+        },
+      },
+    });
+    expect((await currentMeanings(root, graph)).size).toBe(0);
+  });
+  it.each(['length', 'content_filter', 'error', undefined])(
+    'does not cache an incomplete network description (%s)',
+    async (finishReason) => {
+      const root = await fixture();
+      vi.spyOn(globalThis, 'fetch').mockImplementation(
+        async () =>
+          new Response(
+            JSON.stringify({
+              choices: [
+                {
+                  finish_reason: finishReason,
+                  message: { content: 'Partial description.' },
+                },
+              ],
+            }),
+            { status: 200 },
+          ),
+      );
+      const result = await enrichSourcesCommand(ctx(root), {
+        baseUrl: 'https://model.example/v1',
+        model: 'test-model',
+        limit: 1,
+      });
+      expect(result.isError).toBe(true);
+      expect((await currentMeanings(root, await freshGraph(root))).size).toBe(
+        0,
+      );
+    },
+  );
+  it('sends the configured generation budget and invalidates descriptions when it changes', async () => {
+    const root = await fixture();
+    vi.stubEnv('CODEKG_SUMMARY_MAX_TOKENS', '4096');
+    const requests: { max_tokens: number }[] = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
+      requests.push(JSON.parse(String(init?.body)));
+      return new Response(
+        JSON.stringify({
+          choices: [
+            {
+              finish_reason: 'stop',
+              message: { content: 'Complete description.' },
+            },
+          ],
+        }),
+        { status: 200 },
+      );
+    });
+    const options = {
+      baseUrl: 'https://model.example/v1',
+      model: 'test-model',
+    };
+    expect((await enrichSourcesCommand(ctx(root), options)).isError).toBe(
+      false,
+    );
+    expect(requests.map((request) => request.max_tokens)).toEqual([4096, 4096]);
+    await enrichSourcesCommand(ctx(root), options);
+    expect(requests).toHaveLength(2);
+    vi.stubEnv('CODEKG_SUMMARY_MAX_TOKENS', '2048');
+    expect((await currentMeanings(root, await freshGraph(root))).size).toBe(0);
+    await enrichSourcesCommand(ctx(root), options);
+    expect(requests.map((request) => request.max_tokens)).toEqual([
+      4096, 4096, 2048, 2048,
+    ]);
+  });
+  it.each(['0', '511', '16385', 'not-a-number', '2048.5'])(
+    'rejects an invalid description token budget (%s) before sending a request',
+    async (budget) => {
+      const root = await fixture();
+      vi.stubEnv('CODEKG_SUMMARY_MAX_TOKENS', budget);
+      const fetch = vi
+        .spyOn(globalThis, 'fetch')
+        .mockRejectedValue(new Error('Unexpected network request'));
+      await expect(
+        enrichSourcesCommand(ctx(root), {
+          baseUrl: 'https://model.example/v1',
+          model: 'test-model',
+        }),
+      ).rejects.toThrow(/CODEKG_SUMMARY_MAX_TOKENS/);
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
   it('does not send a stored remote-provider credential to a custom local model', async () => {
     const root = await fixture();
     vi.stubEnv('LAT_LLM_KEY', 'sk-secret-for-elsewhere');
@@ -340,7 +459,12 @@ describe('agent retrieval', () => {
     const mock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(
         JSON.stringify({
-          choices: [{ message: { content: 'Source description' } }],
+          choices: [
+            {
+              finish_reason: 'stop',
+              message: { content: 'Source description' },
+            },
+          ],
         }),
         { status: 200 },
       ),
