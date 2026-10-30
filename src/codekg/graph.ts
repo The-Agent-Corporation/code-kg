@@ -423,16 +423,16 @@ const ANCHORED_JOIN =
 const PROCESS_CALL =
   /\b(?:spawn|spawnSync|exec|execSync|execFile|execFileSync|fork|execa|execaNode|Worker|Popen|check_output|check_call|subprocess\.run|os\.system)\b[\s)]*\(/g;
 
-/** Argument ranges of subprocess calls that are code, not text. */
-function processCallSpans(scan: SourceScan): Array<[number, number]> {
-  const spans: Array<[number, number]> = [];
+/** Argument ranges `[start, end)` of subprocess calls in code, not text. */
+function processCalls(scan: SourceScan): Array<[number, number]> {
+  const calls: Array<[number, number]> = [];
   for (const match of scan.code.matchAll(PROCESS_CALL)) {
     if (stringAt(scan, match.index)) continue;
-    const open = match.index + match[0].length - 1;
-    const end = closingParen(scan, open);
-    if (end !== -1) spans.push([open, end]);
+    const start = match.index + match[0].length - 1;
+    const end = closingParen(scan, start);
+    if (end !== -1) calls.push([start, end]);
   }
-  return spans;
+  return calls;
 }
 
 /** Repo paths a mention can mean: built output maps back to its source. */
@@ -448,9 +448,9 @@ function mentionCandidates(path: string): string[] {
 
 /**
  * Module paths a test file shows evidence of loading: loader specifiers and
- * paths built from the test file's own location in its code, plus any path
- * inside a subprocess call's arguments, including a loader specifier in an
- * embedded script. Text in comments and in other strings, such as assertion
+ * paths built from the test file's own location in its code, and any path or
+ * loader specifier inside a subprocess call's arguments, such as a script run
+ * with `node -e`. Text in comments and in other strings, such as assertion
  * expectations, fixture contents and mock targets, does not count.
  */
 function loadedPaths(
@@ -460,10 +460,10 @@ function loadedPaths(
   const testDir = posix.dirname(testPath);
   const scan = scanSource(testPath, content);
   const { code } = scan;
-  const calls = processCallSpans(scan);
-  const inCall = (index: number) =>
+  const calls = processCalls(scan);
+  const isEvidence = (index: number) =>
+    !stringAt(scan, index) ||
     calls.some(([start, end]) => start <= index && index < end);
-  const isEvidence = (index: number) => !stringAt(scan, index) || inCall(index);
   const loads: Array<{ index: number; candidates: string[] }> = [];
   const relative = (index: number, mention: string, fromRoot: boolean) => {
     const local = /^\.{1,2}\//.test(mention)
