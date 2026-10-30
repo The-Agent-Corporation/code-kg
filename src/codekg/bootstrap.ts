@@ -40,7 +40,6 @@ const SECTION_HEADINGS: Record<string, string[]> = {
 
 const DEFAULT_GITIGNORE_LINES = [
   '.code-kg/cache/',
-  '.code-kg/search.sqlite',
   '.code-kg/tmp/',
   'lat.md/.cache/',
 ];

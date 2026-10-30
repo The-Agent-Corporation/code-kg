@@ -284,6 +284,7 @@ describe('code-kg bootstrap', () => {
     const gitignore = await readFile(join(root, '.gitignore'), 'utf-8');
     expect(gitignore).toContain('.code-kg/cache/');
     expect(gitignore).toContain('lat.md/.cache/');
+    expect(gitignore).not.toContain('search.sqlite');
 
     const result = await codeKgCheckCommand(ctx(root));
     expect(result.isError).toBeFalsy();

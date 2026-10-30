@@ -205,14 +205,18 @@ never selected as embedding credentials, including through saved-key fallback.
 
 This selection controls embeddings only. When chat credentials are configured,
 `code-kg update` also attempts paragraph enrichment with the detected chat
-provider. Keep chat credentials unset and out of the selected configuration
-when maintenance must remain entirely local; source descriptions use the
-separate explicit endpoint described in [Source Intelligence](docs/INTELLIGENCE.md).
+provider. Pass `code-kg update --no-enrich` (or set `CODEKG_SKIP_ENRICH=1`) to
+skip it for one run, or keep chat credentials unset and out of the selected
+configuration when maintenance must remain entirely local; source descriptions
+use the separate explicit endpoint described in
+[Source Intelligence](docs/INTELLIGENCE.md).
 
 Use `--backend auto-semantic` when you want the best configured backend without
 breaking offline/local workflows. It selects semantic search when an embedding
-provider is configured and falls back to local lexical search otherwise. Search
-output includes a `Backend:` line so agents can see which path was used.
+provider is configured and falls back to local lexical search when none is
+configured or the semantic search fails (for example, an expired key or a
+model that cannot be downloaded). Search output includes a `Backend:` line so
+agents can see which path was used and why.
 
 Run the opt-in local retrieval eval with:
 
