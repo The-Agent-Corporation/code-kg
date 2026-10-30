@@ -29,21 +29,32 @@ async function project(): Promise<CmdContext> {
 }
 
 describe('agents install/uninstall edge cases', () => {
-  it('refuses to touch AGENTS.md with an unterminated managed block', async () => {
+  const START = '<!-- code-kg:agents:start -->';
+  const END = '<!-- code-kg:agents:end -->';
+  it.each([
+    ['an unterminated block', `# Rules\n\n${START}\n## code-kg\n\nMy notes.\n`],
+    [
+      'a second start before the end',
+      `${START}\nMy notes.\n${START}\n## code-kg\n${END}\n`,
+    ],
+    [
+      'a trailing unmatched start',
+      `${START}\n## code-kg\n${END}\n\nMy notes.\n${START}\n`,
+    ],
+    ['an end without a start', `# Rules\n${END}\nMy notes.\n`],
+  ])('refuses to touch AGENTS.md with %s', async (_, malformed) => {
     const ctx = await project();
-    const partial =
-      '# Rules\n\n<!-- code-kg:agents:start -->\n## code-kg\n\nMy own notes below.\n';
-    await writeFile(join(ctx.projectRoot, 'AGENTS.md'), partial);
+    await writeFile(join(ctx.projectRoot, 'AGENTS.md'), malformed);
 
     const install = await agentsCommand(ctx, { action: 'install' });
     const uninstall = await agentsCommand(ctx, { action: 'uninstall' });
 
     for (const result of [install, uninstall]) {
       expect(result.isError).toBe(true);
-      expect(result.output).toContain('without a matching');
+      expect(result.output).toContain('nothing was changed');
     }
     expect(await readFile(join(ctx.projectRoot, 'AGENTS.md'), 'utf-8')).toBe(
-      partial,
+      malformed,
     );
     expect(existsSync(join(ctx.projectRoot, '.codex'))).toBe(false);
   });

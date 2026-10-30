@@ -436,14 +436,31 @@ async function agentsStatusCommand(ctx: CmdContext): Promise<CmdResult> {
   return { output: lines.join('\n') };
 }
 
-async function unterminatedAgentsBlock(
+function markerCount(content: string, marker: string): number {
+  return content.split(marker).length - 1;
+}
+
+/** Install and uninstall splice exactly one START…END block. */
+async function malformedAgentsBlock(
   projectRoot: string,
 ): Promise<string | null> {
   const content = await readText(join(projectRoot, 'AGENTS.md'));
   if (content === null) return null;
-  const start = content.indexOf(SECTION_START);
-  if (start === -1 || content.includes(SECTION_END, start)) return null;
-  return `AGENTS.md has \`${SECTION_START}\` without a matching \`${SECTION_END}\`; nothing was changed. Close or remove the partial Code-KG block, then re-run.`;
+  const starts = markerCount(content, SECTION_START);
+  const ends = markerCount(content, SECTION_END);
+  if (starts === 0 && ends === 0) return null;
+  if (
+    starts === 1 &&
+    ends === 1 &&
+    content.indexOf(SECTION_START) < content.indexOf(SECTION_END)
+  ) {
+    return null;
+  }
+  const found =
+    starts === 1 && ends === 1
+      ? 'its end marker comes before its start marker'
+      : `it has ${starts} start and ${ends} end marker(s)`;
+  return `AGENTS.md must contain at most one \`${SECTION_START}\` … \`${SECTION_END}\` block, but ${found}; nothing was changed. Fix or remove the Code-KG markers by hand, then re-run.`;
 }
 
 export async function agentsCommand(
@@ -452,10 +469,10 @@ export async function agentsCommand(
 ): Promise<CmdResult> {
   if (opts.action === 'status') return agentsStatusCommand(ctx);
 
-  const unterminated = await unterminatedAgentsBlock(ctx.projectRoot);
-  if (unterminated) {
+  const malformed = await malformedAgentsBlock(ctx.projectRoot);
+  if (malformed) {
     return {
-      output: ['# Code-KG Agents', '', `- ${unterminated}`].join('\n'),
+      output: ['# Code-KG Agents', '', `- ${malformed}`].join('\n'),
       isError: true,
     };
   }
