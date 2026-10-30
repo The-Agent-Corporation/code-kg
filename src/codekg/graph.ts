@@ -398,6 +398,55 @@ function analyzeGraph(fragment: GraphFragment): ProjectGraph {
   };
 }
 
+const PATH_MENTION = /[\w@.-]+(?:\/[\w@.-]+)+/g;
+
+/**
+ * Tests that load a module by path (a subprocess script, a built `dist/`
+ * file, a dynamic import string) have no static import edge. A test file
+ * that names a code file's path gets an INFERRED `tests` edge to it, unless
+ * an extracted edge already covers the pair.
+ */
+function inferredTestEdges(
+  paths: string[],
+  categories: Map<string, string>,
+  contents: Map<string, string>,
+  existing: Set<string>,
+): RelationshipEdge[] {
+  const targets = new Map<string, string>();
+  for (const path of paths) {
+    if (categories.get(path) !== 'code') continue;
+    targets.set(path, path);
+    const built = path.replace(/\.(ts|tsx)$/, '.js');
+    if (built !== path && !categories.has(built)) targets.set(built, path);
+  }
+  const edges: RelationshipEdge[] = [];
+  for (const path of paths) {
+    const content = contents.get(path);
+    if (categories.get(path) !== 'test' || !content) continue;
+    for (const match of content.matchAll(PATH_MENTION)) {
+      const mention = match[0]
+        .replace(/^(?:\.{1,2}\/)+/, '')
+        .replace(/^dist\//, '');
+      const target = targets.get(mention);
+      if (!target) continue;
+      const line = content.slice(0, match.index).split('\n').length;
+      const relationship = edge(
+        fileNode(path).id,
+        fileNode(target).id,
+        'tests',
+        path,
+        line,
+      );
+      if (existing.has(relationship.id)) continue;
+      relationship.confidence = 'INFERRED';
+      relationship.confidence_score = 0.7;
+      existing.add(relationship.id);
+      edges.push(relationship);
+    }
+  }
+  return edges;
+}
+
 export async function extractProjectGraph(
   rootArg = '.',
   discoveryArg?: DiscoveryResult,
@@ -528,6 +577,18 @@ export async function extractProjectGraph(
       );
     }
   }
+  fragment.edges.push(
+    ...inferredTestEdges(
+      codePaths,
+      fileCategories,
+      snapshot.contents,
+      new Set(
+        fragment.edges
+          .filter((entry) => entry.relation === 'tests')
+          .map((entry) => entry.id),
+      ),
+    ),
+  );
   fragment.edges = [
     ...new Map(fragment.edges.map((entry) => [entry.id, entry])).values(),
   ].sort((a, b) => a.id.localeCompare(b.id));
