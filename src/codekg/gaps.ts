@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { CmdContext, CmdResult } from '../context.js';
 import { flattenSections, loadAllSections } from '../lattice.js';
+import { sectionNodeIds } from './anchors.js';
 import { extractProjectGraph } from './graph.js';
 import type { MaterializationManifest } from './types.js';
 
@@ -56,9 +57,7 @@ export async function gapsCommand(ctx: CmdContext): Promise<CmdResult> {
   const testedTargets = testTargets(false);
   const inferredTargets = testTargets(true);
   const anchoredNodeIds = new Set(
-    Object.values(manifest.sections).flatMap(
-      (section) => section.source_node_ids,
-    ),
+    Object.values(manifest.sections).flatMap(sectionNodeIds),
   );
 
   const filesWithoutSections = codeFiles
@@ -78,7 +77,7 @@ export async function gapsCommand(ctx: CmdContext): Promise<CmdResult> {
     .filter(
       (section) =>
         section.status !== 'suppressed' &&
-        section.source_node_ids.length === 0 &&
+        sectionNodeIds(section).length === 0 &&
         section.source_spans.length === 0,
     )
     .map((section) => `[[${section.public_section_id}]]`);

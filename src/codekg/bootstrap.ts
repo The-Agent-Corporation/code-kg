@@ -4,6 +4,8 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { extname } from 'node:path';
 import { scanCodeRefs } from '../code-refs.js';
+import { walkEntries } from '../walk.js';
+import { isSectionEntry } from './anchors.js';
 import { discoverProject } from './discovery.js';
 import {
   extractProjectGraph,
@@ -419,15 +421,67 @@ No test-to-source import relationships were detected during bootstrap.
     .trimEnd();
 }
 
-function rootIndex(discovery: DiscoveryResult): string {
+const GENERATED_ROOT_ENTRIES: Array<[stem: string, summary: string]> = [
+  ['architecture', 'Repository structure and entry points.'],
+  ['cross-cutting', 'Shared concerns and likely integration paths.'],
+  ['confidence', 'Review queue for uncertain generated knowledge.'],
+  ['tests', 'Test layout and validation notes.'],
+];
+
+type RootEntry = { stem: string; summary: string };
+
+function leadingSentence(markdown: string): string {
+  const paragraph = markdown
+    .split(/\n\s*\n/)
+    .map((block) =>
+      block
+        .split('\n')
+        .filter((line) => !/^\s*(#|<!--)/.test(line))
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim(),
+    )
+    .find(Boolean);
+  if (!paragraph) return 'Curated knowledge.';
+  return /^.*?[.!?](?=\s|$)/.exec(paragraph)?.[0] ?? paragraph;
+}
+
+/**
+ * Hand-written files and directories at the top of `lat.md/`. The root index
+ * must list them, and listing them here keeps the root generated, so its
+ * snapshot keeps refreshing instead of turning into merge proposals.
+ */
+async function curatedRootEntries(root: string): Promise<RootEntry[]> {
+  const latDir = join(root, 'lat.md');
+  if (!existsSync(latDir)) return [];
+  const generated = new Set(['lat', ...GENERATED_ROOT_ENTRIES.map(([s]) => s)]);
+  // `check` sees lat.md/ through the same walk, so ignored files stay out.
+  const indexes = new Map<string, string>();
+  for (const path of await walkEntries(latDir)) {
+    const [top, child, ...deeper] = path.split('/');
+    if (child === undefined && top.endsWith('.md'))
+      indexes.set(top.slice(0, -3), path);
+    else if (child === `${top}.md` && !deeper.length) indexes.set(top, path);
+  }
+  const entries: RootEntry[] = [];
+  for (const [stem, index] of indexes) {
+    if (generated.has(stem)) continue;
+    const content = await readFile(join(latDir, index), 'utf-8');
+    entries.push({ stem, summary: leadingSentence(content) });
+  }
+  return entries.sort((a, b) => a.stem.localeCompare(b.stem));
+}
+
+function rootIndex(discovery: DiscoveryResult, curated: RootEntry[]): string {
+  const links = [
+    ...GENERATED_ROOT_ENTRIES.map(([stem, summary]) => ({ stem, summary })),
+    ...curated,
+  ].map(({ stem, summary }) => `- [[${stem}]] - ${summary}`);
   return `# Code-KG Knowledge Base
 
 This knowledge base was bootstrapped from local repository discovery and should be curated as the code changes.
 
-- [[architecture]] - Repository structure and entry points.
-- [[cross-cutting]] - Shared concerns and likely integration paths.
-- [[confidence]] - Review queue for uncertain generated knowledge.
-- [[tests]] - Test layout and validation notes.
+${links.join('\n')}
 
 ## Repository Snapshot
 
@@ -891,7 +945,7 @@ export async function createBootstrapPlan(
   const files: BootstrapFile[] = [
     {
       path: 'lat.md/lat.md',
-      content: rootIndex(discovery),
+      content: rootIndex(discovery, await curatedRootEntries(root)),
       committed: true,
     },
     {
@@ -974,6 +1028,7 @@ export async function formatMaterializationPreview(
   return lines.join('\n');
 }
 
+// @lat: [[lat.md/concepts#Concepts#Merge-Safe Materialization]]
 export async function writeBootstrapPlan(
   plan: BootstrapPlan,
 ): Promise<string[]> {
@@ -982,6 +1037,8 @@ export async function writeBootstrapPlan(
   if (currentManifest) {
     nextManifest.relationships = currentManifest.relationships;
     nextManifest.suppressed = currentManifest.suppressed;
+    for (const [id, section] of Object.entries(currentManifest.sections))
+      if (isSectionEntry(section)) nextManifest.sections[id] ??= section;
   }
 
   const written: string[] = [];

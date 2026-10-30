@@ -46,8 +46,11 @@ candidate under `.code-kg/cache/merge-proposals/` for manual review.
 
 Manifest sections distinguish broad coverage evidence from edit-safe source
 anchors. `source_node_ids` can support drift and coverage for overview sections,
-but source-editing features must use only `source_spans` on sections marked with
-`source_anchor_policy: "edit-safe"`.
+but source-editing features must use only `source_spans` or `source_anchors` on
+sections marked with `source_anchor_policy: "edit-safe"`. `code-kg anchor
+<section-id> <symbol-or-file>` marks a curated section edit-safe and anchors it
+to graph symbols, so `apply-backlinks` follows them as the source moves. Drift
+asks for a review only when an anchored symbol's own body changes.
 
 The agent guidance slice installs a managed `AGENTS.md` section plus a safe
 Codex lifecycle hooks. The guidance tells coding agents to query Code-KG
@@ -66,7 +69,7 @@ hook entries are preserved. The Claude plugin includes the same lifecycle events
 
 The Code-KG MCP server exposes the daily agent workflow directly: search,
 section reads with approximate token budgets, check, drift, confidence,
-suppression, and backlink preview/write tools.
+suppression, section anchors, and backlink preview/write tools.
 
 `code-kg doctor` now acts as a readiness report for agent use. It checks the
 knowledge base, manifest, cache ignore rule, installed agent guidance, Codex
@@ -96,6 +99,9 @@ node dist/src/codekg/cli.js suppress list
 node dist/src/codekg/cli.js suppress node <node-id>
 node dist/src/codekg/cli.js suppress relationship <relationship-id>
 node dist/src/codekg/cli.js suppress clear <id>
+node dist/src/codekg/cli.js anchor "lat.md/notes#Notes#Auth" src/auth.ts#login
+node dist/src/codekg/cli.js anchor "lat.md/notes#Notes#Auth" --list
+node dist/src/codekg/cli.js anchor "lat.md/notes#Notes#Auth" --remove login
 node dist/src/codekg/cli.js apply-backlinks --preview
 node dist/src/codekg/cli.js apply-backlinks --write
 node dist/src/codekg/cli.js search "entry points"
@@ -228,3 +234,11 @@ Run the opt-in local retrieval eval with:
 ```bash
 LAT_TEST_LOCAL_EMBEDDINGS=1 pnpm vitest run tests/search.test.ts --testNamePattern "local embeddings eval"
 ```
+
+`tests/retrieval-eval.test.ts` asks 17 questions about this repository against
+its committed `lat.md/` and reports recall@5 and mean reciprocal rank. The
+lexical half runs in the normal suite and fails if either number drops more
+than 0.03 below its recorded floor, which leaves room for generated sections
+reshuffling after a code change. The semantic half runs with
+`LAT_TEST_LOCAL_EMBEDDINGS=1`. Raise the floors when ranking or curated sections
+improve.

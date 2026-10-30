@@ -2,10 +2,21 @@ import { existsSync } from 'node:fs';
 import { readFile, realpath, writeFile } from 'node:fs/promises';
 import { extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type { CmdContext, CmdResult } from '../context.js';
-import { backlinkAnchorsForSection } from './anchors.js';
+import {
+  anchorName,
+  anchorSpan,
+  backlinkAnchorsForSection,
+  sourceAnchorPolicy,
+} from './anchors.js';
 import { writeJsonAtomic } from './cache.js';
+import { freshGraph } from './fresh.js';
 import { sourceHash } from './structural.js';
-import type { MaterializationManifest } from './types.js';
+import type {
+  ManifestSection,
+  MaterializationManifest,
+  ProjectGraph,
+  SourceSpan,
+} from './types.js';
 
 type ApplyBacklinksOptions = {
   write: boolean;
@@ -26,6 +37,8 @@ type BacklinkSkip = {
 type BacklinkPlan = {
   insertions: BacklinkInsertion[];
   skips: BacklinkSkip[];
+  /** The graph anchors were located in, when any section has anchors. */
+  graph: ProjectGraph | null;
 };
 
 const SLASH_COMMENT_EXTENSIONS = new Set([
@@ -137,6 +150,49 @@ function missingManifest(): CmdResult {
   };
 }
 
+type BacklinkTarget = {
+  span: SourceSpan;
+  /** Content hash the span's line numbers were taken from. */
+  baseline: string | undefined;
+  anchored: boolean;
+};
+
+function anchoredTargets(
+  section: ManifestSection,
+  graph: ProjectGraph | null,
+  skips: BacklinkSkip[],
+): BacklinkTarget[] {
+  if (sourceAnchorPolicy(section) !== 'edit-safe' || !graph) return [];
+  const targets: BacklinkTarget[] = [];
+  for (const anchor of section.source_anchors ?? []) {
+    const node = graph.nodes.find((n) => n.id === anchor.node_id);
+    const span = node && anchorSpan(node);
+    if (!span) {
+      skips.push({
+        file: anchor.file,
+        reason: `skipped ${anchorName(anchor)}: section ${section.stable_id} is anchored to it, but it no longer exists in the source; re-anchor the section with code-kg anchor`,
+      });
+      continue;
+    }
+    if (node.kind !== 'file' && !node.clear_start) {
+      skips.push({
+        file: anchor.file,
+        reason:
+          node.clear_start === false
+            ? `skipped ${anchorName(anchor)}: code from an earlier line continues onto its first line at ${span.file}:${span.start_line}, so a backlink there could land inside a string or comment; start the declaration on its own line`
+            : `skipped ${anchorName(anchor)}: its syntax tree was not available to confirm a safe line for the backlink; anchor the enclosing function, class or file instead`,
+      });
+      continue;
+    }
+    targets.push({
+      span,
+      baseline: graph.source_hashes?.[span.file],
+      anchored: true,
+    });
+  }
+  return targets;
+}
+
 async function backlinkPlan(
   ctx: CmdContext,
   manifest: MaterializationManifest,
@@ -144,18 +200,28 @@ async function backlinkPlan(
   const insertions: BacklinkInsertion[] = [];
   const skips: BacklinkSkip[] = [];
   const seen = new Set<string>();
+  const active = Object.values(manifest.sections).filter(
+    (section) =>
+      section.status !== 'suppressed' && section.status !== 'orphaned',
+  );
+  const graph = active.some((section) => section.source_anchors?.length)
+    ? await freshGraph(ctx.projectRoot)
+    : null;
 
-  for (const section of Object.values(manifest.sections)) {
-    if (section.status === 'suppressed' || section.status === 'orphaned') {
-      continue;
-    }
-
-    const spans = [...backlinkAnchorsForSection(section)].sort((a, b) =>
-      a.file === b.file
-        ? a.start_line - b.start_line
-        : a.file.localeCompare(b.file),
+  for (const section of active) {
+    const targets = [
+      ...backlinkAnchorsForSection(section).map((span) => ({
+        span,
+        baseline: section.source_hashes?.[span.file],
+        anchored: false,
+      })),
+      ...anchoredTargets(section, graph, skips),
+    ].sort((a, b) =>
+      a.span.file === b.span.file
+        ? a.span.start_line - b.span.start_line
+        : a.span.file.localeCompare(b.span.file),
     );
-    for (const span of spans) {
+    for (const { span, baseline, anchored } of targets) {
       const pathReason = skippedPathReason(span.file);
       if (pathReason) {
         skips.push({ file: span.file, reason: pathReason });
@@ -197,19 +263,22 @@ async function backlinkPlan(
 
       // Span line numbers are only trustworthy for the content they were
       // recorded against; a stale line can fall inside a string literal.
-      const recordedHash = section.source_hashes?.[span.file];
       const currentHash = sourceHash(content);
-      if (!recordedHash) {
+      if (!baseline) {
         skips.push({
           file: span.file,
-          reason: `skipped ${span.file}: section ${section.stable_id} has no recorded source hash for it, so its span line numbers cannot be verified; record fresh spans before inserting backlinks`,
+          reason: anchored
+            ? `skipped ${span.file}: it is not in the extracted source graph`
+            : `skipped ${span.file}: section ${section.stable_id} has no recorded source hash for it, so its span line numbers cannot be verified; record fresh spans or anchor the section with code-kg anchor`,
         });
         continue;
       }
-      if (recordedHash !== currentHash) {
+      if (baseline !== currentHash) {
         skips.push({
           file: span.file,
-          reason: `skipped ${span.file}: changed since section ${section.stable_id} recorded its source spans; record fresh spans before inserting backlinks`,
+          reason: anchored
+            ? `skipped ${span.file}: changed while its symbols were being located; rerun apply-backlinks`
+            : `skipped ${span.file}: changed since section ${section.stable_id} recorded its source spans; record fresh spans or anchor the section with code-kg anchor`,
         });
         continue;
       }
@@ -227,10 +296,13 @@ async function backlinkPlan(
   insertions.sort((a, b) =>
     a.file === b.file ? a.line - b.line : a.file.localeCompare(b.file),
   );
-  return { insertions, skips };
+  return { insertions, skips, graph };
 }
 
-function formatPlan(plan: BacklinkPlan, write: boolean): string {
+function formatPlan(
+  plan: Pick<BacklinkPlan, 'insertions' | 'skips'>,
+  write: boolean,
+): string {
   const lines = ['# Code-KG Apply Backlinks', ''];
   if (plan.insertions.length === 0 && plan.skips.length === 0) {
     lines.push('No backlink changes.');
@@ -279,10 +351,37 @@ export function insertCommentLine(
   );
 }
 
+/**
+ * An inserted comment changes the hash of an anchored file, and of an anchored
+ * symbol whose body contains it. Anchors reviewed against the pre-insert
+ * content move to the new hash, as span baselines do.
+ */
+async function rehashAnchors(
+  ctx: CmdContext,
+  manifest: MaterializationManifest,
+  before: ProjectGraph | null,
+  files: Set<string>,
+): Promise<void> {
+  const anchors = Object.values(manifest.sections)
+    .flatMap((section) => section.source_anchors ?? [])
+    .filter((anchor) => files.has(anchor.file));
+  if (!before || !anchors.length) return;
+  const hashes = (graph: ProjectGraph) =>
+    new Map(graph.nodes.map((node) => [node.id, node.body_hash]));
+  const previous = hashes(before);
+  const next = hashes(await freshGraph(ctx.projectRoot));
+  for (const anchor of anchors) {
+    const hash = next.get(anchor.node_id);
+    if (hash && anchor.hash === previous.get(anchor.node_id))
+      anchor.hash = hash;
+  }
+}
+
 async function writeInsertions(
   ctx: CmdContext,
   manifest: MaterializationManifest,
   insertions: BacklinkInsertion[],
+  graph: ProjectGraph | null,
 ): Promise<{ written: BacklinkInsertion[]; skips: BacklinkSkip[] }> {
   const written: BacklinkInsertion[] = [];
   const skips: BacklinkSkip[] = [];
@@ -351,6 +450,7 @@ async function writeInsertions(
         }
       }
     }
+    await rehashAnchors(ctx, manifest, graph, new Set(rehashed.keys()));
     await writeJsonAtomic(manifestPath(ctx), manifest, 2);
   }
 
@@ -360,6 +460,7 @@ async function writeInsertions(
   return { written, skips };
 }
 
+// @lat: [[lat.md/concepts#Concepts#Source Anchor Policies]]
 export async function applyBacklinksCommand(
   ctx: CmdContext,
   opts: ApplyBacklinksOptions,
@@ -376,6 +477,7 @@ export async function applyBacklinksCommand(
     ctx,
     manifest,
     plan.insertions,
+    plan.graph,
   );
   return {
     output: formatPlan(

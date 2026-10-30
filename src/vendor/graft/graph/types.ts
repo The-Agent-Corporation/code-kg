@@ -63,6 +63,9 @@ export interface NodeV1 {
   // location (Tier-1, deterministic)
   path: string; // repo-relative: "src/cache.ts"
   span: string; // whole definition: "L165-L222"
+  // Code-KG: symbol nodes only. True when no construct from an earlier line runs
+  // onto the definition's first line, so a comment line can go directly above it.
+  clear_start?: boolean;
   signature: string | null; // "get(k: string): number" — null for kind:"file"
   exported: boolean;
   // How the node was extracted. "ast" = a first-class hand-written extractor

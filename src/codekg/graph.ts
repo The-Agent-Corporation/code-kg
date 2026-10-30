@@ -505,6 +505,7 @@ function loadedPaths(
  * an INFERRED `tests` edge to the module, unless an extracted edge already
  * covers the pair.
  */
+// @lat: [[lat.md/concepts#Concepts#Relationship Confidence]]
 function inferredTestEdges(
   paths: string[],
   categories: Map<string, string>,
@@ -551,6 +552,7 @@ function inferredTestEdges(
   return edges;
 }
 
+// @lat: [[lat.md/concepts#Concepts#Structural Extraction]]
 export async function extractProjectGraph(
   rootArg = '.',
   discoveryArg?: DiscoveryResult,
@@ -642,6 +644,7 @@ export async function extractProjectGraph(
     }
     node.body_hash =
       raw.kind === 'file' ? node.body_hash : 'sha256:' + raw.body_hash;
+    if (raw.kind !== 'file') node.clear_start = raw.clear_start;
     node.signature = raw.signature ?? undefined;
     node.search_text = raw.body_text ?? node.search_text;
     node.origin = raw.origin;

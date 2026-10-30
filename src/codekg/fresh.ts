@@ -6,6 +6,7 @@ import type { ProjectGraph } from './types.js';
 
 const active = new Map<string, Promise<ProjectGraph>>();
 
+// @lat: [[lat.md/concepts#Concepts#Structural Extraction]]
 export async function freshGraph(root: string): Promise<ProjectGraph> {
   root = resolve(root);
   const pending = active.get(root);

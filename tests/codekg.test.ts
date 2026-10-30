@@ -488,7 +488,7 @@ describe('code-kg bootstrap', () => {
 
     expect(result.isError).toBeTruthy();
     expect(result.output).toContain(
-      'Manifest section architecture is edit-safe but has no source_spans.',
+      'Manifest section architecture is edit-safe but has no source_spans or source_anchors.',
     );
   });
 
@@ -581,6 +581,26 @@ describe('code-kg bootstrap', () => {
     expect(result.output).toContain(
       'lat.md/architecture#Architecture#Entry Points',
     );
+  });
+
+  it('matches words below the leading paragraph and ignores question words', async () => {
+    const root = await makeProject();
+    await writeBootstrapPlan(await createBootstrapPlan(root));
+    await writeFile(
+      join(root, 'lat.md', 'notes.md'),
+      '# Notes\n\nShort lead paragraph.\n\n## Rollback\n\nUndo a release.\n\nThe flux capacitor is reset after every rollback.\n',
+    );
+
+    const deep = await localSearchCommand(
+      ctx(root),
+      'what resets the capacitor',
+      5,
+    );
+    const filler = await localSearchCommand(ctx(root), 'what is the', 5);
+
+    expect(deep.output).toContain('lat.md/notes#Notes#Rollback');
+    expect(filler.isError).toBe(true);
+    expect(filler.output).toBe('No sections matched "what is the".');
   });
 
   it('uses local lexical search as the default Code-KG search backend', async () => {

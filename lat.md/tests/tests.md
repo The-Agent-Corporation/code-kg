@@ -8,6 +8,7 @@ This section records the test layout discovered during bootstrap and indexes gen
 These paths looked test-related during local discovery.
 
 - tests/agents-edge-cases.test.ts
+- tests/anchor.test.ts
 - tests/backlinks-safety.test.ts
 - tests/cases.test.ts
 - tests/code-refs-no-match.test.ts
@@ -15,6 +16,7 @@ These paths looked test-related during local discovery.
 - tests/codekg-messages.test.ts
 - tests/codekg.test.ts
 - tests/config-corrupt.test.ts
+- tests/curated-files.test.ts
 - tests/enrich.test.ts
 - tests/gaps-inferred.test.ts
 - tests/git-hooks.test.ts
@@ -25,8 +27,6 @@ These paths looked test-related during local discovery.
 - tests/lattice.test.ts
 - tests/limits.test.ts
 - tests/mcp.test.ts
-- tests/parser.test.ts
-- tests/search-fallback.test.ts
 
 ## Source Test Highlights
 
@@ -38,6 +38,14 @@ Test file `tests/agents-edge-cases.test.ts` contains tests and validation symbol
 
 - Symbols: `roots (const)`, `project (function)`
 - Imports: `src/codekg/agents.ts`, `src/context.ts`
+- Imported by: none detected
+
+### tests/anchor.test.ts
+
+Test file `tests/anchor.test.ts` contains tests and validation symbols. Key symbols: `roots`, `SECTION`, and 7 more.
+
+- Symbols: `roots (const)`, `SECTION (const)`, `GREET (const)`, `ctx (function)`, `project (function)`, `readManifest (function)`, `add (const)`, `entry (function)`, and 1 more
+- Imports: `src/codekg/anchor.ts`, `src/codekg/anchors.ts`, `src/codekg/backlinks.ts`, `src/codekg/bootstrap.ts`, `src/codekg/check.ts`, `src/codekg/context.ts`, and 5 more
 - Imported by: none detected
 
 ### tests/backlinks-safety.test.ts
@@ -94,6 +102,14 @@ Test file `tests/config-corrupt.test.ts` contains tests and validation symbols. 
 
 - Symbols: `roots (const)`, `CORRUPT (const)`, `project (function)`
 - Imports: `src/codekg/bootstrap.ts`, `src/codekg/check.ts`, `src/codekg/enrich.ts`, `src/codekg/search.ts`, `src/codekg/semantic.ts`, `src/config.ts`, and 1 more
+- Imported by: none detected
+
+### tests/curated-files.test.ts
+
+Test file `tests/curated-files.test.ts` contains tests and validation symbols. Key symbols: `roots`, `NOTES`.
+
+- Symbols: `roots (const)`, `NOTES (const)`
+- Imports: `src/codekg/bootstrap.ts`, `src/codekg/check.ts`, `src/codekg/types.ts`, `src/context.ts`
 - Imported by: none detected
 
 ### tests/enrich.test.ts
@@ -184,6 +200,14 @@ Test file `tests/parser.test.ts` contains tests and validation symbols. Key symb
 - Imports: `src/extensions/wiki-link/index.ts`, `src/parser.ts`
 - Imported by: none detected
 
+### tests/retrieval-eval.test.ts
+
+Test file `tests/retrieval-eval.test.ts` contains tests and validation symbols. Key symbols: `A`, `T`, and 11 more.
+
+- Symbols: `A (const)`, `T (const)`, `C (const)`, `QUESTIONS (const)`, `LEXICAL_FLOOR (const)`, `SEMANTIC_FLOOR (const)`, `SLACK (const)`, `Score (type)`, and 5 more
+- Imports: `src/codekg/search.ts`, `src/lattice.ts`, `src/search/db.ts`, `src/search/index.ts`, `src/search/provider.ts`, `src/search/search.ts`
+- Imported by: none detected
+
 ### tests/search-fallback.test.ts
 
 Test file `tests/search-fallback.test.ts` contains tests and validation symbols. Key symbols: `semantic`, `roots`, and 1 more.
@@ -208,37 +232,39 @@ Test file `tests/source-scan.test.ts` contains tests and validation symbols. Key
 - Imports: `src/codekg/source-scan.ts`
 - Imported by: none detected
 
-### tests/trace-depth.test.ts
-
-Test file `tests/trace-depth.test.ts` contains tests and validation symbols. Key symbols: `roots`, `chain`, and 1 more.
-
-- Symbols: `roots (const)`, `chain (function)`, `callTrace (function)`
-- Imports: `src/codekg/mcp.ts`, `src/codekg/query.ts`, `src/context.ts`
-- Imported by: none detected
-
-### tests/walk-symlinks.test.ts
-
-Test file `tests/walk-symlinks.test.ts` contains tests and validation symbols. Key symbols: `root`.
-
-- Symbols: `root (const)`
-- Imports: `src/code-refs.ts`, `src/walk.ts`
-- Imported by: none detected
-
 ## Test Coverage Links
 
 Test coverage links map inferred test relationships from test imports to source files so agents can find validation paths.
 
 ### src/context.ts
 
-Source file `src/context.ts` is covered by test imports from `tests/agents-edge-cases.test.ts`, `tests/backlinks-safety.test.ts`, and 10 more.
+Source file `src/context.ts` is covered by test imports from `tests/agents-edge-cases.test.ts`, `tests/anchor.test.ts`, and 12 more.
 
-- Tests: `tests/agents-edge-cases.test.ts`, `tests/backlinks-safety.test.ts`, `tests/cases.test.ts`, `tests/codekg-intelligence.test.ts`, `tests/codekg-messages.test.ts`, `tests/codekg.test.ts`, and 6 more
+- Tests: `tests/agents-edge-cases.test.ts`, `tests/anchor.test.ts`, `tests/backlinks-safety.test.ts`, `tests/cases.test.ts`, `tests/codekg-intelligence.test.ts`, `tests/codekg-messages.test.ts`, and 8 more
 
 ### src/codekg/bootstrap.ts
 
-Source file `src/codekg/bootstrap.ts` is covered by test imports from `tests/backlinks-safety.test.ts`, `tests/codekg-intelligence.test.ts`, and 5 more.
+Source file `src/codekg/bootstrap.ts` is covered by test imports from `tests/anchor.test.ts`, `tests/backlinks-safety.test.ts`, and 7 more.
 
-- Tests: `tests/backlinks-safety.test.ts`, `tests/codekg-intelligence.test.ts`, `tests/codekg-messages.test.ts`, `tests/codekg.test.ts`, `tests/config-corrupt.test.ts`, `tests/gaps-inferred.test.ts`, and 1 more
+- Tests: `tests/anchor.test.ts`, `tests/backlinks-safety.test.ts`, `tests/codekg-intelligence.test.ts`, `tests/codekg-messages.test.ts`, `tests/codekg.test.ts`, `tests/config-corrupt.test.ts`, and 3 more
+
+### src/codekg/check.ts
+
+Source file `src/codekg/check.ts` is covered by test imports from `tests/anchor.test.ts`, `tests/backlinks-safety.test.ts`, and 4 more.
+
+- Tests: `tests/anchor.test.ts`, `tests/backlinks-safety.test.ts`, `tests/codekg-messages.test.ts`, `tests/codekg.test.ts`, `tests/config-corrupt.test.ts`, `tests/curated-files.test.ts`
+
+### src/codekg/mcp.ts
+
+Source file `src/codekg/mcp.ts` is covered by test imports from `tests/anchor.test.ts`, `tests/codekg-intelligence.test.ts`, and 3 more.
+
+- Tests: `tests/anchor.test.ts`, `tests/codekg-intelligence.test.ts`, `tests/codekg-messages.test.ts`, `tests/codekg.test.ts`, `tests/trace-depth.test.ts`
+
+### src/codekg/types.ts
+
+Source file `src/codekg/types.ts` is covered by test imports from `tests/anchor.test.ts`, `tests/backlinks-safety.test.ts`, and 3 more.
+
+- Tests: `tests/anchor.test.ts`, `tests/backlinks-safety.test.ts`, `tests/codekg-intelligence.test.ts`, `tests/codekg.test.ts`, `tests/curated-files.test.ts`
 
 ### src/code-refs.ts
 
@@ -246,17 +272,23 @@ Source file `src/code-refs.ts` is covered by test imports from `tests/cases.test
 
 - Tests: `tests/cases.test.ts`, `tests/code-refs-no-match.test.ts`, `tests/input-errors.test.ts`, `tests/walk-symlinks.test.ts`
 
-### src/codekg/check.ts
+### src/codekg/drift.ts
 
-Source file `src/codekg/check.ts` is covered by test imports from `tests/backlinks-safety.test.ts`, `tests/codekg-messages.test.ts`, and 2 more.
+Source file `src/codekg/drift.ts` is covered by test imports from `tests/anchor.test.ts`, `tests/backlinks-safety.test.ts`, and 2 more.
 
-- Tests: `tests/backlinks-safety.test.ts`, `tests/codekg-messages.test.ts`, `tests/codekg.test.ts`, `tests/config-corrupt.test.ts`
+- Tests: `tests/anchor.test.ts`, `tests/backlinks-safety.test.ts`, `tests/codekg-intelligence.test.ts`, `tests/codekg.test.ts`
 
-### src/codekg/mcp.ts
+### src/codekg/search.ts
 
-Source file `src/codekg/mcp.ts` is covered by test imports from `tests/codekg-intelligence.test.ts`, `tests/codekg-messages.test.ts`, and 2 more.
+Source file `src/codekg/search.ts` is covered by test imports from `tests/codekg.test.ts`, `tests/config-corrupt.test.ts`, and 2 more.
 
-- Tests: `tests/codekg-intelligence.test.ts`, `tests/codekg-messages.test.ts`, `tests/codekg.test.ts`, `tests/trace-depth.test.ts`
+- Tests: `tests/codekg.test.ts`, `tests/config-corrupt.test.ts`, `tests/retrieval-eval.test.ts`, `tests/search-fallback.test.ts`
+
+### src/lattice.ts
+
+Source file `src/lattice.ts` is covered by test imports from `tests/cases.test.ts`, `tests/lattice.test.ts`, and 2 more.
+
+- Tests: `tests/cases.test.ts`, `tests/lattice.test.ts`, `tests/retrieval-eval.test.ts`, `tests/search-fallback.test.ts`
 
 ### src/codekg/agents.ts
 
@@ -264,11 +296,17 @@ Source file `src/codekg/agents.ts` is covered by test imports from `tests/agents
 
 - Tests: `tests/agents-edge-cases.test.ts`, `tests/codekg-intelligence.test.ts`, `tests/codekg.test.ts`
 
-### src/codekg/drift.ts
+### src/codekg/backlinks.ts
 
-Source file `src/codekg/drift.ts` is covered by test imports from `tests/backlinks-safety.test.ts`, `tests/codekg-intelligence.test.ts`, and 1 more.
+Source file `src/codekg/backlinks.ts` is covered by test imports from `tests/anchor.test.ts`, `tests/backlinks-safety.test.ts`, and 1 more.
 
-- Tests: `tests/backlinks-safety.test.ts`, `tests/codekg-intelligence.test.ts`, `tests/codekg.test.ts`
+- Tests: `tests/anchor.test.ts`, `tests/backlinks-safety.test.ts`, `tests/codekg.test.ts`
+
+### src/codekg/context.ts
+
+Source file `src/codekg/context.ts` is covered by test imports from `tests/anchor.test.ts`, `tests/codekg.test.ts`, and 1 more.
+
+- Tests: `tests/anchor.test.ts`, `tests/codekg.test.ts`, `tests/gaps-inferred.test.ts`
 
 ### src/codekg/graph.ts
 
@@ -282,11 +320,11 @@ Source file `src/codekg/query.ts` is covered by test imports from `tests/codekg-
 
 - Tests: `tests/codekg-intelligence.test.ts`, `tests/input-errors.test.ts`, `tests/trace-depth.test.ts`
 
-### src/codekg/search.ts
+### src/codekg/review-source.ts
 
-Source file `src/codekg/search.ts` is covered by test imports from `tests/codekg.test.ts`, `tests/config-corrupt.test.ts`, and 1 more.
+Source file `src/codekg/review-source.ts` is covered by test imports from `tests/anchor.test.ts`, `tests/backlinks-safety.test.ts`, and 1 more.
 
-- Tests: `tests/codekg.test.ts`, `tests/config-corrupt.test.ts`, `tests/search-fallback.test.ts`
+- Tests: `tests/anchor.test.ts`, `tests/backlinks-safety.test.ts`, `tests/codekg-intelligence.test.ts`
 
 ### src/codekg/structural.ts
 
@@ -294,41 +332,23 @@ Source file `src/codekg/structural.ts` is covered by test imports from `tests/ba
 
 - Tests: `tests/backlinks-safety.test.ts`, `tests/codekg-intelligence.test.ts`, `tests/enrich.test.ts`
 
-### src/codekg/types.ts
-
-Source file `src/codekg/types.ts` is covered by test imports from `tests/backlinks-safety.test.ts`, `tests/codekg-intelligence.test.ts`, and 1 more.
-
-- Tests: `tests/backlinks-safety.test.ts`, `tests/codekg-intelligence.test.ts`, `tests/codekg.test.ts`
-
-### src/lattice.ts
-
-Source file `src/lattice.ts` is covered by test imports from `tests/cases.test.ts`, `tests/lattice.test.ts`, and 1 more.
-
-- Tests: `tests/cases.test.ts`, `tests/lattice.test.ts`, `tests/search-fallback.test.ts`
-
 ### src/cli/check.ts
 
 Source file `src/cli/check.ts` is covered by test imports from `tests/cases.test.ts`, `tests/enrich.test.ts`.
 
 - Tests: `tests/cases.test.ts`, `tests/enrich.test.ts`
 
-### src/codekg/backlinks.ts
+### src/codekg/anchors.ts
 
-Source file `src/codekg/backlinks.ts` is covered by test imports from `tests/backlinks-safety.test.ts`, `tests/codekg.test.ts`.
+Source file `src/codekg/anchors.ts` is covered by test imports from `tests/anchor.test.ts`, `tests/codekg.test.ts`.
 
-- Tests: `tests/backlinks-safety.test.ts`, `tests/codekg.test.ts`
+- Tests: `tests/anchor.test.ts`, `tests/codekg.test.ts`
 
 ### src/codekg/cache.ts
 
 Source file `src/codekg/cache.ts` is covered by test imports from `tests/codekg-intelligence.test.ts`, `tests/enrich.test.ts`.
 
 - Tests: `tests/codekg-intelligence.test.ts`, `tests/enrich.test.ts`
-
-### src/codekg/context.ts
-
-Source file `src/codekg/context.ts` is covered by test imports from `tests/codekg.test.ts`, `tests/gaps-inferred.test.ts`.
-
-- Tests: `tests/codekg.test.ts`, `tests/gaps-inferred.test.ts`
 
 ### src/codekg/enrich.ts
 
@@ -341,12 +361,6 @@ Source file `src/codekg/enrich.ts` is covered by test imports from `tests/config
 Source file `src/codekg/gaps.ts` is covered by test imports from `tests/codekg.test.ts`, `tests/gaps-inferred.test.ts`.
 
 - Tests: `tests/codekg.test.ts`, `tests/gaps-inferred.test.ts`
-
-### src/codekg/review-source.ts
-
-Source file `src/codekg/review-source.ts` is covered by test imports from `tests/backlinks-safety.test.ts`, `tests/codekg-intelligence.test.ts`.
-
-- Tests: `tests/backlinks-safety.test.ts`, `tests/codekg-intelligence.test.ts`
 
 ### src/codekg/semantic.ts
 
@@ -366,17 +380,11 @@ Source file `src/config.ts` is covered by test imports from `tests/config-corrup
 
 - Tests: `tests/config-corrupt.test.ts`, `tests/search.test.ts`
 
-### tests/rag-replay-server.ts
+### src/search/db.ts
 
-Source file `tests/rag-replay-server.ts` is covered by test imports from `tests/mcp.test.ts`, `tests/search.test.ts`.
+Source file `src/search/db.ts` is covered by test imports from `tests/retrieval-eval.test.ts`, `tests/search.test.ts`.
 
-- Tests: `tests/mcp.test.ts`, `tests/search.test.ts`
-
-### src/cli/refs.ts
-
-Source file `src/cli/refs.ts` is covered by test imports from `tests/cases.test.ts`.
-
-- Tests: `tests/cases.test.ts`
+- Tests: `tests/retrieval-eval.test.ts`, `tests/search.test.ts`
 
 ## Generated Test Specs
 

@@ -212,6 +212,12 @@ AGENTS.md                    optional generated agent guidance
 convention: `<dir>/<dir>.md`. Code-KG should not introduce `index.md` unless
 lat.md validation is intentionally changed.
 
+Hand-written files at the top of `lat.md/` (and directories with a
+`<dir>/<dir>.md` index) are never written by materialization and have no
+manifest entry. The generated root index lists them after its own links, using
+each file's leading sentence, so adding a curated file does not require editing
+the generated root.
+
 ### Ignored by Default
 
 ```text
@@ -599,7 +605,7 @@ Section statuses:
 | --- | --- | --- |
 | `generated` | Auto-created and unedited. | May update in place. |
 | `edited` | Generated, then changed by user. | Never overwrite; emit merge proposal. |
-| `curated` | Human-authored or promoted. | Never overwrite. |
+| `curated` | Human-authored or promoted. | Never overwrite; section entries from `code-kg anchor` are kept. |
 | `suppressed` | User rejected candidate. | Do not regenerate. |
 | `orphaned` | Generated section source disappeared. | Report drift; do not delete automatically. |
 
@@ -741,11 +747,35 @@ Post-MVP target styles after scanner support exists:
 | HTML, XML | `<!-- @lat: [[section-id]] -->` |
 | CSS | `/* @lat: [[section-id]] */` |
 
+Only `edit-safe` sections receive backlinks. A curated section becomes
+`edit-safe` by anchoring it to the symbols or files it documents:
+
+```bash
+code-kg anchor "lat.md/auth#Auth#Token Validation" src/auth.ts#validateToken
+code-kg anchor "lat.md/auth#Auth#Token Validation" --list
+code-kg anchor "lat.md/auth#Auth#Token Validation" --remove validateToken
+```
+
+Anchors are graph node ids stored in the section's `source_anchors`, so
+`apply-backlinks` inserts at the symbol's current line. Hand-written sections
+get their own `curated` manifest entry keyed by section id, which
+materialization keeps. Sections of generated files cannot be anchored until
+the file is edited or reviewed.
+
+Each anchor also records the node's `body_hash`: the symbol's definition text,
+or the whole file for a file anchor. Drift warns when that hash changes or the
+node disappears, and `code-kg review-source <section-id> --write` records the
+current hash after review. Edits elsewhere in the file do not count, and the
+comments `apply-backlinks --write` inserts carry the recorded hash forward.
+
 Backlink insertion policy:
 
 - Default is preview only.
 - Source edits require `--write`.
 - Insertions are language-aware.
+- An anchored symbol is skipped when any syntax node from an earlier line,
+  other than one enclosing the symbol, runs onto its first line; the inserted
+  comment line could otherwise land inside a string or comment.
 - The command should show a patch or diff before writing.
 - It should skip generated files, vendored code, and files ignored by detection.
 
@@ -900,6 +930,7 @@ code-kg drift --apply-safe
 code-kg confidence list
 code-kg confidence accept <relationship-id>
 code-kg confidence reject <relationship-id>
+code-kg anchor <section-id> <symbol-or-file>
 code-kg apply-backlinks --preview
 code-kg apply-backlinks --write
 

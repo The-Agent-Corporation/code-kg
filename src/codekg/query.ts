@@ -12,6 +12,8 @@ import { sourceHash } from './structural.js';
 import { currentMeanings } from './meaning.js';
 import { visibleGraph } from './visibility.js';
 import { InputError } from './errors.js';
+import { STOP_WORDS } from './search.js';
+import { anchorChanges, manifestOwner, sectionNodeIds } from './anchors.js';
 import type {
   EntityNode,
   MaterializationManifest,
@@ -43,17 +45,12 @@ export type QueryResult = {
   warnings: string[];
   backend: string;
 };
-const STOP = new Set(
-  'a an and are at be by can do does for from how i in is it of on or the this to what where which who with'.split(
-    ' ',
-  ),
-);
 export function tokenize(text: string): string[] {
   return text
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
     .toLowerCase()
     .split(/[^a-z0-9]+/)
-    .filter((token) => token.length > 1 && !STOP.has(token));
+    .filter((token) => token.length > 1 && !STOP_WORDS.has(token));
 }
 export function withinScope(path: string, scope?: string): boolean {
   if (!scope || scope === '.') return true;
@@ -249,6 +246,7 @@ export async function ask(
     }
   }
   const knowledgeFiles = new Map<string, string>();
+  const graphNodes = new Map(graph.nodes.map((node) => [node.id, node]));
   for (const section of sections) {
     let body = knowledgeFiles.get(section.filePath);
     if (body === undefined) {
@@ -259,15 +257,15 @@ export async function ask(
       .split('\n')
       .slice(section.startLine - 1, section.endLine)
       .join('\n');
-    const owner = Object.values(manifest?.sections ?? {}).find(
-      (s) => s.file === section.filePath,
-    );
+    const owner = manifestOwner(manifest, section);
     if (owner?.status === 'suppressed' || owner?.status === 'orphaned')
       continue;
     if (
       opts.in &&
       !withinScope(section.filePath, opts.in) &&
-      !owner?.source_node_ids.some((id) => nodes.some((n) => n.id === id))
+      !(owner ? sectionNodeIds(owner) : []).some((id) =>
+        nodes.some((n) => n.id === id),
+      )
     )
       continue;
     const words = new Set(tokenize(section.heading + ' ' + text));
@@ -277,9 +275,13 @@ export async function ask(
     if (!value) continue;
     const baseline =
       owner?.source_hashes ?? manifest?.sections.architecture?.source_hashes;
-    const stale = Object.entries(baseline ?? {}).some(
-      ([p, h]) => graph.source_hashes?.[p] !== h,
-    );
+    const anchors = owner && anchorChanges(owner, graphNodes);
+    const stale =
+      Object.entries(baseline ?? {}).some(
+        ([p, h]) => graph.source_hashes?.[p] !== h,
+      ) ||
+      !!anchors?.missing.length ||
+      !!anchors?.changed.length;
     hits.push({
       id: section.id,
       kind: 'knowledge',

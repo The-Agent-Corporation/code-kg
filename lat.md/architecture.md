@@ -27,8 +27,8 @@ No parsed entrypoint files were available for first-hop dependency flow during b
 
 The initial inventory groups files by broad category so later extraction can focus on high-value paths.
 
-- Code files: 101
-- Test files: 24
+- Code files: 102
+- Test files: 27
 - Documentation files: 78
 - Config files: 2
 - Asset files: 2
@@ -36,14 +36,14 @@ The initial inventory groups files by broad category so later extraction can foc
 
 ## Structural Graph
 
-Code-KG extracted a deterministic structural graph with 1155 nodes, 2809 edges, 4 communities using the multi-language-directory-fallback analysis path.
+Code-KG extracted a deterministic structural graph with 1214 nodes, 3026 edges, 4 communities using the multi-language-directory-fallback analysis path.
 
 ## Communities
 
 Directory-based communities provide the first subsystem map until graph clustering is available.
 
-- src: 73 files, 776 symbols, cohesion 0.85
-- tests: 46 files, 219 symbols, cohesion 0.48
+- src: 74 files, 807 symbols, cohesion 0.83
+- tests: 49 files, 243 symbols, cohesion 0.47
 - templates: 2 files, 27 symbols, cohesion 1
 - scripts: 4 files, 4 symbols, cohesion 0.86
 
@@ -55,12 +55,12 @@ High-degree nodes may deserve review as important entry points, bridges, or util
 - src/codekg/cli.ts (file)
 - src/codekg/bootstrap.ts (file)
 - src (module)
-- src/codekg/agents.ts (file)
 - src/context.ts (file)
+- src/codekg/agents.ts (file)
 - tests/codekg-intelligence.test.ts (file)
-- src/codekg/graph.ts (file)
 - src/lattice.ts (file)
-- src/cli/init.ts (file)
+- src/codekg/graph.ts (file)
+- src/codekg/types.ts (file)
 
 ## Dependency Hotspots
 
@@ -68,33 +68,45 @@ Dependency hotspots list source files with incoming local imports so agents can 
 
 ### src/context.ts
 
-Source file `src/context.ts` is imported by local files including `src/cli/check.ts`, `src/cli/context.ts`, and 45 more.
+Source file `src/context.ts` is imported by local files including `src/cli/check.ts`, `src/cli/context.ts`, and 48 more.
 
-- Imported by: `src/cli/check.ts`, `src/cli/context.ts`, `src/cli/expand.ts`, `src/cli/hook.ts`, `src/cli/index.ts`, `src/cli/locate.ts`, and 41 more
+- Imported by: `src/cli/check.ts`, `src/cli/context.ts`, `src/cli/expand.ts`, `src/cli/hook.ts`, `src/cli/index.ts`, `src/cli/locate.ts`, and 44 more
 
 ### src/codekg/types.ts
 
-Source file `src/codekg/types.ts` is imported by local files including `src/codekg/anchors.ts`, `src/codekg/backlinks.ts`, and 20 more.
+Source file `src/codekg/types.ts` is imported by local files including `src/codekg/anchor.ts`, `src/codekg/anchors.ts`, and 23 more.
 
-- Imported by: `src/codekg/anchors.ts`, `src/codekg/backlinks.ts`, `src/codekg/bootstrap.ts`, `src/codekg/check.ts`, `src/codekg/confidence.ts`, `src/codekg/context.ts`, and 16 more
+- Imported by: `src/codekg/anchor.ts`, `src/codekg/anchors.ts`, `src/codekg/backlinks.ts`, `src/codekg/bootstrap.ts`, `src/codekg/check.ts`, `src/codekg/confidence.ts`, and 19 more
 
 ### src/lattice.ts
 
-Source file `src/lattice.ts` is imported by local files including `src/cli/check.ts`, `src/cli/context.ts`, and 20 more.
+Source file `src/lattice.ts` is imported by local files including `src/cli/check.ts`, `src/cli/context.ts`, and 22 more.
 
-- Imported by: `src/cli/check.ts`, `src/cli/context.ts`, `src/cli/expand.ts`, `src/cli/hook.ts`, `src/cli/locate.ts`, `src/cli/refs.ts`, and 16 more
+- Imported by: `src/cli/check.ts`, `src/cli/context.ts`, `src/cli/expand.ts`, `src/cli/hook.ts`, `src/cli/locate.ts`, `src/cli/refs.ts`, and 18 more
 
 ### src/codekg/cache.ts
 
-Source file `src/codekg/cache.ts` is imported by local files including `src/codekg/agent-context.ts`, `src/codekg/backlinks.ts`, and 10 more.
+Source file `src/codekg/cache.ts` is imported by local files including `src/codekg/agent-context.ts`, `src/codekg/anchor.ts`, and 11 more.
 
-- Imported by: `src/codekg/agent-context.ts`, `src/codekg/backlinks.ts`, `src/codekg/enrich.ts`, `src/codekg/graph.ts`, `src/codekg/meaning.ts`, `src/codekg/query.ts`, and 6 more
+- Imported by: `src/codekg/agent-context.ts`, `src/codekg/anchor.ts`, `src/codekg/backlinks.ts`, `src/codekg/enrich.ts`, `src/codekg/graph.ts`, `src/codekg/meaning.ts`, and 7 more
 
 ### src/codekg/structural.ts
 
-Source file `src/codekg/structural.ts` is imported by local files including `src/codekg/agent-context.ts`, `src/codekg/backlinks.ts`, and 9 more.
+Source file `src/codekg/structural.ts` is imported by local files including `src/codekg/agent-context.ts`, `src/codekg/anchor.ts`, and 10 more.
 
-- Imported by: `src/codekg/agent-context.ts`, `src/codekg/backlinks.ts`, `src/codekg/discovery.ts`, `src/codekg/enrich.ts`, `src/codekg/graph.ts`, `src/codekg/meaning.ts`, and 5 more
+- Imported by: `src/codekg/agent-context.ts`, `src/codekg/anchor.ts`, `src/codekg/backlinks.ts`, `src/codekg/discovery.ts`, `src/codekg/enrich.ts`, `src/codekg/graph.ts`, and 6 more
+
+### src/codekg/anchors.ts
+
+Source file `src/codekg/anchors.ts` is imported by local files including `src/codekg/anchor.ts`, `src/codekg/backlinks.ts`, and 9 more.
+
+- Imported by: `src/codekg/anchor.ts`, `src/codekg/backlinks.ts`, `src/codekg/bootstrap.ts`, `src/codekg/check.ts`, `src/codekg/context.ts`, `src/codekg/drift.ts`, and 5 more
+
+### src/codekg/bootstrap.ts
+
+Source file `src/codekg/bootstrap.ts` is imported by local files including `src/codekg/cli.ts`, `src/codekg/update.ts`, and 9 more.
+
+- Imported by: `src/codekg/cli.ts`, `src/codekg/update.ts`, `tests/anchor.test.ts`, `tests/backlinks-safety.test.ts`, `tests/codekg-intelligence.test.ts`, `tests/codekg-messages.test.ts`, and 5 more
 
 ### src/config.ts
 
@@ -102,11 +114,23 @@ Source file `src/config.ts` is imported by local files including `scripts/cook-t
 
 - Imported by: `scripts/cook-test-rag.ts`, `src/cli/hook.ts`, `src/cli/init.ts`, `src/codekg/enrich.ts`, `src/codekg/query.ts`, `src/codekg/search.ts`, and 5 more
 
-### src/codekg/bootstrap.ts
+### src/codekg/check.ts
 
-Source file `src/codekg/bootstrap.ts` is imported by local files including `src/codekg/cli.ts`, `src/codekg/update.ts`, and 7 more.
+Source file `src/codekg/check.ts` is imported by local files including `src/codekg/cli.ts`, `src/codekg/doctor.ts`, and 8 more.
 
-- Imported by: `src/codekg/cli.ts`, `src/codekg/update.ts`, `tests/backlinks-safety.test.ts`, `tests/codekg-intelligence.test.ts`, `tests/codekg-messages.test.ts`, `tests/codekg.test.ts`, and 3 more
+- Imported by: `src/codekg/cli.ts`, `src/codekg/doctor.ts`, `src/codekg/mcp.ts`, `src/codekg/update.ts`, `tests/anchor.test.ts`, `tests/backlinks-safety.test.ts`, and 4 more
+
+### src/codekg/fresh.ts
+
+Source file `src/codekg/fresh.ts` is imported by local files including `src/codekg/agent-context.ts`, `src/codekg/anchor.ts`, and 7 more.
+
+- Imported by: `src/codekg/agent-context.ts`, `src/codekg/anchor.ts`, `src/codekg/backlinks.ts`, `src/codekg/changed.ts`, `src/codekg/context.ts`, `src/codekg/meaning.ts`, and 3 more
+
+### src/search/provider.ts
+
+Source file `src/search/provider.ts` is imported by local files including `src/cli/init.ts`, `src/cli/search.ts`, and 7 more.
+
+- Imported by: `src/cli/init.ts`, `src/cli/search.ts`, `src/codekg/semantic.ts`, `src/search/embeddings.ts`, `src/search/index.ts`, `src/search/search.ts`, and 3 more
 
 ### src/code-refs.ts
 
@@ -114,47 +138,23 @@ Source file `src/code-refs.ts` is imported by local files including `src/cli/che
 
 - Imported by: `src/cli/check.ts`, `src/cli/refs.ts`, `src/cli/section.ts`, `src/codekg/bootstrap.ts`, `tests/cases.test.ts`, `tests/code-refs-no-match.test.ts`, and 2 more
 
-### src/codekg/check.ts
-
-Source file `src/codekg/check.ts` is imported by local files including `src/codekg/cli.ts`, `src/codekg/doctor.ts`, and 6 more.
-
-- Imported by: `src/codekg/cli.ts`, `src/codekg/doctor.ts`, `src/codekg/mcp.ts`, `src/codekg/update.ts`, `tests/backlinks-safety.test.ts`, `tests/codekg-messages.test.ts`, and 2 more
-
 ### src/codekg/graph.ts
 
 Source file `src/codekg/graph.ts` is imported by local files including `src/codekg/bootstrap.ts`, `src/codekg/cli.ts`, and 6 more.
 
 - Imported by: `src/codekg/bootstrap.ts`, `src/codekg/cli.ts`, `src/codekg/drift.ts`, `src/codekg/fresh.ts`, `src/codekg/gaps.ts`, `tests/codekg-intelligence.test.ts`, and 2 more
 
-### src/search/provider.ts
+### src/codekg/search.ts
 
-Source file `src/search/provider.ts` is imported by local files including `src/cli/init.ts`, `src/cli/search.ts`, and 6 more.
+Source file `src/codekg/search.ts` is imported by local files including `src/codekg/cli.ts`, `src/codekg/mcp.ts`, and 5 more.
 
-- Imported by: `src/cli/init.ts`, `src/cli/search.ts`, `src/codekg/semantic.ts`, `src/search/embeddings.ts`, `src/search/index.ts`, `src/search/search.ts`, and 2 more
-
-### src/codekg/fresh.ts
-
-Source file `src/codekg/fresh.ts` is imported by local files including `src/codekg/agent-context.ts`, `src/codekg/changed.ts`, and 5 more.
-
-- Imported by: `src/codekg/agent-context.ts`, `src/codekg/changed.ts`, `src/codekg/context.ts`, `src/codekg/meaning.ts`, `src/codekg/query.ts`, `src/codekg/review-source.ts`, and 1 more
-
-### src/codekg/query.ts
-
-Source file `src/codekg/query.ts` is imported by local files including `src/codekg/agent-context.ts`, `src/codekg/mcp.ts`, and 4 more.
-
-- Imported by: `src/codekg/agent-context.ts`, `src/codekg/mcp.ts`, `src/codekg/workspace.ts`, `tests/codekg-intelligence.test.ts`, `tests/input-errors.test.ts`, `tests/trace-depth.test.ts`
-
-### src/format.ts
-
-Source file `src/format.ts` is imported by local files including `src/cli/locate.ts`, `src/cli/refs.ts`, and 4 more.
-
-- Imported by: `src/cli/locate.ts`, `src/cli/refs.ts`, `src/cli/search.ts`, `src/cli/section.ts`, `src/codekg/search.ts`, `tests/cases.test.ts`
+- Imported by: `src/codekg/cli.ts`, `src/codekg/mcp.ts`, `src/codekg/query.ts`, `tests/codekg.test.ts`, `tests/config-corrupt.test.ts`, `tests/retrieval-eval.test.ts`, and 1 more
 
 ### src/walk.ts
 
-Source file `src/walk.ts` is imported by local files including `src/cli/check.ts`, `src/code-refs.ts`, and 4 more.
+Source file `src/walk.ts` is imported by local files including `src/cli/check.ts`, `src/code-refs.ts`, and 5 more.
 
-- Imported by: `src/cli/check.ts`, `src/code-refs.ts`, `src/codekg/check.ts`, `src/codekg/discovery.ts`, `src/lattice.ts`, `tests/walk-symlinks.test.ts`
+- Imported by: `src/cli/check.ts`, `src/code-refs.ts`, `src/codekg/bootstrap.ts`, `src/codekg/check.ts`, `src/codekg/discovery.ts`, `src/lattice.ts`, and 1 more
 
 ## Source File Highlights
 
@@ -170,11 +170,19 @@ Source file `src/codekg/cli.ts` contains source symbols. Key symbols: `PreviewAc
 
 ### src/codekg/bootstrap.ts
 
-Source file `src/codekg/bootstrap.ts` contains source symbols. Key symbols: `MergeProposal`, `SECTION_HEADINGS`, and 51 more.
+Source file `src/codekg/bootstrap.ts` contains source symbols. Key symbols: `MergeProposal`, `SECTION_HEADINGS`, and 55 more.
 
-- Symbols: `MergeProposal (type)`, `SECTION_HEADINGS (const)`, `DEFAULT_GITIGNORE_LINES (const)`, `SOURCE_FILE_HIGHLIGHT_LIMIT (const)`, `TEST_FILE_HIGHLIGHT_LIMIT (const)`, `SOURCE_SYMBOL_LIMIT (const)`, `SOURCE_IMPORT_LIMIT (const)`, `hash (function)`, and 45 more
-- Imports: `src/code-refs.ts`, `src/codekg/discovery.ts`, `src/codekg/graph.ts`, `src/codekg/limits.ts`, `src/codekg/types.ts`
-- Imported by: `src/codekg/cli.ts`, `src/codekg/update.ts`, `tests/backlinks-safety.test.ts`, `tests/codekg-intelligence.test.ts`, `tests/codekg-messages.test.ts`, `tests/codekg.test.ts`, and 3 more
+- Symbols: `MergeProposal (type)`, `SECTION_HEADINGS (const)`, `DEFAULT_GITIGNORE_LINES (const)`, `SOURCE_FILE_HIGHLIGHT_LIMIT (const)`, `TEST_FILE_HIGHLIGHT_LIMIT (const)`, `SOURCE_SYMBOL_LIMIT (const)`, `SOURCE_IMPORT_LIMIT (const)`, `hash (function)`, and 49 more
+- Imports: `src/code-refs.ts`, `src/codekg/anchors.ts`, `src/codekg/discovery.ts`, `src/codekg/graph.ts`, `src/codekg/limits.ts`, `src/codekg/types.ts`, and 1 more
+- Imported by: `src/codekg/cli.ts`, `src/codekg/update.ts`, `tests/anchor.test.ts`, `tests/backlinks-safety.test.ts`, `tests/codekg-intelligence.test.ts`, `tests/codekg-messages.test.ts`, and 5 more
+
+### src/context.ts
+
+Source file `src/context.ts` contains source symbols. Key symbols: `Styler`, `identity`, and 3 more.
+
+- Symbols: `Styler (type)`, `identity (const)`, `plainStyler (const)`, `CmdContext (type)`, `CmdResult (type)`
+- Imports: none detected
+- Imported by: `src/cli/check.ts`, `src/cli/context.ts`, `src/cli/expand.ts`, `src/cli/hook.ts`, `src/cli/index.ts`, `src/cli/locate.ts`, and 44 more
 
 ### src/codekg/agents.ts
 
@@ -184,13 +192,13 @@ Source file `src/codekg/agents.ts` contains source symbols. Key symbols: `SECTIO
 - Imports: `src/codekg/discovery.ts`, `src/codekg/git-hooks.ts`, `src/codekg/semantic.ts`, `src/context.ts`
 - Imported by: `tests/agents-edge-cases.test.ts`, `tests/codekg-intelligence.test.ts`, `tests/codekg.test.ts`
 
-### src/context.ts
+### src/lattice.ts
 
-Source file `src/context.ts` contains source symbols. Key symbols: `Styler`, `identity`, and 3 more.
+Source file `src/lattice.ts` contains source symbols. Key symbols: `Section`, `Ref`, and 22 more.
 
-- Symbols: `Styler (type)`, `identity (const)`, `plainStyler (const)`, `CmdContext (type)`, `CmdResult (type)`
-- Imports: none detected
-- Imported by: `src/cli/check.ts`, `src/cli/context.ts`, `src/cli/expand.ts`, `src/cli/hook.ts`, `src/cli/index.ts`, `src/cli/locate.ts`, and 41 more
+- Symbols: `Section (type)`, `Ref (type)`, `LatFrontmatter (type)`, `parseFrontmatter (function)`, `findLatticeDir (function)`, `findProjectRoot (function)`, `listLatticeFiles (function)`, `headingText (function)`, and 16 more
+- Imports: `src/extensions/wiki-link/types.ts`, `src/parser.ts`, `src/walk.ts`
+- Imported by: `src/cli/check.ts`, `src/cli/context.ts`, `src/cli/expand.ts`, `src/cli/hook.ts`, `src/cli/locate.ts`, `src/cli/refs.ts`, and 18 more
 
 ### src/codekg/graph.ts
 
@@ -200,13 +208,13 @@ Source file `src/codekg/graph.ts` contains source symbols. Key symbols: `LOCAL_I
 - Imports: `src/codekg/cache.ts`, `src/codekg/discovery.ts`, `src/codekg/source-scan.ts`, `src/codekg/structural.ts`, `src/codekg/types.ts`, `src/source-parser.ts`
 - Imported by: `src/codekg/bootstrap.ts`, `src/codekg/cli.ts`, `src/codekg/drift.ts`, `src/codekg/fresh.ts`, `src/codekg/gaps.ts`, `tests/codekg-intelligence.test.ts`, and 2 more
 
-### src/lattice.ts
+### src/codekg/types.ts
 
-Source file `src/lattice.ts` contains source symbols. Key symbols: `Section`, `Ref`, and 22 more.
+Source file `src/codekg/types.ts` contains source symbols. Key symbols: `FileCategory`, `DiscoveredFile`, and 17 more.
 
-- Symbols: `Section (type)`, `Ref (type)`, `LatFrontmatter (type)`, `parseFrontmatter (function)`, `findLatticeDir (function)`, `findProjectRoot (function)`, `listLatticeFiles (function)`, `headingText (function)`, and 16 more
-- Imports: `src/extensions/wiki-link/types.ts`, `src/parser.ts`, `src/walk.ts`
-- Imported by: `src/cli/check.ts`, `src/cli/context.ts`, `src/cli/expand.ts`, `src/cli/hook.ts`, `src/cli/locate.ts`, `src/cli/refs.ts`, and 16 more
+- Symbols: `FileCategory (type)`, `DiscoveredFile (type)`, `DiscoveryResult (type)`, `SourceSpan (type)`, `SourceAnchor (type)`, `Confidence (type)`, `EntityNode (type)`, `RelationshipEdge (type)`, and 11 more
+- Imports: none detected
+- Imported by: `src/codekg/anchor.ts`, `src/codekg/anchors.ts`, `src/codekg/backlinks.ts`, `src/codekg/bootstrap.ts`, `src/codekg/check.ts`, `src/codekg/confidence.ts`, and 19 more
 
 ### src/cli/init.ts
 
@@ -271,11 +279,3 @@ Source file `src/cli/context.ts` contains source symbols. Key symbols: `makeStyl
 - Symbols: `makeStyler (function)`, `resolveContext (function)`
 - Imports: `src/context.ts`, `src/lattice.ts`
 - Imported by: `src/cli/index.ts`, `src/codekg/cli.ts`
-
-### src/cli/expand.ts
-
-Source file `src/cli/expand.ts` contains source symbols. Key symbols: `WIKI_LINK_RE`, `formatLocation`, and 3 more.
-
-- Symbols: `WIKI_LINK_RE (const)`, `formatLocation (function)`, `ResolvedRef (type)`, `expandPrompt (function)`, `expandCommand (function)`
-- Imports: `src/context.ts`, `src/lattice.ts`
-- Imported by: `src/cli/hook.ts`, `src/codekg/mcp.ts`, `src/mcp/server.ts`

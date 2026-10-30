@@ -1,0 +1,288 @@
+import { cpSync, mkdtempSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import type { Client } from '@libsql/client';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import {
+  rankSectionsLexically,
+  readSectionBodies,
+} from '../src/codekg/search.js';
+import {
+  flattenSections,
+  loadAllSections,
+  type Section,
+} from '../src/lattice.js';
+import { closeDb, ensureSchema, openDb } from '../src/search/db.js';
+import { indexSections } from '../src/search/index.js';
+import { detectProvider } from '../src/search/provider.js';
+import { searchSections } from '../src/search/search.js';
+
+/**
+ * Questions an agent asks about this repository, each with the sections of
+ * its committed knowledge base that answer it. Any listed id counts as a hit.
+ */
+const A = 'lat.md/architecture#Architecture#';
+const T = 'lat.md/tests/tests#Tests#';
+const C = 'lat.md/concepts#Concepts#';
+const QUESTIONS: Array<{ question: string; answers: string[] }> = [
+  {
+    question:
+      'how are human edits preserved when the knowledge base is regenerated',
+    answers: [
+      `${C}Merge-Safe Materialization`,
+      `${A}Source File Highlights#src/codekg/bootstrap.ts`,
+      `${A}Dependency Hotspots#src/codekg/bootstrap.ts`,
+    ],
+  },
+  {
+    question: 'what does edit-safe mean for a section',
+    answers: [
+      `${C}Source Anchor Policies`,
+      `${A}Dependency Hotspots#src/codekg/types.ts`,
+      `${T}Test Coverage Links#src/codekg/backlinks.ts`,
+    ],
+  },
+  {
+    question: 'when does drift report a warning',
+    answers: [
+      `${C}Drift and Source Review`,
+      `${T}Test Coverage Links#src/codekg/drift.ts`,
+    ],
+  },
+  {
+    question: 'how do I acknowledge that a section was reviewed against source',
+    answers: [
+      `${C}Drift and Source Review`,
+      `${T}Test Coverage Links#src/codekg/review-source.ts`,
+    ],
+  },
+  {
+    question: 'how does a curated section become edit-safe',
+    answers: [`${C}Section Anchors`, `${C}Source Anchor Policies`],
+  },
+  {
+    question: 'how does apply-backlinks insert @lat comments into source files',
+    answers: [
+      `${C}Source Anchor Policies`,
+      `${T}Test Coverage Links#src/codekg/backlinks.ts`,
+      `${T}Source Test Highlights#tests/backlinks-safety.test.ts`,
+    ],
+  },
+  {
+    question: 'what happens when no embedding provider is configured',
+    answers: [
+      `${C}Search Backends`,
+      `${T}Test Coverage Links#src/codekg/search.ts`,
+      `${T}Test Coverage Links#src/config.ts`,
+      `${A}Dependency Hotspots#src/config.ts`,
+      `${T}Source Test Highlights#tests/search-fallback.test.ts`,
+    ],
+  },
+  {
+    question: 'which search backends can code-kg search use',
+    answers: [
+      `${C}Search Backends`,
+      `${T}Test Coverage Links#src/codekg/search.ts`,
+      `${T}Source Test Highlights#tests/search-fallback.test.ts`,
+    ],
+  },
+  {
+    question: 'how are inferred test edges different from extracted imports',
+    answers: [
+      `${C}Relationship Confidence`,
+      `${A}Source File Highlights#src/codekg/graph.ts`,
+      `${A}Dependency Hotspots#src/codekg/graph.ts`,
+      `${T}Source Test Highlights#tests/gaps-inferred.test.ts`,
+      'lat.md/confidence#Confidence Review',
+    ],
+  },
+  {
+    question: 'what does the pre-commit hook do',
+    answers: [
+      `${C}Agent Guidance and Hooks`,
+      `${T}Source Test Highlights#tests/git-hooks.test.ts`,
+    ],
+  },
+  {
+    question: 'how is the AGENTS.md guidance block installed',
+    answers: [
+      `${C}Agent Guidance and Hooks`,
+      `${A}Source File Highlights#src/codekg/agents.ts`,
+      `${T}Test Coverage Links#src/codekg/agents.ts`,
+      `${T}Source Test Highlights#tests/agents-edge-cases.test.ts`,
+    ],
+  },
+  {
+    question: 'where is the MCP server defined',
+    answers: [
+      `${T}Test Coverage Links#src/codekg/mcp.ts`,
+      `${T}Source Test Highlights#tests/mcp.test.ts`,
+    ],
+  },
+  {
+    question: 'how is the structural graph extracted from source code',
+    answers: [
+      `${C}Structural Extraction`,
+      `${A}Structural Graph`,
+      `${A}Source File Highlights#src/codekg/graph.ts`,
+      `${A}Dependency Hotspots#src/codekg/graph.ts`,
+      `${A}Dependency Hotspots#src/codekg/structural.ts`,
+    ],
+  },
+  {
+    question: 'where are the code-kg CLI commands registered',
+    answers: [
+      `${A}Source File Highlights#src/codekg/cli.ts`,
+      `${A}Entry Points`,
+    ],
+  },
+  {
+    question: 'how are wiki links between sections validated',
+    answers: [
+      `${A}Source File Highlights#src/cli/check.ts`,
+      `${T}Test Coverage Links#src/cli/check.ts`,
+      'lat.md/tests/check-md#Check Md Tests',
+    ],
+  },
+  {
+    question: 'what is the materialization manifest',
+    answers: [
+      `${C}Merge-Safe Materialization`,
+      `${A}Dependency Hotspots#src/codekg/types.ts`,
+      `${A}Source File Highlights#src/codekg/bootstrap.ts`,
+    ],
+  },
+  {
+    question: 'how does a hook read its payload from stdin',
+    answers: [
+      `${C}Agent Guidance and Hooks`,
+      `${T}Source Test Highlights#tests/hook-stdin.test.ts`,
+    ],
+  },
+];
+
+/**
+ * Measured on the committed knowledge base. Raise these when ranking or
+ * curated sections improve; lowering one needs a reason in the commit.
+ */
+const LEXICAL_FLOOR = { recallAt5: 0.824, mrr: 0.708 };
+const SEMANTIC_FLOOR = { recallAt5: 0.882, mrr: 0.698 };
+/**
+ * Generated per-file sections are top-N lists that reshuffle as the code
+ * changes, so a run may fall this far below a floor. One question leaving
+ * the top 5 costs 1/17, more than this.
+ */
+const SLACK = 0.03;
+
+type Score = { recallAt5: number; mrr: number; report: string };
+
+function score(rankings: string[][]): Score {
+  let hits = 0;
+  let reciprocal = 0;
+  const lines = QUESTIONS.map(({ question, answers }, index) => {
+    const rank = rankings[index].findIndex((id) => answers.includes(id)) + 1;
+    if (rank >= 1 && rank <= 5) hits++;
+    if (rank >= 1) reciprocal += 1 / rank;
+    return `${rank ? `#${rank}` : 'miss'}\t${question}`;
+  });
+  const round = (value: number) => Math.round(value * 1000) / 1000;
+  return {
+    recallAt5: round(hits / QUESTIONS.length),
+    mrr: round(reciprocal / QUESTIONS.length),
+    report: lines.join('\n'),
+  };
+}
+
+const repoLatDir = join(import.meta.dirname, '..', 'lat.md');
+let sections: Section[];
+let bodies: Map<string, string>;
+
+beforeAll(async () => {
+  sections = flattenSections(await loadAllSections(repoLatDir));
+  bodies = await readSectionBodies(repoLatDir, sections);
+});
+
+describe('retrieval eval (lexical)', () => {
+  it('names curated sections that exist, and an existing answer for every question', () => {
+    const ids = new Set(sections.map((section) => section.id));
+    const missingCurated = QUESTIONS.flatMap(({ answers }) => answers).filter(
+      (id) => id.startsWith(C) && !ids.has(id),
+    );
+    const unanswerable = QUESTIONS.filter(
+      ({ answers }) => !answers.some((id) => ids.has(id)),
+    ).map(({ question }) => question);
+    expect(missingCurated).toStrictEqual([]);
+    expect(unanswerable).toStrictEqual([]);
+  });
+
+  it('stays at or above the recorded floor', () => {
+    const result = score(
+      QUESTIONS.map(({ question }) =>
+        rankSectionsLexically(sections, question, 10, bodies).map(
+          (section) => section.id,
+        ),
+      ),
+    );
+
+    expect(result.recallAt5, result.report).toBeGreaterThanOrEqual(
+      LEXICAL_FLOOR.recallAt5 - SLACK,
+    );
+    expect(result.mrr, result.report).toBeGreaterThanOrEqual(
+      LEXICAL_FLOOR.mrr - SLACK,
+    );
+    console.info(
+      `lexical recall@5=${result.recallAt5} mrr=${result.mrr}\n${result.report}`,
+    );
+  });
+});
+
+describe.skipIf(process.env.LAT_TEST_LOCAL_EMBEDDINGS !== '1')(
+  'retrieval eval (local embeddings)',
+  () => {
+    let tmp: string;
+    let db: Client;
+
+    beforeAll(async () => {
+      tmp = mkdtempSync(join(tmpdir(), 'codekg-retrieval-eval-'));
+      cpSync(repoLatDir, join(tmp, 'lat.md'), { recursive: true });
+      db = openDb(join(tmp, 'lat.md'));
+      await ensureSchema(db, detectProvider('local').dimensions);
+      await indexSections(
+        join(tmp, 'lat.md'),
+        db,
+        detectProvider('local'),
+        'local',
+      );
+    }, 300_000);
+
+    afterAll(async () => {
+      if (db) await closeDb(db);
+      if (tmp) rmSync(tmp, { recursive: true, force: true });
+    });
+
+    it('stays at or above the recorded floor', async () => {
+      const provider = detectProvider('local');
+      const rankings: string[][] = [];
+      for (const { question } of QUESTIONS) {
+        const results = await searchSections(
+          db,
+          question,
+          provider,
+          'local',
+          10,
+        );
+        rankings.push(results.map((result) => result.id));
+      }
+      const result = score(rankings);
+      console.info(
+        `semantic recall@5=${result.recallAt5} mrr=${result.mrr}\n${result.report}`,
+      );
+      expect(result.recallAt5, result.report).toBeGreaterThanOrEqual(
+        SEMANTIC_FLOOR.recallAt5 - SLACK,
+      );
+      expect(result.mrr, result.report).toBeGreaterThanOrEqual(
+        SEMANTIC_FLOOR.mrr - SLACK,
+      );
+    }, 300_000);
+  },
+);
