@@ -262,13 +262,14 @@ export function createCodeKgMcpServer(ctx: CmdContext): McpServer {
   );
   server.tool(
     'codekg_trace_calls',
-    'Trace callers, callees, references, and transitive impact; inferred edges remain labeled',
+    'Trace callers and references (direction "in", the default) or callees (direction "out"); inferred edges remain labeled. Depth defaults to 1 (direct only, like CLI `callers`/`callees`); pass depth "all" for transitive impact like CLI `impact`.',
     {
       query: z.string().min(1),
       direction: z.enum(['in', 'out']).optional(),
       depth: z
         .union([z.number().int().min(1).max(100), z.literal('all')])
-        .optional(),
+        .optional()
+        .describe('Traversal depth (default 1) or "all"'),
       in: z.string().optional(),
       max_tokens: budget,
     },

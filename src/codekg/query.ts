@@ -412,7 +412,22 @@ export async function trace(
     }
     frontier = next;
   }
-  return { query, seeds, hits, warnings: graph.analysis.parse_errors };
+  const truncated =
+    frontier.size > 0 &&
+    graph.edges.some((edge) => {
+      if (edge.relation === 'contains') return false;
+      const from = incoming ? edge.target : edge.source;
+      const to = incoming ? edge.source : edge.target;
+      return frontier.has(from) && !visited.has(to) && ids.has(to);
+    });
+  return {
+    query,
+    seeds,
+    hits,
+    depth,
+    truncated,
+    warnings: graph.analysis.parse_errors,
+  };
 }
 export async function traceCommand(
   ctx: CmdContext,
@@ -425,12 +440,21 @@ export async function traceCommand(
   } = {},
 ): Promise<CmdResult> {
   const result = await trace(ctx.projectRoot, query, opts);
+  const moreHint =
+    ctx.mode === 'mcp'
+      ? 'call again with depth: "all" for transitive results'
+      : 'rerun with --depth all for transitive results';
   return {
     output: bounded(
       [
         '# Code-KG ' + (opts.direction === 'out' ? 'Dependencies' : 'Impact'),
         '',
         'Query: ' + query,
+        'Depth: ' +
+          (result.depth === Infinity ? 'all' : result.depth) +
+          (result.truncated
+            ? ' (more results beyond this depth; ' + moreHint + ')'
+            : ''),
         ...result.warnings.map((w) => 'Warning: ' + w),
         ...result.seeds.map(
           (n) => 'Seed: ' + n.label + ' (' + n.source_file + ')',
