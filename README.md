@@ -49,7 +49,8 @@ anchors. `source_node_ids` can support drift and coverage for overview sections,
 but source-editing features must use only `source_spans` or `source_anchors` on
 sections marked with `source_anchor_policy: "edit-safe"`. `code-kg anchor
 <section-id> <symbol-or-file>` marks a curated section edit-safe and anchors it
-to graph symbols, so `apply-backlinks` follows them as the source moves.
+to graph symbols, so `apply-backlinks` follows them as the source moves. Drift
+asks for a review only when an anchored symbol's own body changes.
 
 The agent guidance slice installs a managed `AGENTS.md` section plus a safe
 Codex lifecycle hooks. The guidance tells coding agents to query Code-KG

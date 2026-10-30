@@ -22,7 +22,7 @@ Hand-written files such as this one have no manifest entry and are never written
 - Sections can record `source_hashes`, one content hash per covered file. When a file's current hash differs, [[src/codekg/drift.ts#driftCommand]] reports "Source content changed" and names the sections to review.
 - A missing manifest is the only error. Uncovered files and a changed graph are informational, and new relationships between documented files are suggestions.
 - `code-kg review-source <stable-id> --write` ([[src/codekg/review-source.ts#reviewSourceCommand]]) is the explicit acknowledgement after reading the source. It records the current hashes and marks the section `curated`, without changing prose or relationship confidence. If an `edit-safe` section's span files changed, it drops those spans, and a section left with no spans or anchors becomes `coverage-only`; see [[concepts#Concepts#Source Anchor Policies]].
-- CI fails a pull request when drift prints any warning. `code-kg update --no-enrich` refreshes the generated knowledge.
+- CI fails a pull request when drift prints any warning. `code-kg update --no-enrich` refreshes the generated knowledge; a curated section that drift names needs a reread and `review-source --write`.
 
 ## Source Anchor Policies
 
@@ -40,7 +40,7 @@ A section's `source_anchor_policy` says whether Code-KG may edit source files fo
 - Anchors are node ids in the section's `source_anchors`, with `--list` to show where they are now and `--remove` to drop one.
 - A section of a hand-written file gets its own curated manifest entry, keyed by section id, which `code-kg update` keeps. Sections of generated files are refused, because updates rewrite them.
 - `apply-backlinks` locates each anchor in a fresh graph and skips one whose symbol is gone; `code-kg check` reports it, like a broken `[[file#symbol]]` link.
-- Anchored files get a source hash baseline, so drift asks for a review when they change.
+- Each anchor records its node's `body_hash`. Drift warns when an anchored symbol's own body changes or the symbol disappears, not when other code in its file does, and `review-source --write` records the new hash.
 
 ## Relationship Confidence
 

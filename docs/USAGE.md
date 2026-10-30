@@ -60,7 +60,9 @@ code-kg apply-backlinks --write
 
 `code-kg check` fails when an anchored symbol is renamed or deleted; re-anchor
 the section, or drop the anchor with `code-kg anchor <section> --remove
-<symbol>`.
+<symbol>`. When an anchored symbol's body changes, `code-kg drift` names the
+section; reread it, then acknowledge with `code-kg review-source <section>
+--write`.
 
 ## Hook Behavior
 

@@ -762,6 +762,12 @@ get their own `curated` manifest entry keyed by section id, which
 materialization keeps. Sections of generated files cannot be anchored until
 the file is edited or reviewed.
 
+Each anchor also records the node's `body_hash`: the symbol's definition text,
+or the whole file for a file anchor. Drift warns when that hash changes or the
+node disappears, and `code-kg review-source <section-id> --write` records the
+current hash after review. Edits elsewhere in the file do not count, and the
+comments `apply-backlinks --write` inserts carry the recorded hash forward.
+
 Backlink insertion policy:
 
 - Default is preview only.
