@@ -773,6 +773,9 @@ Backlink insertion policy:
 - Default is preview only.
 - Source edits require `--write`.
 - Insertions are language-aware.
+- An anchored symbol is skipped when any syntax node from an earlier line,
+  other than one enclosing the symbol, runs onto its first line; the inserted
+  comment line could otherwise land inside a string or comment.
 - The command should show a patch or diff before writing.
 - It should skip generated files, vendored code, and files ignored by detection.
 

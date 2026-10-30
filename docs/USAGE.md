@@ -58,11 +58,19 @@ code-kg apply-backlinks --preview
 code-kg apply-backlinks --write
 ```
 
-`code-kg check` fails when an anchored symbol is renamed or deleted; re-anchor
-the section, or drop the anchor with `code-kg anchor <section> --remove
-<symbol>`. When an anchored symbol's body changes, `code-kg drift` names the
+`code-kg check` fails when an anchored symbol is renamed or deleted, which also
+stops the pre-commit hook and CI; re-anchor the section, or drop the anchor
+with `code-kg anchor <section> --remove <symbol>`. If the section's heading
+was renamed or deleted instead, pass the old section id that `check` prints:
+`--list` and `--remove` accept it, and removing the last anchor drops the
+entry. When an anchored symbol's body changes, `code-kg drift` names the
 section; reread it, then acknowledge with `code-kg review-source <section>
 --write`.
+
+A section gets one backlink per file, at the first anchored symbol in it; an
+existing `@lat:` comment for the section anywhere in the file counts.
+`apply-backlinks` skips a symbol whose first line continues code from an
+earlier line, such as the end of a multi-line string.
 
 ## Hook Behavior
 

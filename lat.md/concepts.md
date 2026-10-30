@@ -39,7 +39,8 @@ A section's `source_anchor_policy` says whether Code-KG may edit source files fo
 
 - Anchors are node ids in the section's `source_anchors`, with `--list` to show where they are now and `--remove` to drop one.
 - A section of a hand-written file gets its own curated manifest entry, keyed by section id, which `code-kg update` keeps. Sections of generated files are refused, because updates rewrite them.
-- `apply-backlinks` locates each anchor in a fresh graph and skips one whose symbol is gone; `code-kg check` reports it, like a broken `[[file#symbol]]` link.
+- `apply-backlinks` locates each anchor in a fresh graph and skips one whose symbol is gone; `code-kg check` reports it, like a broken `[[file#symbol]]` link. It also skips a symbol whose first line continues code from an earlier line, such as the end of a multi-line string, so a comment never lands inside a literal.
+- When an anchored heading is renamed or deleted, `--list` and `--remove` still accept the entry's manifest key, and removing its last anchor drops the entry.
 - Each anchor records its node's `body_hash`. Drift warns when an anchored symbol's own body changes or the symbol disappears, not when other code in its file does, and `review-source --write` records the new hash.
 
 ## Relationship Confidence
@@ -72,6 +73,6 @@ Every graph edge carries a confidence. `EXTRACTED` edges come from static syntax
 
 The structural graph comes from tree-sitter parses of source files. It has file, module and symbol nodes, typed edges such as `contains`, `imports` and `tests`, directory communities, and a content hash per file.
 
-- [[src/codekg/graph.ts#extractProjectGraph]] extracts symbols from discovered code and test files, resolves local imports, adds inferred test edges, and records `source_hashes`.
+- [[src/codekg/graph.ts#extractProjectGraph]] extracts symbols from discovered code and test files, resolves local imports, adds inferred test edges, and records `source_hashes`. Each symbol node carries a `body_hash` of its definition and, from tree-sitter, `clear_start`: whether a comment line can go directly above it.
 - Commands that need a current graph call [[src/codekg/fresh.ts#freshGraph]], which re-extracts under a lock, reuses cached per-file extraction, and writes the graph cache in `.code-kg/cache/`.
 - [[architecture#Architecture#Structural Graph]] summarizes the graph for this repository, and [[architecture#Architecture#Communities]] lists its communities.
