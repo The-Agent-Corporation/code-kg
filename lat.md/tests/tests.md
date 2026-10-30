@@ -45,7 +45,7 @@ Test file `tests/agents-edge-cases.test.ts` contains tests and validation symbol
 Test file `tests/anchor.test.ts` contains tests and validation symbols. Key symbols: `roots`, `SECTION`, and 7 more.
 
 - Symbols: `roots (const)`, `SECTION (const)`, `GREET (const)`, `ctx (function)`, `project (function)`, `readManifest (function)`, `add (const)`, `entry (function)`, and 1 more
-- Imports: `src/codekg/anchor.ts`, `src/codekg/anchors.ts`, `src/codekg/backlinks.ts`, `src/codekg/bootstrap.ts`, `src/codekg/check.ts`, `src/codekg/drift.ts`, and 4 more
+- Imports: `src/codekg/anchor.ts`, `src/codekg/anchors.ts`, `src/codekg/backlinks.ts`, `src/codekg/bootstrap.ts`, `src/codekg/check.ts`, `src/codekg/context.ts`, and 5 more
 - Imported by: none detected
 
 ### tests/backlinks-safety.test.ts
@@ -302,6 +302,12 @@ Source file `src/codekg/backlinks.ts` is covered by test imports from `tests/anc
 
 - Tests: `tests/anchor.test.ts`, `tests/backlinks-safety.test.ts`, `tests/codekg.test.ts`
 
+### src/codekg/context.ts
+
+Source file `src/codekg/context.ts` is covered by test imports from `tests/anchor.test.ts`, `tests/codekg.test.ts`, and 1 more.
+
+- Tests: `tests/anchor.test.ts`, `tests/codekg.test.ts`, `tests/gaps-inferred.test.ts`
+
 ### src/codekg/graph.ts
 
 Source file `src/codekg/graph.ts` is covered by test imports from `tests/codekg-intelligence.test.ts`, `tests/codekg.test.ts`, and 1 more.
@@ -343,12 +349,6 @@ Source file `src/codekg/anchors.ts` is covered by test imports from `tests/ancho
 Source file `src/codekg/cache.ts` is covered by test imports from `tests/codekg-intelligence.test.ts`, `tests/enrich.test.ts`.
 
 - Tests: `tests/codekg-intelligence.test.ts`, `tests/enrich.test.ts`
-
-### src/codekg/context.ts
-
-Source file `src/codekg/context.ts` is covered by test imports from `tests/codekg.test.ts`, `tests/gaps-inferred.test.ts`.
-
-- Tests: `tests/codekg.test.ts`, `tests/gaps-inferred.test.ts`
 
 ### src/codekg/enrich.ts
 

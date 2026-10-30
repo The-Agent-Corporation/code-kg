@@ -450,6 +450,7 @@ async function writeInsertions(
   return { written, skips };
 }
 
+// @lat: [[lat.md/concepts#Concepts#Source Anchor Policies]]
 export async function applyBacklinksCommand(
   ctx: CmdContext,
   opts: ApplyBacklinksOptions,

@@ -263,6 +263,7 @@ async function applySafeManifestUpdates(
   await writeFile(manifestPath(ctx), JSON.stringify(manifest, null, 2) + '\n');
 }
 
+// @lat: [[lat.md/concepts#Concepts#Drift and Source Review]]
 export async function driftCommand(
   ctx: CmdContext,
   opts: DriftOptions = {},

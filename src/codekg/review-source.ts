@@ -7,6 +7,7 @@ import { freshGraph } from './fresh.js';
 import type { MaterializationManifest } from './types.js';
 import { sourceHash } from './structural.js';
 
+// @lat: [[lat.md/concepts#Concepts#Drift and Source Review]]
 export async function reviewSourceCommand(
   ctx: CmdContext,
   stableId: string,

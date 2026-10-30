@@ -198,6 +198,7 @@ async function listAnchors(
   ]);
 }
 
+// @lat: [[lat.md/concepts#Concepts#Section Anchors]]
 export async function anchorCommand(
   ctx: CmdContext,
   sectionQuery: string,

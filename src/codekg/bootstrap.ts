@@ -1026,6 +1026,7 @@ export async function formatMaterializationPreview(
   return lines.join('\n');
 }
 
+// @lat: [[lat.md/concepts#Concepts#Merge-Safe Materialization]]
 export async function writeBootstrapPlan(
   plan: BootstrapPlan,
 ): Promise<string[]> {

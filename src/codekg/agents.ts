@@ -463,6 +463,7 @@ async function malformedAgentsBlock(
   return `AGENTS.md must contain at most one \`${SECTION_START}\` … \`${SECTION_END}\` block, but ${found}; nothing was changed. Fix or remove the Code-KG markers by hand, then re-run.`;
 }
 
+// @lat: [[lat.md/concepts#Concepts#Agent Guidance and Hooks]]
 export async function agentsCommand(
   ctx: CmdContext,
   opts: AgentsOptions,

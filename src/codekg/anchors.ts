@@ -6,6 +6,7 @@ import type {
   SourceSpan,
 } from './types.js';
 
+// @lat: [[lat.md/concepts#Concepts#Source Anchor Policies]]
 export function sourceAnchorPolicy(
   section: ManifestSection,
 ): 'coverage-only' | 'edit-safe' {

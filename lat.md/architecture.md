@@ -36,13 +36,13 @@ The initial inventory groups files by broad category so later extraction can foc
 
 ## Structural Graph
 
-Code-KG extracted a deterministic structural graph with 1208 nodes, 2994 edges, 4 communities using the multi-language-directory-fallback analysis path.
+Code-KG extracted a deterministic structural graph with 1213 nodes, 3022 edges, 4 communities using the multi-language-directory-fallback analysis path.
 
 ## Communities
 
 Directory-based communities provide the first subsystem map until graph clustering is available.
 
-- src: 74 files, 802 symbols, cohesion 0.83
+- src: 74 files, 807 symbols, cohesion 0.83
 - tests: 49 files, 242 symbols, cohesion 0.47
 - templates: 2 files, 27 symbols, cohesion 1
 - scripts: 4 files, 4 symbols, cohesion 0.86
@@ -96,6 +96,12 @@ Source file `src/codekg/structural.ts` is imported by local files including `src
 
 - Imported by: `src/codekg/agent-context.ts`, `src/codekg/anchor.ts`, `src/codekg/backlinks.ts`, `src/codekg/discovery.ts`, `src/codekg/enrich.ts`, `src/codekg/graph.ts`, and 6 more
 
+### src/codekg/anchors.ts
+
+Source file `src/codekg/anchors.ts` is imported by local files including `src/codekg/anchor.ts`, `src/codekg/backlinks.ts`, and 9 more.
+
+- Imported by: `src/codekg/anchor.ts`, `src/codekg/backlinks.ts`, `src/codekg/bootstrap.ts`, `src/codekg/check.ts`, `src/codekg/context.ts`, `src/codekg/drift.ts`, and 5 more
+
 ### src/codekg/bootstrap.ts
 
 Source file `src/codekg/bootstrap.ts` is imported by local files including `src/codekg/cli.ts`, `src/codekg/update.ts`, and 9 more.
@@ -131,12 +137,6 @@ Source file `src/search/provider.ts` is imported by local files including `src/c
 Source file `src/code-refs.ts` is imported by local files including `src/cli/check.ts`, `src/cli/refs.ts`, and 6 more.
 
 - Imported by: `src/cli/check.ts`, `src/cli/refs.ts`, `src/cli/section.ts`, `src/codekg/bootstrap.ts`, `tests/cases.test.ts`, `tests/code-refs-no-match.test.ts`, and 2 more
-
-### src/codekg/anchors.ts
-
-Source file `src/codekg/anchors.ts` is imported by local files including `src/codekg/anchor.ts`, `src/codekg/backlinks.ts`, and 6 more.
-
-- Imported by: `src/codekg/anchor.ts`, `src/codekg/backlinks.ts`, `src/codekg/bootstrap.ts`, `src/codekg/check.ts`, `src/codekg/query.ts`, `src/codekg/review-source.ts`, and 2 more
 
 ### src/codekg/graph.ts
 

@@ -505,6 +505,7 @@ function loadedPaths(
  * an INFERRED `tests` edge to the module, unless an extracted edge already
  * covers the pair.
  */
+// @lat: [[lat.md/concepts#Concepts#Relationship Confidence]]
 function inferredTestEdges(
   paths: string[],
   categories: Map<string, string>,
@@ -551,6 +552,7 @@ function inferredTestEdges(
   return edges;
 }
 
+// @lat: [[lat.md/concepts#Concepts#Structural Extraction]]
 export async function extractProjectGraph(
   rootArg = '.',
   discoveryArg?: DiscoveryResult,

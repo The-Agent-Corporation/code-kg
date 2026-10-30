@@ -30,5 +30,5 @@ These imports cross the first-pass directory communities and may indicate integr
 - tests/anchor.test.ts imports src/codekg/backlinks.ts
 - tests/anchor.test.ts imports src/codekg/bootstrap.ts
 - tests/anchor.test.ts imports src/codekg/check.ts
+- tests/anchor.test.ts imports src/codekg/context.ts
 - tests/anchor.test.ts imports src/codekg/drift.ts
-- tests/anchor.test.ts imports src/codekg/mcp.ts

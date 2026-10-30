@@ -108,6 +108,7 @@ export async function readSectionBodies(
 }
 
 /** Sections matching `query` lexically, best first. */
+// @lat: [[lat.md/concepts#Concepts#Search Backends]]
 export function rankSectionsLexically(
   sections: Section[],
   query: string,
