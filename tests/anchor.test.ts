@@ -123,6 +123,42 @@ describe('code-kg anchor', () => {
     expect(Object.keys((await readManifest(root)).sections)).not.toContain(
       'lat.md/architecture#Architecture#Entry Points',
     );
+    const list = await anchorCommand(ctx(root), 'Entry Points', {
+      action: 'list',
+    });
+    expect(list.isError).toBeFalsy();
+    expect(list.output).toContain(
+      'lat.md/architecture#Architecture#Entry Points has no source anchors. lat.md/architecture.md is generated',
+    );
+  });
+
+  it('lets an entry whose heading was renamed be listed and removed by its key', async () => {
+    const root = await project();
+    await add(root, SECTION, 'greet');
+    await writeFile(
+      join(root, 'lat.md/notes.md'),
+      '# Notes\n\nHand-written notes.\n\n## Greetings\n\nHow greeting works.\n',
+    );
+
+    const check = await codeKgCheckCommand(ctx(root));
+    const list = await anchorCommand(ctx(root), SECTION, { action: 'list' });
+    const added = await add(root, SECTION, 'src/other.ts#wave');
+    const removed = await anchorCommand(ctx(root), SECTION, {
+      action: 'remove',
+      target: 'greet',
+    });
+
+    expect(check.output).toContain(
+      `Manifest section ${SECTION} points to missing section ${SECTION}. Restore the heading, or drop the entry by removing its anchors: code-kg anchor "${SECTION}" --remove "`,
+    );
+    expect(list.output).toContain('- src/greet.ts#greet at src/greet.ts:1');
+    expect(added.isError).toBe(true);
+    expect(added.output).toContain(`No section matches ${SECTION}.`);
+    expect(removed.output).toContain(
+      `Removed anchor src/greet.ts#greet from ${SECTION}.`,
+    );
+    expect((await readManifest(root)).sections[SECTION]).toBeUndefined();
+    expect((await codeKgCheckCommand(ctx(root))).isError).toBeFalsy();
   });
 
   it('anchors a curated file entry and keeps it when the anchor is removed', async () => {

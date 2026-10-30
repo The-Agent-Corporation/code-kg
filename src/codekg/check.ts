@@ -5,7 +5,7 @@ import { checkAllCommand } from '../cli/check.js';
 import type { CmdContext, CmdResult } from '../context.js';
 import { flattenSections, loadAllSections } from '../lattice.js';
 import { walkEntries } from '../walk.js';
-import { anchorName } from './anchors.js';
+import { anchorName, isSectionEntry } from './anchors.js';
 import type {
   MaterializationManifest,
   SourceAnchor,
@@ -200,8 +200,14 @@ export async function codeKgCheckCommand(ctx: CmdContext): Promise<CmdResult> {
           continue;
         }
         if (!ids.has(section.public_section_id)) {
+          const anchors = isSectionEntry(section)
+            ? (section.source_anchors ?? [])
+            : [];
           errors.push(
-            `Manifest section ${stableId} points to missing section ${section.public_section_id}.`,
+            `Manifest section ${stableId} points to missing section ${section.public_section_id}.` +
+              (anchors.length
+                ? ` Restore the heading, or drop the entry by removing its anchors: ${anchors.map((a) => `code-kg anchor ${JSON.stringify(stableId)} --remove ${JSON.stringify(a.node_id)}`).join('; ')}.`
+                : ''),
           );
         }
       }

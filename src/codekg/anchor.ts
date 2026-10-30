@@ -172,22 +172,22 @@ function matchAnchor(
 
 async function listAnchors(
   ctx: CmdContext,
-  section: Section,
+  id: string,
   entry: ManifestSection | undefined,
 ): Promise<CmdResult> {
   const anchors = entry?.source_anchors ?? [];
-  if (!anchors.length) return reply([`${section.id} has no source anchors.`]);
+  if (!anchors.length) return reply([`${id} has no source anchors.`]);
   const nodes = new Map(
     (await freshGraph(ctx.projectRoot)).nodes.map((node) => [node.id, node]),
   );
   return reply([
-    `${section.id} (${entry!.source_anchor_policy ?? 'coverage-only'}):`,
+    `${id} (${entry!.source_anchor_policy ?? 'coverage-only'}):`,
     '',
     ...anchors.map((anchor) => {
       const node = nodes.get(anchor.node_id);
       const span = node && anchorSpan(node);
       if (!span)
-        return `- ${anchorName(anchor)} is missing from the source; remove it with \`code-kg anchor ${quote(section.id)} --remove ${quote(anchor.node_id)}\``;
+        return `- ${anchorName(anchor)} is missing from the source; remove it with \`code-kg anchor ${quote(id)} --remove ${quote(anchor.node_id)}\``;
       return (
         `- ${anchorName(anchor)} at ${span.file}:${span.start_line}` +
         (node.body_hash === anchor.hash
@@ -213,11 +213,24 @@ export async function anchorCommand(
       ],
       true,
     );
-  const section = await resolveSection(ctx.latDir, sectionQuery);
-  if (typeof section === 'string') return reply([section], true);
-  const target = targetEntry(manifest, section);
-  if ('error' in target) return reply([target.error], true);
-  if (opts.action === 'list') return listAnchors(ctx, section, target.entry);
+  const resolved = await resolveSection(ctx.latDir, sectionQuery);
+  const orphan = manifest.sections[sectionQuery];
+  let section: Section | null = null;
+  let target: Target;
+  if (typeof resolved !== 'string') {
+    section = resolved;
+    target = targetEntry(manifest, resolved);
+  } else if (opts.action !== 'add' && orphan && isSectionEntry(orphan)) {
+    // A section entry whose heading was renamed or deleted can still be
+    // listed and emptied by its manifest key.
+    target = { key: sectionQuery, entry: orphan };
+  } else return reply([resolved], true);
+  const id = section?.id ?? sectionQuery;
+  if ('error' in target)
+    return opts.action === 'list'
+      ? reply([`${id} has no source anchors. ${target.error}`])
+      : reply([target.error], true);
+  if (opts.action === 'list') return listAnchors(ctx, id, target.entry);
   if (!opts.target)
     return reply(['Name the symbol or file to anchor, or pass --list.'], true);
 
@@ -235,8 +248,9 @@ export async function anchorCommand(
     if (isSectionEntry(entry) && !entry.source_anchors)
       delete manifest.sections[target.key];
     await writeJsonAtomic(path, manifest, 2);
-    return reply([`Removed anchor ${anchorName(anchor)} from ${section.id}.`]);
+    return reply([`Removed anchor ${anchorName(anchor)} from ${id}.`]);
   }
+  if (!section) return reply([`No section matches ${sectionQuery}.`], true);
 
   const graph = await visibleGraph(
     ctx.projectRoot,
