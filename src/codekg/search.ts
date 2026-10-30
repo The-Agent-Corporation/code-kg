@@ -134,17 +134,30 @@ export async function codeKgSearchCommand(
 
   if (selected.backend === 'semantic') {
     const { searchCommand, cliProgress } = await import('../cli/search.js');
-    return withBackendLabel(
-      await searchCommand(
+    let result: CmdResult;
+    try {
+      result = await searchCommand(
         ctx,
         query,
         { limit, reindex: opts.reindex },
         ctx.mode === 'cli'
           ? cliProgress(opts.reindex === true, ctx.styler)
           : undefined,
-      ),
-      selected.label,
-    );
+      );
+    } catch (error) {
+      result = {
+        output: `Semantic search failed: ${(error as Error).message}`,
+        isError: true,
+      };
+    }
+    if (result.isError && opts.backend === 'auto-semantic' && query?.trim()) {
+      const reason = result.output.replace(/\s+/g, ' ').trim().slice(0, 160);
+      return withBackendLabel(
+        await localSearchCommand(ctx, query, limit),
+        `local lexical (auto-semantic fallback; ${reason})`,
+      );
+    }
+    return withBackendLabel(result, selected.label);
   }
 
   return withBackendLabel(
