@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { join, posix, resolve, relative } from 'node:path';
+import { isAbsolute, join, posix, resolve, relative, sep } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { CmdContext, CmdResult } from '../context.js';
@@ -51,6 +51,14 @@ export function tokenize(text: string): string[] {
     .toLowerCase()
     .split(/[^a-z0-9]+/)
     .filter((token) => token.length > 1 && !STOP_WORDS.has(token));
+}
+/** Agent tool payloads name files by absolute path; graph nodes use project-relative ones. */
+export function projectQuery(root: string, query: string): string {
+  if (!isAbsolute(query)) return query;
+  const path = relative(resolve(root), query);
+  return path && !path.startsWith('..') && !isAbsolute(path)
+    ? path.split(sep).join('/')
+    : query;
 }
 export function withinScope(path: string, scope?: string): boolean {
   if (!scope || scope === '.') return true;
@@ -369,6 +377,7 @@ export async function trace(
   opts: { direction?: 'in' | 'out'; depth?: number; in?: string } = {},
 ) {
   withinScope('', opts.in);
+  query = projectQuery(root, query);
   const graph = await visibleGraph(root, await freshGraph(root));
   const visible = graph.nodes.filter(
     (n) => n.kind !== 'module' && withinScope(n.source_file ?? '', opts.in),
@@ -550,6 +559,7 @@ export async function skeletonCommand(
     ctx.projectRoot,
     await freshGraph(ctx.projectRoot),
   );
+  path = projectQuery(ctx.projectRoot, path);
   const files = [
     ...new Set(
       graph.nodes.flatMap((n) => (n.source_file ? [n.source_file] : [])),

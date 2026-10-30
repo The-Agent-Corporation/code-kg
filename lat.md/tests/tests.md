@@ -93,7 +93,7 @@ Test file `tests/codekg-messages.test.ts` contains tests and validation symbols.
 Test file `tests/codekg.test.ts` contains tests and validation symbols. Key symbols: `roots`, `execFile`, and 10 more.
 
 - Symbols: `roots (const)`, `execFile (const)`, `makeProject (function)`, `ctx (function)`, `readManifest (function)`, `writeManifest (function)`, `addInferredRelationship (function)`, `addImportRelationship (function)`, and 4 more
-- Imports: `src/codekg/agents.ts`, `src/codekg/anchors.ts`, `src/codekg/backlinks.ts`, `src/codekg/bootstrap.ts`, `src/codekg/changed.ts`, `src/codekg/check.ts`, and 16 more
+- Imports: `src/codekg/agents.ts`, `src/codekg/anchors.ts`, `src/codekg/backlinks.ts`, `src/codekg/bootstrap.ts`, `src/codekg/changed.ts`, `src/codekg/check.ts`, and 17 more
 - Imported by: none detected
 
 ### tests/config-corrupt.test.ts
@@ -278,6 +278,12 @@ Source file `src/codekg/drift.ts` is covered by test imports from `tests/anchor.
 
 - Tests: `tests/anchor.test.ts`, `tests/backlinks-safety.test.ts`, `tests/codekg-intelligence.test.ts`, `tests/codekg.test.ts`
 
+### src/codekg/query.ts
+
+Source file `src/codekg/query.ts` is covered by test imports from `tests/codekg-intelligence.test.ts`, `tests/codekg.test.ts`, and 2 more.
+
+- Tests: `tests/codekg-intelligence.test.ts`, `tests/codekg.test.ts`, `tests/input-errors.test.ts`, `tests/trace-depth.test.ts`
+
 ### src/codekg/search.ts
 
 Source file `src/codekg/search.ts` is covered by test imports from `tests/codekg.test.ts`, `tests/config-corrupt.test.ts`, and 2 more.
@@ -313,12 +319,6 @@ Source file `src/codekg/context.ts` is covered by test imports from `tests/ancho
 Source file `src/codekg/graph.ts` is covered by test imports from `tests/codekg-intelligence.test.ts`, `tests/codekg.test.ts`, and 1 more.
 
 - Tests: `tests/codekg-intelligence.test.ts`, `tests/codekg.test.ts`, `tests/gaps-inferred.test.ts`
-
-### src/codekg/query.ts
-
-Source file `src/codekg/query.ts` is covered by test imports from `tests/codekg-intelligence.test.ts`, `tests/input-errors.test.ts`, and 1 more.
-
-- Tests: `tests/codekg-intelligence.test.ts`, `tests/input-errors.test.ts`, `tests/trace-depth.test.ts`
 
 ### src/codekg/review-source.ts
 

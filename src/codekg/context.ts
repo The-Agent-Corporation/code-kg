@@ -5,6 +5,7 @@ import type { CmdContext, CmdResult } from '../context.js';
 import { flattenSections, loadAllSections, type Section } from '../lattice.js';
 import { sectionNodeIds } from './anchors.js';
 import { freshGraph } from './fresh.js';
+import { projectQuery } from './query.js';
 import type {
   EntityNode,
   MaterializationManifest,
@@ -160,6 +161,7 @@ export async function buildContextInfo(
   query: string,
   graphArg?: ProjectGraph,
 ): Promise<ContextInfo | null> {
+  query = projectQuery(ctx.projectRoot, query);
   const graph = graphArg ?? (await freshGraph(ctx.projectRoot));
   const nodes = matchedNodes(graph, query);
   if (nodes.length === 0) return null;

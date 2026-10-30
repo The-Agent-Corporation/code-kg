@@ -51,6 +51,7 @@ import { contextCommand } from '../src/codekg/context.js';
 import { gapsCommand } from '../src/codekg/gaps.js';
 import { changedCommand } from '../src/codekg/changed.js';
 import { updateCommand } from '../src/codekg/update.js';
+import { skeletonCommand, traceCommand } from '../src/codekg/query.js';
 import type {
   ManifestRelationship,
   MaterializationManifest,
@@ -1118,6 +1119,25 @@ describe('code-kg bootstrap', () => {
     expect(result.output).toContain('makeValue');
     expect(result.output).toContain('src/util.ts');
     expect(result.output).toContain('## Knowledge Sections');
+  });
+
+  it('accepts absolute paths inside the project, as agent hooks pass them', async () => {
+    const root = await makeProject();
+    await writeBootstrapPlan(await createBootstrapPlan(root));
+    const file = join(root, 'src', 'util.ts');
+
+    const context = await contextCommand(ctx(root), file);
+    const skeleton = await skeletonCommand(ctx(root), file);
+    const impact = await traceCommand(ctx(root), file);
+    const outside = await contextCommand(ctx(root), join(tmpdir(), 'util.ts'));
+
+    expect(context.isError).toBeFalsy();
+    expect(context.output).toContain('imported by: `src/index.ts`');
+    expect(skeleton.isError).toBeFalsy();
+    expect(skeleton.output).toContain('makeValue');
+    expect(impact.output).toContain('Seed: src/util.ts (src/util.ts)');
+    expect(impact.output).toContain('- src/index.ts | src/index.ts:1');
+    expect(outside.isError).toBe(true);
   });
 
   it('reports useful documentation and coverage gaps', async () => {
