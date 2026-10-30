@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { extname } from 'node:path';
 import { scanCodeRefs } from '../code-refs.js';
+import { walkEntries } from '../walk.js';
 import { isSectionEntry } from './anchors.js';
 import { discoverProject } from './discovery.js';
 import {
@@ -454,17 +455,18 @@ async function curatedRootEntries(root: string): Promise<RootEntry[]> {
   const latDir = join(root, 'lat.md');
   if (!existsSync(latDir)) return [];
   const generated = new Set(['lat', ...GENERATED_ROOT_ENTRIES.map(([s]) => s)]);
+  // `check` sees lat.md/ through the same walk, so ignored files stay out.
+  const indexes = new Map<string, string>();
+  for (const path of await walkEntries(latDir)) {
+    const [top, child, ...deeper] = path.split('/');
+    if (child === undefined && top.endsWith('.md'))
+      indexes.set(top.slice(0, -3), path);
+    else if (child === `${top}.md` && !deeper.length) indexes.set(top, path);
+  }
   const entries: RootEntry[] = [];
-  for (const entry of await readdir(latDir, { withFileTypes: true })) {
-    if (entry.name.startsWith('.')) continue;
-    const index = entry.isDirectory()
-      ? join(latDir, entry.name, `${entry.name}.md`)
-      : entry.isFile() && entry.name.endsWith('.md')
-        ? join(latDir, entry.name)
-        : null;
-    const stem = entry.name.replace(/\.md$/, '');
-    if (!index || generated.has(stem)) continue;
-    const content = existsSync(index) ? await readFile(index, 'utf-8') : '';
+  for (const [stem, index] of indexes) {
+    if (generated.has(stem)) continue;
+    const content = await readFile(join(latDir, index), 'utf-8');
     entries.push({ stem, summary: leadingSentence(content) });
   }
   return entries.sort((a, b) => a.stem.localeCompare(b.stem));

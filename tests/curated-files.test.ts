@@ -70,4 +70,46 @@ describe('hand-written knowledge files', () => {
     );
     expect(check.isError, check.output).toBeFalsy();
   });
+
+  it('leave ignored files and directories without an index out of the root index', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'codekg-curated-'));
+    roots.push(root);
+    const lat = join(root, 'lat.md');
+    const ctx = {
+      latDir: lat,
+      projectRoot: root,
+      styler: plainStyler,
+      mode: 'cli' as const,
+    };
+    await mkdir(join(root, 'src'), { recursive: true });
+    await writeFile(join(root, 'src', 'index.ts'), 'export const a = 1;\n');
+    await writeBootstrapPlan(await createBootstrapPlan(root));
+    await writeFile(join(lat, '.gitignore'), 'local.md\nprivate/private.md\n');
+    await writeFile(join(lat, 'local.md'), '# Local\n\nSecret local notes.\n');
+    await mkdir(join(lat, 'private'));
+    await writeFile(
+      join(lat, 'private', 'private.md'),
+      '# Private\n\nPrivate index.\n',
+    );
+
+    await writeBootstrapPlan(await createBootstrapPlan(root));
+    const ignored = await readFile(join(lat, 'lat.md'), 'utf-8');
+    const ignoredCheck = await codeKgCheckCommand(ctx);
+    await mkdir(join(lat, 'drafts'));
+    await writeFile(join(lat, 'drafts', 'idea.md'), '# Idea\n\nAn idea.\n');
+    await writeBootstrapPlan(await createBootstrapPlan(root));
+    const unindexed = await readFile(join(lat, 'lat.md'), 'utf-8');
+    const unindexedCheck = await codeKgCheckCommand(ctx);
+
+    for (const index of [ignored, unindexed]) {
+      expect(index).not.toContain('[[local]]');
+      expect(index).not.toContain('Secret local notes');
+      expect(index).not.toContain('[[private]]');
+      expect(index).not.toContain('[[drafts]]');
+    }
+    expect(ignoredCheck.isError, ignoredCheck.output).toBeFalsy();
+    expect(unindexedCheck.output).toContain(
+      'missing index file "drafts/drafts.md"',
+    );
+  });
 });
