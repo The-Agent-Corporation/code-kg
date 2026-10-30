@@ -26,12 +26,17 @@ if [ ! -d "$repo_root/lat.md" ]; then
 fi
 
 # Auto-staging is only safe when every pending knowledge-base change comes from
-# this hook; otherwise `git add` would sweep unstaged hand edits into the commit.
-kb_paths="lat.md .code-kg/materialization-manifest.json"
+# this hook; otherwise `git add` would sweep unstaged hand edits into the commit,
+# or replace a staged manifest edit with the regenerated manifest.
+manifest=".code-kg/materialization-manifest.json"
+kb_paths="lat.md $manifest"
+kb_changed() {
+  # shellcheck disable=SC2086
+  ! git -C "$repo_root" diff --quiet -- $kb_paths ||
+    [ -n "$(git -C "$repo_root" ls-files --others --exclude-standard -- $kb_paths)" ]
+}
 kb_dirty=""
-# shellcheck disable=SC2086
-if ! git -C "$repo_root" diff --quiet -- $kb_paths ||
-  [ -n "$(git -C "$repo_root" ls-files --others --exclude-standard -- $kb_paths)" ]; then
+if kb_changed || ! git -C "$repo_root" diff --cached --quiet -- "$manifest"; then
   kb_dirty=1
 fi
 
@@ -48,10 +53,15 @@ if ! code-kg --dir "$repo_root" update; then
   exit 1
 fi
 
-if [ -n "$kb_dirty" ]; then
-  echo "[code-kg] NOTE: lat.md/ or the manifest had unstaged changes before this commit,"
-  echo "[code-kg]       so the refreshed knowledge base was NOT staged. Review it with"
-  echo "[code-kg]       'git diff -- lat.md .code-kg' and stage what belongs in a commit."
+if ! kb_changed; then
+  : # The knowledge base was already current; nothing to stage.
+elif [ -n "$kb_dirty" ]; then
+  echo "[code-kg] NOTE: lat.md/ or the manifest had changes this hook did not make"
+  echo "[code-kg]       (unstaged edits, or a staged manifest edit), so the refreshed"
+  echo "[code-kg]       knowledge base was NOT staged. It stays unstaged on later commits"
+  echo "[code-kg]       until you review it with 'git diff -- lat.md .code-kg' and stage"
+  echo "[code-kg]       or discard it. Changes from running 'code-kg update' yourself are"
+  echo "[code-kg]       safe to stage: git add lat.md $manifest"
 else
   # Stage the regenerated, tracked knowledge-base files into this commit.
   # shellcheck disable=SC2086

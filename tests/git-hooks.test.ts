@@ -9,7 +9,7 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import {
   installGitHook,
   uninstallGitHook,
@@ -179,5 +179,71 @@ describe('installed pre-commit hook', () => {
       'My unstaged note.',
     );
     expect(readFileSync(doc, 'utf-8')).toContain('My unstaged note.');
+  }, 60_000);
+
+  const commit = (message: string) => {
+    const result = spawnSync(
+      'git',
+      [
+        '-c',
+        'user.name=t',
+        '-c',
+        'user.email=t@t',
+        'commit',
+        '-q',
+        '-m',
+        message,
+      ],
+      { cwd: root, env, encoding: 'utf-8' },
+    );
+    expect(result.status).toBe(0);
+    return result.stdout + result.stderr;
+  };
+  const manifest = '.code-kg/materialization-manifest.json';
+
+  it('does not replace a staged manifest edit with the regenerated one', () => {
+    const path = join(root, manifest);
+    const original = readFileSync(path, 'utf-8');
+    writeFileSync(path, '{\n  "hand_note": "kept",' + original.slice(1));
+    git('add', manifest);
+    writeFileSync(join(root, 'src', 'b.ts'), 'export const b = 2;\n');
+    git('add', 'src/b.ts');
+
+    const output = commit('add b');
+
+    expect(git('show', `HEAD:${manifest}`)).toContain('"hand_note"');
+    expect(output).toContain('It stays unstaged on later commits');
+  }, 60_000);
+
+  it('stays quiet when the staged knowledge base is already current', () => {
+    writeFileSync(join(root, 'src', 'b.ts'), 'export const b = 2;\n');
+    execFileSync(process.execPath, [cliPath, 'update', '--no-enrich'], {
+      cwd: root,
+      env,
+      stdio: 'ignore',
+    });
+    git('add', '-A');
+
+    const output = commit('add b');
+
+    expect(output, output).not.toContain('NOTE');
+    expect(git('status', '--porcelain', '--', 'lat.md', manifest)).toBe('');
+  }, 60_000);
+
+  it('explains that an unstaged manual update stays unstaged', () => {
+    writeFileSync(join(root, 'src', 'b.ts'), 'export const b = 2;\n');
+    execFileSync(process.execPath, [cliPath, 'update', '--no-enrich'], {
+      cwd: root,
+      env,
+      stdio: 'ignore',
+    });
+    git('add', 'src/b.ts');
+
+    const output = commit('add b');
+
+    expect(git('show', '--name-only', '--format=', 'HEAD').trim()).toBe(
+      'src/b.ts',
+    );
+    expect(output).toContain(`safe to stage: git add lat.md ${manifest}`);
   }, 60_000);
 });
