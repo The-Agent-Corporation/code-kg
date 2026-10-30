@@ -16,7 +16,7 @@ Use this section for auth, persistence, configuration, background work, observab
 - src/codekg/graph.ts (file)
 - src/lattice.ts (file)
 - src/cli/init.ts (file)
-- tests/cases.test.ts (file)
+- src/codekg/types.ts (file)
 
 ## Cross-Community Imports
 
