@@ -12,6 +12,7 @@ Each generated file in `lat.md/` has an entry in `.code-kg/materialization-manif
 - Changed by hand: the entry becomes `edited`, the file is left alone, and the new content goes to `.code-kg/cache/merge-proposals/<stable-id>.md`.
 - Already `edited`, `curated` or `suppressed`: kept, with a merge proposal when the generated candidate changed.
 - No longer produced: a `generated` entry becomes `orphaned`.
+- A file that no longer needs its merge proposal, because it is `generated` again or matches the candidate, has the old proposal removed.
 
 Hand-written files such as this one have no manifest entry and are never written; the generated root index lists them. When nothing else changed, the manifest keeps its `generated_at`, so a no-op update leaves it untouched. The implementation map is [[architecture#Architecture#Source File Highlights#src/codekg/bootstrap.ts]].
 

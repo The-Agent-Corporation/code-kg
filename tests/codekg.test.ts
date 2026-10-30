@@ -2176,6 +2176,18 @@ describe('code-kg bootstrap', () => {
     );
     expect(architecture).toContain('Human edited architecture notes.');
     expect(proposal).toContain('- Code files: 3');
+
+    await writeFile(join(root, 'lat.md', 'architecture.md'), proposal);
+    const adopted = await writeBootstrapPlan(await createBootstrapPlan(root));
+
+    expect(adopted).toContain(
+      'removed stale merge proposal .code-kg/cache/merge-proposals/architecture.md for architecture',
+    );
+    expect(
+      existsSync(
+        join(root, '.code-kg', 'cache', 'merge-proposals', 'architecture.md'),
+      ),
+    ).toBe(false);
   });
 
   it('lists inferred relationships in the confidence review queue', async () => {

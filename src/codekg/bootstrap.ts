@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { extname } from 'node:path';
 import { scanCodeRefs } from '../code-refs.js';
@@ -844,6 +844,16 @@ async function writeMergeProposal(
   return path;
 }
 
+async function clearMergeProposal(
+  root: string,
+  stableId: string,
+): Promise<string[]> {
+  const path = mergeProposalPath(stableId);
+  if (!existsSync(join(root, path))) return [];
+  await rm(join(root, path));
+  return [`removed stale merge proposal ${path} for ${stableId}`];
+}
+
 async function ensureDefaultGitignore(root: string): Promise<boolean> {
   const path = join(root, '.gitignore');
   let content = '';
@@ -1080,6 +1090,10 @@ export async function writeBootstrapPlan(
             file.content,
           );
           mergeProposals.push(`merge proposal ${proposalPath} for ${stableId}`);
+        } else {
+          mergeProposals.push(
+            ...(await clearMergeProposal(plan.root, stableId)),
+          );
         }
         nextManifest.sections[stableId] = {
           ...currentSection,
@@ -1105,6 +1119,7 @@ export async function writeBootstrapPlan(
         continue;
       }
 
+      mergeProposals.push(...(await clearMergeProposal(plan.root, stableId)));
       if (currentHash !== nextSection.generated_hash) {
         await writeFile(target, file.content, 'utf-8');
         updated.push(file.path);
