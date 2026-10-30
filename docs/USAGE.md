@@ -49,6 +49,19 @@ code-kg check
 code-kg drift
 ```
 
+To let `apply-backlinks` add `@lat:` comments for a hand-written section,
+anchor it to the symbols it documents, then preview and write:
+
+```bash
+code-kg anchor "lat.md/notes#Notes#Memory Coverage" apps/api/memory.py#coverage
+code-kg apply-backlinks --preview
+code-kg apply-backlinks --write
+```
+
+`code-kg check` fails when an anchored symbol is renamed or deleted; re-anchor
+the section, or drop the anchor with `code-kg anchor <section> --remove
+<symbol>`.
+
 ## Hook Behavior
 
 `code-kg agents install` adds managed guidance to `AGENTS.md` and installs

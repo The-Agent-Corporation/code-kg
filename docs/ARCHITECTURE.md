@@ -605,7 +605,7 @@ Section statuses:
 | --- | --- | --- |
 | `generated` | Auto-created and unedited. | May update in place. |
 | `edited` | Generated, then changed by user. | Never overwrite; emit merge proposal. |
-| `curated` | Human-authored or promoted. | Never overwrite. |
+| `curated` | Human-authored or promoted. | Never overwrite; section entries from `code-kg anchor` are kept. |
 | `suppressed` | User rejected candidate. | Do not regenerate. |
 | `orphaned` | Generated section source disappeared. | Report drift; do not delete automatically. |
 
@@ -746,6 +746,21 @@ Post-MVP target styles after scanner support exists:
 | Lua, SQL | `-- @lat: [[section-id]]` |
 | HTML, XML | `<!-- @lat: [[section-id]] -->` |
 | CSS | `/* @lat: [[section-id]] */` |
+
+Only `edit-safe` sections receive backlinks. A curated section becomes
+`edit-safe` by anchoring it to the symbols or files it documents:
+
+```bash
+code-kg anchor "lat.md/auth#Auth#Token Validation" src/auth.ts#validateToken
+code-kg anchor "lat.md/auth#Auth#Token Validation" --list
+code-kg anchor "lat.md/auth#Auth#Token Validation" --remove validateToken
+```
+
+Anchors are graph node ids stored in the section's `source_anchors`, so
+`apply-backlinks` inserts at the symbol's current line. Hand-written sections
+get their own `curated` manifest entry keyed by section id, which
+materialization keeps. Sections of generated files cannot be anchored until
+the file is edited or reviewed.
 
 Backlink insertion policy:
 
@@ -906,6 +921,7 @@ code-kg drift --apply-safe
 code-kg confidence list
 code-kg confidence accept <relationship-id>
 code-kg confidence reject <relationship-id>
+code-kg anchor <section-id> <symbol-or-file>
 code-kg apply-backlinks --preview
 code-kg apply-backlinks --write
 

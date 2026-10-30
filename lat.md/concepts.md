@@ -21,17 +21,26 @@ Hand-written files such as this one have no manifest entry and are never written
 
 - Sections can record `source_hashes`, one content hash per covered file. When a file's current hash differs, [[src/codekg/drift.ts#driftCommand]] reports "Source content changed" and names the sections to review.
 - A missing manifest is the only error. Uncovered files and a changed graph are informational, and new relationships between documented files are suggestions.
-- `code-kg review-source <stable-id> --write` ([[src/codekg/review-source.ts#reviewSourceCommand]]) is the explicit acknowledgement after reading the source. It records the current hashes and marks the section `curated`, without changing prose or relationship confidence. If an `edit-safe` section's span files changed, it downgrades the section to `coverage-only`; see [[concepts#Concepts#Source Anchor Policies]].
+- `code-kg review-source <stable-id> --write` ([[src/codekg/review-source.ts#reviewSourceCommand]]) is the explicit acknowledgement after reading the source. It records the current hashes and marks the section `curated`, without changing prose or relationship confidence. If an `edit-safe` section's span files changed, it drops those spans, and a section left with no spans or anchors becomes `coverage-only`; see [[concepts#Concepts#Source Anchor Policies]].
 - CI fails a pull request when drift prints any warning. `code-kg update --no-enrich` refreshes the generated knowledge.
 
 ## Source Anchor Policies
 
-A section's `source_anchor_policy` says whether Code-KG may edit source files for it. `coverage-only`, the default, uses spans and node ids only as evidence; `edit-safe` lets `apply-backlinks --write` add backlink comments at its spans.
+A section's `source_anchor_policy` says whether Code-KG may edit source files for it. `coverage-only`, the default, uses spans and node ids only as evidence; `edit-safe` lets `apply-backlinks --write` add backlink comments at its spans or anchors.
 
 - [[src/codekg/anchors.ts#sourceAnchorPolicy]] reads the policy, and [[src/codekg/anchors.ts#backlinkAnchorsForSection]] returns spans only for `edit-safe` sections.
 - [[src/codekg/backlinks.ts#applyBacklinksCommand]] previews by default. With `--write` it inserts one `@lat:` comment line per section and file, indented like the target line, keeping line endings, shebangs and encoding declarations in place.
 - A span is trusted only while the file's hash matches the section's recorded hash; otherwise the file is skipped. After writing, sections whose hash matched get the new hash and their spans move down past the inserted lines.
 - Paths outside the project root, including through symlinks, and dependency or build folders are refused.
+
+## Section Anchors
+
+`code-kg anchor <section> <symbol-or-file>` makes a curated section `edit-safe` by pinning it to graph symbols, so its backlinks follow them as the source moves; see [[src/codekg/anchor.ts#anchorCommand]].
+
+- Anchors are node ids in the section's `source_anchors`, with `--list` to show where they are now and `--remove` to drop one.
+- A section of a hand-written file gets its own curated manifest entry, keyed by section id, which `code-kg update` keeps. Sections of generated files are refused, because updates rewrite them.
+- `apply-backlinks` locates each anchor in a fresh graph and skips one whose symbol is gone; `code-kg check` reports it, like a broken `[[file#symbol]]` link.
+- Anchored files get a source hash baseline, so drift asks for a review when they change.
 
 ## Relationship Confidence
 
