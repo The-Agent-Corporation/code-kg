@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import type { CmdContext, CmdResult } from '../context.js';
-import { buildContextInfo } from './context.js';
+import { buildContextInfo, formatTestLabel } from './context.js';
 import { freshGraph } from './fresh.js';
 
 function gitChangedFiles(projectRoot: string): string[] {
@@ -57,7 +57,9 @@ export async function changedCommand(ctx: CmdContext): Promise<CmdResult> {
     lines.push(
       `- Tests: ${
         info.testedBy.length
-          ? info.testedBy.map((test) => `\`${test}\``).join(', ')
+          ? info.testedBy
+              .map((test) => formatTestLabel(test, info.inferredTests))
+              .join(', ')
           : 'none detected'
       }`,
     );

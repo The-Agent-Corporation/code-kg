@@ -13,7 +13,7 @@ import { applyBacklinksCommand } from './backlinks.js';
 import { codeKgCheckCommand } from './check.js';
 import { confidenceCommand } from './confidence.js';
 import { driftCommand } from './drift.js';
-import { codeKgSearchCommand } from './search.js';
+import { codeKgSearchCommand, withCodeKgNavHints } from './search.js';
 import { suppressCommand } from './suppress.js';
 import {
   askCommand,
@@ -96,7 +96,9 @@ export function createCodeKgMcpServer(ctx: CmdContext): McpServer {
         .describe('Approximate maximum tokens to return'),
     },
     async ({ query, max_tokens }) =>
-      toMcp(await sectionCommand(ctx, query), { maxTokens: max_tokens }),
+      toMcp(withCodeKgNavHints(ctx, await sectionCommand(ctx, query)), {
+        maxTokens: max_tokens,
+      }),
   );
 
   server.tool(
@@ -262,13 +264,14 @@ export function createCodeKgMcpServer(ctx: CmdContext): McpServer {
   );
   server.tool(
     'codekg_trace_calls',
-    'Trace callers, callees, references, and transitive impact; inferred edges remain labeled',
+    'Trace callers and references (direction "in", the default) or callees (direction "out"); inferred edges remain labeled. Depth defaults to 1 (direct only, like CLI `callers`/`callees`); pass depth "all" for transitive impact like CLI `impact`.',
     {
       query: z.string().min(1),
       direction: z.enum(['in', 'out']).optional(),
       depth: z
         .union([z.number().int().min(1).max(100), z.literal('all')])
-        .optional(),
+        .optional()
+        .describe('Traversal depth (default 1) or "all"'),
       in: z.string().optional(),
       max_tokens: budget,
     },

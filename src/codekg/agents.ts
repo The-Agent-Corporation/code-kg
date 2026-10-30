@@ -1,5 +1,12 @@
 import { constants as fsConstants, existsSync } from 'node:fs';
-import { access, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import {
+  access,
+  mkdir,
+  readFile,
+  rm,
+  rmdir,
+  writeFile,
+} from 'node:fs/promises';
 import { delimiter, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { CmdContext, CmdResult } from '../context.js';
@@ -287,7 +294,7 @@ async function installCodexHook(
     : [];
   preToolUse.push({
     matcher: CODEX_HOOK_MATCHER,
-    hooks: [{ type: 'command', command: hookCommand }],
+    hooks: [{ type: 'command', command: hookCommand, timeout: 10 }],
   });
   const next: CodexHooksConfig = {
     ...config,
@@ -360,6 +367,14 @@ async function uninstallCodexHook(projectRoot: string): Promise<string> {
     delete nextHooks.PreToolUse;
   }
   const next: CodexHooksConfig = { ...config, hooks: nextHooks };
+  if (
+    Object.keys(nextHooks).length === 0 &&
+    Object.keys(next).every((key) => key === 'hooks')
+  ) {
+    await rm(hooksPath);
+    await rmdir(join(projectRoot, '.codex')).catch(() => undefined);
+    return 'removed Codex hook';
+  }
   await writeFile(hooksPath, JSON.stringify(next, null, 2) + '\n');
   return 'removed Codex hook';
 }
@@ -421,17 +436,52 @@ async function agentsStatusCommand(ctx: CmdContext): Promise<CmdResult> {
   return { output: lines.join('\n') };
 }
 
+function markerCount(content: string, marker: string): number {
+  return content.split(marker).length - 1;
+}
+
+/** Install and uninstall splice exactly one START…END block. */
+async function malformedAgentsBlock(
+  projectRoot: string,
+): Promise<string | null> {
+  const content = await readText(join(projectRoot, 'AGENTS.md'));
+  if (content === null) return null;
+  const starts = markerCount(content, SECTION_START);
+  const ends = markerCount(content, SECTION_END);
+  if (starts === 0 && ends === 0) return null;
+  if (
+    starts === 1 &&
+    ends === 1 &&
+    content.indexOf(SECTION_START) < content.indexOf(SECTION_END)
+  ) {
+    return null;
+  }
+  const found =
+    starts === 1 && ends === 1
+      ? 'its end marker comes before its start marker'
+      : `it has ${starts} start and ${ends} end marker(s)`;
+  return `AGENTS.md must contain at most one \`${SECTION_START}\` … \`${SECTION_END}\` block, but ${found}; nothing was changed. Fix or remove the Code-KG markers by hand, then re-run.`;
+}
+
 export async function agentsCommand(
   ctx: CmdContext,
   opts: AgentsOptions,
 ): Promise<CmdResult> {
   if (opts.action === 'status') return agentsStatusCommand(ctx);
 
+  const malformed = await malformedAgentsBlock(ctx.projectRoot);
+  if (malformed) {
+    return {
+      output: ['# Code-KG Agents', '', `- ${malformed}`].join('\n'),
+      isError: true,
+    };
+  }
+
   const changes =
     opts.action === 'install'
       ? await (async () => {
           const hookSelection = await selectHookCommand();
-          return [
+          const installed = [
             await installAgentsMd(
               ctx.projectRoot,
               hookSelection.fallbackInvocation,
@@ -439,6 +489,12 @@ export async function agentsCommand(
             await installCodexHook(ctx.projectRoot, hookSelection.hookCommand),
             await installGitHook(ctx.projectRoot),
           ];
+          if (hookSelection.fallbackInvocation) {
+            installed.push(
+              `warning: \`code-kg\` is not on PATH, so AGENTS.md and .codex/hooks.json use this machine's path (${hookSelection.fallbackInvocation}). Run \`code-kg install-global\` and re-run \`code-kg agents install\` before committing them.`,
+            );
+          }
+          return installed;
         })()
       : [
           await uninstallAgentsMd(ctx.projectRoot),

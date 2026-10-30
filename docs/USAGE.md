@@ -51,9 +51,14 @@ code-kg drift
 
 ## Hook Behavior
 
-`code-kg agents install` adds managed guidance to `AGENTS.md` and installs a
-Codex `PreToolUse` hook. The hook is non-blocking. It nudges agents before broad
-raw-source search or direct raw-source reads when Code-KG is installed.
+`code-kg agents install` adds managed guidance to `AGENTS.md` and installs
+Codex hooks in `.codex/hooks.json`: `PreToolUse` (`code-kg hook-check`) plus
+`SessionStart`, `UserPromptSubmit`, `PostToolUse`, and `Stop`
+(`code-kg agent-context session|prompt|edit|stop`). See
+[Source Intelligence](INTELLIGENCE.md#agent-integration) for what each event
+returns. All hooks are non-blocking and time-limited. The `PreToolUse` hook
+nudges agents before broad raw-source search or direct raw-source reads when
+Code-KG is installed.
 
 Examples:
 

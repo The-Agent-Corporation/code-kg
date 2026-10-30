@@ -45,7 +45,9 @@ Code-KG produces and maintains `lat.md/`, a **reviewable markdown knowledge grap
 
 ### Command pattern
 
-Commands are pure functions taking a `CmdContext` (`{ latDir, projectRoot, styler, mode: 'cli' | 'mcp' }`) and returning a `CmdResult` (`{ output, isError? }`) — see `src/context.ts`. The same command functions back both the CLI and the MCP server; `mode` and `styler` (plain vs. colored) are the only environment differences. When adding a command, write it as a context-in/result-out function and wire it into both `cli.ts` and `mcp.ts`.
+Commands are pure functions taking a `CmdContext` (`{ latDir, projectRoot, styler, mode: 'cli' | 'mcp' }`) and returning a `CmdResult` (`{ output, isError? }`) — see `src/context.ts`. The same command functions back both the CLI and the MCP server; `mode` and `styler` (plain vs. colored) are the only environment differences. Query and review commands (search, section, ask, trace, context, gaps, drift, check, confidence, suppress, apply-backlinks, …) are wired into both `cli.ts` and `mcp.ts`. Setup and knowledge-writing commands are CLI-only: `bootstrap`/`materialize`, `update`, `enrich`, `reconcile`, `review-source`, `semantic`, `agents`, `git-hooks`, `doctor`, and `workspace add/list/remove` (MCP has only `codekg_workspace_ask`). When adding a command, write it as a context-in/result-out function so it can be wired into either or both.
+
+User-input errors in Code-KG commands throw `InputError` (`src/codekg/errors.ts`): the CLI prints just the message and exits 1, and MCP returns it as an error result.
 
 ### Key data model: the materialization manifest
 
@@ -58,11 +60,11 @@ Repeated materialization preserves human-edited and curated sections: when gener
 
 ### Generated/ignored artifacts
 
-`.gitignore` excludes `.code-kg/cache/`, `.code-kg/search.sqlite`, `.code-kg/tmp/`, and `lat.md/.cache/`. The committed knowledge base is `lat.md/*.md` and `.code-kg/materialization-manifest.json`. Tree-sitter WASM grammars come from `@repomix/tree-sitter-wasms` / `web-tree-sitter` (structural extraction in `src/codekg/graph.ts`).
+`.gitignore` excludes `.code-kg/cache/`, `.code-kg/tmp/`, and `lat.md/.cache/` (which holds the vector index, `lat.md/.cache/vectors.db`). The committed knowledge base is `lat.md/*.md` and `.code-kg/materialization-manifest.json`. Tree-sitter WASM grammars come from `@repomix/tree-sitter-wasms` / `web-tree-sitter` (structural extraction in `src/codekg/graph.ts`).
 
 ### Search
 
-Local-first. Lexical search always works offline; semantic search uses a local embedding provider (`Xenova/bge-small-en-v1.5`, 384-dim) via `@huggingface/transformers`, persisted in libsql/`search.sqlite`. `--backend auto-semantic` picks semantic when a provider is configured and falls back to lexical otherwise. Remote embeddings work via `LAT_LLM_KEY` (OpenAI `sk-...` or Vercel `vck_...`).
+Local-first. Lexical search always works offline; semantic search uses a local embedding provider (`Xenova/bge-small-en-v1.5`, 384-dim) via `@huggingface/transformers`, persisted in a libsql vector index at `lat.md/.cache/vectors.db` (`src/search/db.ts`). `--backend auto-semantic` picks semantic when a provider is configured and falls back to lexical when none is configured or the semantic search fails (the `Backend:` line says why); `--backend semantic` reports the failure instead. Remote embeddings work via `LAT_LLM_KEY` (OpenAI `sk-...` or Vercel `vck_...`).
 
 ## Working in this repo with Code-KG itself
 

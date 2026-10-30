@@ -117,11 +117,18 @@ export function cliProgress(reindex: boolean, s: Styler): IndexProgress {
   };
 }
 
+/** Wording that differs between the lat and code-kg front ends. */
+export type SearchPresentation = {
+  noProvider?: (ctx: CmdContext) => string;
+  navHints?: (ctx: CmdContext) => string;
+};
+
 export async function searchCommand(
   ctx: CmdContext,
   query: string | undefined,
   opts: { limit: number; reindex?: boolean },
   progress?: IndexProgress,
+  presentation: SearchPresentation = {},
 ): Promise<CmdResult> {
   const { getEmbeddingKey, getConfigPath } = await import('../config.js');
   let key: string | undefined;
@@ -133,14 +140,15 @@ export async function searchCommand(
   if (!key) {
     const s = ctx.styler;
     return {
-      output:
-        s.red('No semantic embedding provider configured.') +
-        ' Set LAT_EMBEDDING_PROVIDER=local for local embeddings, provide a key via LAT_LLM_KEY, LAT_LLM_KEY_FILE, LAT_LLM_KEY_HELPER, or run ' +
-        s.cyan('lat init') +
-        (ctx.mode === 'cli'
-          ? ' to save one in ' + s.dim(getConfigPath())
-          : '') +
-        '.',
+      output: presentation.noProvider
+        ? presentation.noProvider(ctx)
+        : s.red('No semantic embedding provider configured.') +
+          ' Set LAT_EMBEDDING_PROVIDER=local for local embeddings, provide a key via LAT_LLM_KEY, LAT_LLM_KEY_FILE, LAT_LLM_KEY_HELPER, or run ' +
+          s.cyan('lat init') +
+          (ctx.mode === 'cli'
+            ? ' to save one in ' + s.dim(getConfigPath())
+            : '') +
+          '.',
       isError: true,
     };
   }
@@ -159,6 +167,6 @@ export async function searchCommand(
   return {
     output:
       formatResultList(ctx, `Search results for "${query}":`, result.matches) +
-      formatNavHints(ctx),
+      (presentation.navHints ?? formatNavHints)(ctx),
   };
 }

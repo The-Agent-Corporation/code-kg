@@ -20,14 +20,20 @@ export type ContextInfo = {
   importedBy: string[];
   testedBy: string[];
   tests: string[];
+  /** Entries of `testedBy`/`tests` linked only by INFERRED path references. */
+  inferredTests: string[];
 };
 
-function inlineList(items: string[]): string {
+function inlineList(items: string[], inferred: string[] = []): string {
   if (items.length === 0) return 'none detected';
   return items
     .slice(0, 8)
-    .map((item) => `\`${item}\``)
+    .map((item) => formatTestLabel(item, inferred))
     .join(', ');
+}
+
+export function formatTestLabel(item: string, inferred: string[]): string {
+  return inferred.includes(item) ? `\`${item}\` (inferred)` : `\`${item}\``;
 }
 
 async function readManifest(
@@ -83,11 +89,13 @@ function relationshipLabels(
   nodeIds: Set<string>,
   relation: RelationshipEdge['relation'],
   direction: 'outgoing' | 'incoming',
+  confidence?: (value: RelationshipEdge['confidence']) => boolean,
 ): string[] {
   const nodes = new Map(graph.nodes.map((node) => [node.id, node]));
   return unique(
     graph.edges
       .filter((edge) => edge.relation === relation)
+      .filter((edge) => !confidence || confidence(edge.confidence))
       .filter((edge) =>
         direction === 'outgoing'
           ? nodeIds.has(edge.source)
@@ -206,6 +214,18 @@ export async function buildContextInfo(
       'incoming',
     ),
     tests: relationshipLabels(graph, relationshipNodeIds, 'tests', 'outgoing'),
+    inferredTests: (['incoming', 'outgoing'] as const).flatMap((direction) => {
+      const label = (inferred: boolean) =>
+        relationshipLabels(
+          graph,
+          relationshipNodeIds,
+          'tests',
+          direction,
+          (confidence) => (confidence === 'INFERRED') === inferred,
+        );
+      const extracted = new Set(label(false));
+      return label(true).filter((item) => !extracted.has(item));
+    }),
   };
 }
 
@@ -232,8 +252,8 @@ export function formatContextInfo(info: ContextInfo): string {
     '',
     `- imports: ${inlineList(info.imports)}`,
     `- imported by: ${inlineList(info.importedBy)}`,
-    `- tested by: ${inlineList(info.testedBy)}`,
-    `- tests: ${inlineList(info.tests)}`,
+    `- tested by: ${inlineList(info.testedBy, info.inferredTests)}`,
+    `- tests: ${inlineList(info.tests, info.inferredTests)}`,
     '',
     '## Commands',
     '',

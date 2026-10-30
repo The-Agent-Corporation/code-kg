@@ -22,16 +22,27 @@ export type LatConfig = {
   local_embedding_dimensions?: number;
 };
 
+/** Where JSON.parse failed, without the input excerpt its message may quote. */
+function jsonErrorLocation(content: string, message: string): string {
+  const lineColumn = /\(line (\d+) column (\d+)\)/.exec(message);
+  if (lineColumn) return ` (line ${lineColumn[1]}, column ${lineColumn[2]})`;
+  const position = /at position (\d+)/.exec(message);
+  if (!position) return '';
+  const lines = content.slice(0, Number(position[1])).split('\n');
+  return ` (line ${lines.length}, column ${lines.at(-1)!.length + 1})`;
+}
+
 export function readConfig(): LatConfig {
   const configPath = getConfigPath();
   if (!existsSync(configPath)) return {};
+  const content = readFileSync(configPath, 'utf-8');
   try {
-    return JSON.parse(readFileSync(configPath, 'utf-8'));
+    return JSON.parse(content);
   } catch (err) {
-    process.stderr.write(
-      `Error: failed to parse config ${configPath}: ${(err as Error).message}\n`,
+    // The config holds llm_key, and parser messages can quote the input.
+    throw new Error(
+      `Failed to parse config ${configPath}: not valid JSON${jsonErrorLocation(content, (err as Error).message)}`,
     );
-    process.exit(1);
   }
 }
 
@@ -172,5 +183,15 @@ export function hasEmbeddingConfig(): boolean {
     return !!getEmbeddingKey();
   } catch {
     return false;
+  }
+}
+
+/** Why the embedding configuration cannot be resolved, or null if it can. */
+export function embeddingConfigError(): string | null {
+  try {
+    getEmbeddingKey();
+    return null;
+  } catch (error) {
+    return (error as Error).message;
   }
 }

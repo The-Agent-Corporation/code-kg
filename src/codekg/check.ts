@@ -113,7 +113,7 @@ async function validateManifestAnchors(
 }
 
 export async function codeKgCheckCommand(ctx: CmdContext): Promise<CmdResult> {
-  const base = await checkAllCommand(ctx);
+  const base = await checkAllCommand(ctx, { product: 'code-kg' });
   const errors: string[] = [];
   const manifestPath = join(
     ctx.projectRoot,

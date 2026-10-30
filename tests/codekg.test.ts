@@ -284,6 +284,19 @@ describe('code-kg bootstrap', () => {
     const gitignore = await readFile(join(root, '.gitignore'), 'utf-8');
     expect(gitignore).toContain('.code-kg/cache/');
     expect(gitignore).toContain('lat.md/.cache/');
+    expect(gitignore).not.toContain('search.sqlite');
+
+    const manifestFile = join(
+      root,
+      '.code-kg',
+      'materialization-manifest.json',
+    );
+    const firstManifest = await readFile(manifestFile, 'utf-8');
+    const rerun = await writeBootstrapPlan(await createBootstrapPlan(root));
+    expect(rerun).toContain(
+      'kept existing .code-kg/materialization-manifest.json',
+    );
+    expect(await readFile(manifestFile, 'utf-8')).toBe(firstManifest);
 
     const result = await codeKgCheckCommand(ctx(root));
     expect(result.isError).toBeFalsy();
@@ -671,8 +684,9 @@ describe('code-kg bootstrap', () => {
 
       expect(result.isError).toBeTruthy();
       expect(result.output).toContain(
-        'No semantic embedding provider configured',
+        'No semantic embedding provider configured. Run `code-kg semantic enable-local`',
       );
+      expect(result.output).not.toContain('lat init');
     } finally {
       for (const [key, value] of Object.entries(originalEnv)) {
         if (value === undefined) {
@@ -704,6 +718,7 @@ describe('code-kg bootstrap', () => {
     expect(hooks.hooks.PreToolUse[0].matcher).toContain('Grep');
     expect(hooks.hooks.PreToolUse[0].matcher).toContain('Read');
     expect(hooks.hooks.PreToolUse[0].hooks[0].command).toContain('hook-check');
+    expect(hooks.hooks.PreToolUse[0].hooks[0].timeout).toBe(10);
   });
 
   it('uses code-kg on PATH for installed Codex hooks when available', async () => {

@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { CmdContext, CmdResult } from '../context.js';
+import { sourceAnchorPolicy } from './anchors.js';
 import { readJson, writeJsonAtomic } from './cache.js';
 import { freshGraph } from './fresh.js';
 import type { MaterializationManifest } from './types.js';
@@ -53,14 +54,42 @@ export async function reviewSourceCommand(
       output: 'Section has no source coverage to review.',
       isError: true,
     };
+  // Refreshed hashes would vouch for span line numbers recorded against older
+  // content, and apply-backlinks trusts spans whose file hash matches.
+  const staleSpanFiles =
+    sourceAnchorPolicy(section) === 'edit-safe'
+      ? [...new Set(section.source_spans.map((s) => s.file))].filter(
+          (f) => section.source_hashes?.[f] !== graph.source_hashes![f],
+        )
+      : [];
+  const keptSpans = section.source_spans.filter(
+    (s) => !staleSpanFiles.includes(s.file),
+  );
   if (write) {
+    if (staleSpanFiles.length) {
+      section.source_spans = keptSpans;
+      if (!keptSpans.length) section.source_anchor_policy = 'coverage-only';
+    }
     section.source_hashes = Object.fromEntries(
       files.map((f) => [f, graph.source_hashes![f]]),
     );
     section.current_hash = sourceHash(content);
     section.status = 'curated';
-    await writeJsonAtomic(path, manifest);
+    await writeJsonAtomic(path, manifest, 2);
   }
+  const downgrade = staleSpanFiles.length
+    ? '\n' +
+      (write ? 'Dropped ' : 'Would drop ') +
+      stableId +
+      "'s source spans in " +
+      staleSpanFiles.join(', ') +
+      ': they were recorded against older content.' +
+      (keptSpans.length
+        ? ''
+        : ' With no spans left, it ' +
+          (write ? 'is now' : 'would become') +
+          ' coverage-only. Record fresh spans before marking it edit-safe again.')
+    : '';
   return {
     output:
       (write ? 'Acknowledged' : 'Would acknowledge') +
@@ -69,6 +98,7 @@ export async function reviewSourceCommand(
       ' (' +
       files.length +
       ' files).\n' +
-      'Section prose and relationship confidence are unchanged.',
+      'Section prose and relationship confidence are unchanged.' +
+      downgrade,
   };
 }

@@ -5,8 +5,8 @@ import {
   type Section,
   type SectionMatch,
 } from '../lattice.js';
-import { formatResultList } from '../format.js';
-import { hasEmbeddingConfig } from '../config.js';
+import { formatNavHints, formatResultList } from '../format.js';
+import { embeddingConfigError, hasEmbeddingConfig } from '../config.js';
 
 export type CodeKgSearchBackend =
   | 'local'
@@ -36,6 +36,20 @@ function formatCodeKgNavHints(ctx: CmdContext): string {
       : `${s.dim('*')} \`codekg_section\` - show full content with outgoing/incoming refs\n` +
         `${s.dim('*')} \`codekg_search\` - search for something else`;
   return `\n## To navigate further:\n\n${hints}`;
+}
+
+/** Replaces the lat.md runtime's `lat section`/`lat_section` hints. */
+export function withCodeKgNavHints(
+  ctx: CmdContext,
+  result: CmdResult,
+): CmdResult {
+  return {
+    ...result,
+    output: result.output.replace(
+      formatNavHints(ctx),
+      formatCodeKgNavHints(ctx),
+    ),
+  };
 }
 
 function scoreSection(section: Section, query: string): number {
@@ -94,6 +108,12 @@ export async function localSearchCommand(
   };
 }
 
+function fallbackLabel(reason: string | null): string {
+  if (!reason) return 'local lexical (auto-semantic fallback)';
+  const brief = reason.replace(/\s+/g, ' ').trim().slice(0, 160);
+  return `local lexical (auto-semantic fallback; ${brief})`;
+}
+
 export function selectCodeKgSearchBackend(
   opts: CodeKgSearchOptions = {},
 ): SearchBackendSelection {
@@ -104,12 +124,26 @@ export function selectCodeKgSearchBackend(
     if (hasEmbeddingConfig()) {
       return { backend: 'semantic', label: 'semantic (auto-semantic)' };
     }
-    return {
-      backend: 'local',
-      label: 'local lexical (auto-semantic fallback)',
-    };
+    const error = embeddingConfigError();
+    return { backend: 'local', label: fallbackLabel(error) };
   }
   return { backend: 'local', label: 'local lexical' };
+}
+
+async function semanticSearchCommand(
+  ctx: CmdContext,
+  query: string | undefined,
+  limit: number,
+  reindex: boolean,
+): Promise<CmdResult> {
+  const { cliProgress, searchCommand } = await import('../cli/search.js');
+  const progress =
+    ctx.mode === 'cli' ? cliProgress(reindex, ctx.styler) : undefined;
+  return searchCommand(ctx, query, { limit, reindex }, progress, {
+    noProvider: () =>
+      'No semantic embedding provider configured. Run `code-kg semantic enable-local` for local embeddings, or provide a key via LAT_LLM_KEY, LAT_LLM_KEY_FILE, or LAT_LLM_KEY_HELPER.',
+    navHints: formatCodeKgNavHints,
+  });
 }
 
 function withBackendLabel(result: CmdResult, label: string): CmdResult {
@@ -133,18 +167,27 @@ export async function codeKgSearchCommand(
   const limit = opts.limit ?? 5;
 
   if (selected.backend === 'semantic') {
-    const { searchCommand, cliProgress } = await import('../cli/search.js');
-    return withBackendLabel(
-      await searchCommand(
+    let result: CmdResult;
+    try {
+      result = await semanticSearchCommand(
         ctx,
         query,
-        { limit, reindex: opts.reindex },
-        ctx.mode === 'cli'
-          ? cliProgress(opts.reindex === true, ctx.styler)
-          : undefined,
-      ),
-      selected.label,
-    );
+        limit,
+        opts.reindex === true,
+      );
+    } catch (error) {
+      result = {
+        output: `Semantic search failed: ${(error as Error).message}`,
+        isError: true,
+      };
+    }
+    if (result.isError && opts.backend === 'auto-semantic' && query?.trim()) {
+      return withBackendLabel(
+        await localSearchCommand(ctx, query, limit),
+        fallbackLabel(result.output),
+      );
+    }
+    return withBackendLabel(result, selected.label);
   }
 
   return withBackendLabel(
