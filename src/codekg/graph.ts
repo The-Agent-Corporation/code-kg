@@ -399,12 +399,98 @@ function analyzeGraph(fragment: GraphFragment): ProjectGraph {
 }
 
 const PATH_MENTION = /[\w@.-]+(?:\/[\w@.-]+)+/g;
+const QUOTED = String.raw`(['"\x60])([^'"\x60\n]+)\1`;
+/** `from 'p'`, `import('p')`, `require('p')`, also inside embedded scripts. */
+const LOADER_SPECIFIER = new RegExp(
+  String.raw`(?:\bfrom\s+|\bimport\s*\(\s*|\brequire(?:\.resolve)?\s*\(\s*)` +
+    QUOTED,
+  'g',
+);
+/** `new URL('p', import.meta.url)`, resolved from the test file. */
+const URL_SPECIFIER = new RegExp(
+  String.raw`\bnew URL\(\s*${QUOTED}\s*,\s*import\.meta\.url\s*\)`,
+  'g',
+);
+/** `join(__dirname, '..', 'dist', 'cli.js')` built only from literals. */
+const ANCHORED_JOIN =
+  /\b(?:join|resolve)\(\s*(?:import\.meta\.dirname|__dirname)\s*((?:,\s*(['"`])[^'"`\n]*\2\s*)+),?\s*\)/g;
+const PROCESS_CALL =
+  /\b(?:spawn|spawnSync|exec|execSync|execFile|execFileSync|fork|execa|execaNode|Worker|Popen|check_output|check_call|subprocess\.run|os\.system)\b/;
+
+/** Blanks whole-line and leading block comments, keeping offsets intact. */
+function withoutComments(content: string): string {
+  const blank = (text: string) => text.replace(/[^\n]/g, ' ');
+  return content
+    .replace(/^[ \t]*\/\*[\s\S]*?\*\//gm, blank)
+    .replace(/^[ \t]*(?:\/\/|#).*$/gm, blank);
+}
+
+/** Repo paths a mention can mean: built output maps back to its source. */
+function mentionCandidates(path: string): string[] {
+  const normalized = posix.normalize(path);
+  if (normalized.startsWith('../') || normalized === '..') return [];
+  return [
+    normalized,
+    normalized.replace(/(^|\/)dist\//, '$1'),
+    normalized.replace(/(^|\/)dist\//, '$1src/'),
+  ];
+}
+
+/**
+ * Module paths a test file shows evidence of loading: loader specifiers
+ * (including inside embedded scripts), paths built from the test file's own
+ * location, and paths on the same line as a subprocess call. Assertions,
+ * fixtures written under a temp root, mocks, and comments do not count.
+ */
+function loadedPaths(
+  testPath: string,
+  content: string,
+): Array<{ index: number; candidates: string[] }> {
+  const testDir = posix.dirname(testPath);
+  const code = withoutComments(content);
+  const loads: Array<{ index: number; candidates: string[] }> = [];
+  const relative = (index: number, mention: string, fromRoot: boolean) => {
+    const local = /^\.{1,2}\//.test(mention)
+      ? mentionCandidates(posix.join(testDir, mention))
+      : [];
+    const root = fromRoot
+      ? mentionCandidates(mention.replace(/^(?:\.{1,2}\/)+/, ''))
+      : [];
+    loads.push({ index, candidates: [...local, ...root] });
+  };
+
+  for (const match of code.matchAll(LOADER_SPECIFIER)) {
+    relative(match.index, match[2], true);
+  }
+  for (const match of code.matchAll(URL_SPECIFIER)) {
+    relative(match.index, match[2], false);
+  }
+  for (const match of code.matchAll(ANCHORED_JOIN)) {
+    const segments = [...match[1].matchAll(/(['"`])([^'"`\n]*)\1/g)].map(
+      (segment) => segment[2],
+    );
+    loads.push({
+      index: match.index,
+      candidates: mentionCandidates(posix.join(testDir, ...segments)),
+    });
+  }
+  let offset = 0;
+  for (const line of code.split('\n')) {
+    if (PROCESS_CALL.test(line)) {
+      for (const match of line.matchAll(PATH_MENTION)) {
+        relative(offset + match.index, match[0], true);
+      }
+    }
+    offset += line.length + 1;
+  }
+  return loads;
+}
 
 /**
  * Tests that load a module by path (a subprocess script, a built `dist/`
- * file, a dynamic import string) have no static import edge. A test file
- * that names a code file's path gets an INFERRED `tests` edge to it, unless
- * an extracted edge already covers the pair.
+ * file, a dynamic import string) have no static import edge. Such a test gets
+ * an INFERRED `tests` edge to the module, unless an extracted edge already
+ * covers the pair.
  */
 function inferredTestEdges(
   paths: string[],
@@ -423,13 +509,19 @@ function inferredTestEdges(
   for (const path of paths) {
     const content = contents.get(path);
     if (categories.get(path) !== 'test' || !content) continue;
-    for (const match of content.matchAll(PATH_MENTION)) {
-      const mention = match[0]
-        .replace(/^(?:\.{1,2}\/)+/, '')
-        .replace(/^dist\//, '');
-      const target = targets.get(mention);
-      if (!target) continue;
-      const line = content.slice(0, match.index).split('\n').length;
+    for (const { index, candidates } of loadedPaths(path, content)) {
+      const target = candidates
+        .map((candidate) => targets.get(candidate))
+        .find(Boolean);
+      if (!target || target === path) continue;
+      const id = stableId(
+        'edge',
+        fileNode(path).id,
+        'tests',
+        fileNode(target).id,
+      );
+      if (existing.has(id)) continue;
+      const line = content.slice(0, index).split('\n').length;
       const relationship = edge(
         fileNode(path).id,
         fileNode(target).id,
@@ -437,7 +529,6 @@ function inferredTestEdges(
         path,
         line,
       );
-      if (existing.has(relationship.id)) continue;
       relationship.confidence = 'INFERRED';
       relationship.confidence_score = 0.7;
       existing.add(relationship.id);

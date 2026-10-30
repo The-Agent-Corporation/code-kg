@@ -43,11 +43,18 @@ export async function gapsCommand(ctx: CmdContext): Promise<CmdResult> {
       (entry) =>
         !entry.path.includes('.test.') && !entry.path.startsWith('tests/'),
     );
-  const testedTargets = new Set(
-    graph.edges
-      .filter((edge) => edge.relation === 'tests')
-      .map((edge) => edge.target),
-  );
+  const testTargets = (inferred: boolean) =>
+    new Set(
+      graph.edges
+        .filter(
+          (edge) =>
+            edge.relation === 'tests' &&
+            (edge.confidence === 'INFERRED') === inferred,
+        )
+        .map((edge) => edge.target),
+    );
+  const testedTargets = testTargets(false);
+  const inferredTargets = testTargets(true);
   const anchoredNodeIds = new Set(
     Object.values(manifest.sections).flatMap(
       (section) => section.source_node_ids,
@@ -58,7 +65,14 @@ export async function gapsCommand(ctx: CmdContext): Promise<CmdResult> {
     .filter((file) => !sectionText.includes(file.path))
     .map((file) => `\`${file.path}\``);
   const filesWithoutTestCoverage = codeFiles
-    .filter((file) => !testedTargets.has(file.id))
+    .filter(
+      (file) => !testedTargets.has(file.id) && !inferredTargets.has(file.id),
+    )
+    .map((file) => `\`${file.path}\``);
+  const filesWithInferredTestsOnly = codeFiles
+    .filter(
+      (file) => !testedTargets.has(file.id) && inferredTargets.has(file.id),
+    )
     .map((file) => `\`${file.path}\``);
   const sectionsWithoutAnchors = Object.values(manifest.sections)
     .filter(
@@ -83,6 +97,12 @@ export async function gapsCommand(ctx: CmdContext): Promise<CmdResult> {
       '## Files Without Test Coverage',
       '',
       ...bullet(filesWithoutTestCoverage, 'none detected'),
+      '',
+      '## Files Covered Only By Inferred Test Edges',
+      '',
+      'Tests reference these by path (subprocess, built output, or loader string) rather than importing them. Check that a test really exercises them.',
+      '',
+      ...bullet(filesWithInferredTestsOnly, 'none detected'),
       '',
       '## Sections Without Source Anchors',
       '',

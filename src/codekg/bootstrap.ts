@@ -123,10 +123,17 @@ function localFileRelations(
   fileNode: EntityNode,
   relation: 'imports' | 'tests',
   direction: 'outgoing' | 'incoming',
+  inferred?: boolean,
 ): string[] {
   const nodes = new Map(graph.nodes.map((node) => [node.id, node]));
   const relationships = graph.edges.filter((edge) => {
     if (edge.relation !== relation) return false;
+    if (
+      inferred !== undefined &&
+      (edge.confidence === 'INFERRED') !== inferred
+    ) {
+      return false;
+    }
     return direction === 'outgoing'
       ? edge.source === fileNode.id
       : edge.target === fileNode.id;
@@ -362,11 +369,15 @@ function renderTestCoverageLinks(graph: ProjectGraph): string {
   const coverage = [...fileNodes.entries()]
     .map(([path, node]) => ({
       path,
-      tests: localFileRelations(graph, node, 'tests', 'incoming'),
+      tests: localFileRelations(graph, node, 'tests', 'incoming', false),
+      inferred: localFileRelations(graph, node, 'tests', 'incoming', true),
     }))
-    .filter((entry) => entry.tests.length > 0)
+    .filter((entry) => entry.tests.length + entry.inferred.length > 0)
     .sort(
-      (a, b) => b.tests.length - a.tests.length || a.path.localeCompare(b.path),
+      (a, b) =>
+        b.tests.length - a.tests.length ||
+        b.inferred.length - a.inferred.length ||
+        a.path.localeCompare(b.path),
     )
     .slice(0, 25);
 
@@ -384,14 +395,23 @@ No test-to-source import relationships were detected during bootstrap.
     '',
     'Test coverage links map inferred test relationships from test imports to source files so agents can find validation paths.',
     '',
-    ...coverage.flatMap(({ path, tests }) => [
+    ...coverage.flatMap(({ path, tests, inferred }) => [
       `### ${path}`,
       '',
       clampLeadingParagraph(
-        `Source file \`${path}\` is covered by test imports from ${briefInlineCodeList(tests)}.`,
+        tests.length > 0
+          ? `Source file \`${path}\` is covered by test imports from ${briefInlineCodeList(tests)}.`
+          : `Source file \`${path}\` has no test imports; ${briefInlineCodeList(inferred)} load it by path (inferred).`,
       ),
       '',
-      `- Tests: ${inlineCodeList(tests, SOURCE_IMPORT_LIMIT)}`,
+      ...(tests.length > 0
+        ? [`- Tests: ${inlineCodeList(tests, SOURCE_IMPORT_LIMIT)}`]
+        : []),
+      ...(inferred.length > 0
+        ? [
+            `- Inferred tests (load it by path, not by import): ${inlineCodeList(inferred, SOURCE_IMPORT_LIMIT)}`,
+          ]
+        : []),
       '',
     ]),
   ]
