@@ -138,6 +138,11 @@ broad source searches, `code-kg context <file-or-symbol>` before opening raw
 source files, and `code-kg changed` / `code-kg update` around code changes. See
 [docs/USAGE.md](docs/USAGE.md) for the tested happy path and common checks.
 
+This repository's CI runs `code-kg check` and `code-kg drift`. A pull request
+fails when drift reports any warning, so commit the refreshed `lat.md/` and
+`.code-kg/materialization-manifest.json` (`code-kg update --no-enrich`) with
+code changes. Pushes to `main` only annotate the run with a warning.
+
 ## Use as a Claude Code Plugin
 
 This repo is also a Claude Code plugin marketplace. The plugin wires the global
