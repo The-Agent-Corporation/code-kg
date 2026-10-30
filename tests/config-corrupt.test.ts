@@ -71,6 +71,29 @@ describe('a corrupt lat config file', () => {
     }
   });
 
+  it.each([
+    ['{"llm_key": "sk-secret-123" x}', ' (line 1, column 29)'],
+    ['x{"llm_key": "sk-secret-123"}', ''],
+    ['{"llm_key": "sk-secret-123",\n}', ' (line 2, column 1)'],
+  ])(
+    'never echoes config contents in the parse error: %j',
+    async (content, at) => {
+      await writeFile(getConfigPath(), content);
+
+      expect(() => readConfig()).toThrow(
+        new Error(
+          `Failed to parse config ${getConfigPath()}: not valid JSON${at}`,
+        ),
+      );
+      for (const message of [
+        (await codeKgCheckCommand(await project())).output,
+        (await semanticCommand(await project(), { action: 'status' })).output,
+      ]) {
+        expect(message).not.toContain('sk-secret');
+      }
+    },
+  );
+
   it('leaves auto-semantic search working on the lexical backend', async () => {
     const result = await codeKgSearchCommand(await project(), 'architecture', {
       backend: 'auto-semantic',
