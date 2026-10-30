@@ -22,8 +22,17 @@ async function readWorkspace(root: string): Promise<Workspace | null> {
     if ((e as NodeJS.ErrnoException).code === 'ENOENT') return null;
     throw e;
   }
-  const data = JSON.parse(text) as Workspace;
+  let data: Workspace;
+  try {
+    data = JSON.parse(text) as Workspace;
+  } catch (e) {
+    throw new InputError(
+      `Invalid Code-KG workspace configuration in ${workspacePath(root)}: ${(e as Error).message}`,
+    );
+  }
   if (
+    !data ||
+    typeof data !== 'object' ||
     data.version !== 1 ||
     !Array.isArray(data.repositories) ||
     data.repositories.some(

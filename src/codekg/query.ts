@@ -644,7 +644,7 @@ export async function grepCommand(
         }
       } catch (error) {
         const failure = error as { code?: number | string; stderr?: string };
-        if (failure.code === 1) continue;
+        if (failure.code === 1 && !failure.stderr?.trim()) continue;
         if (failure.code === 'ENOENT')
           throw new InputError(
             'Regex search requires ripgrep (rg) on PATH; omit --regex for a literal search.',

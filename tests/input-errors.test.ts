@@ -1,11 +1,12 @@
 import { execFile } from 'node:child_process';
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { promisify } from 'node:util';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { hasRipgrep } from '../src/code-refs.js';
 import { askCommand, grepCommand, mapCommand } from '../src/codekg/query.js';
+import { workspaceCommand } from '../src/codekg/workspace.js';
 import { InputError } from '../src/codekg/errors.js';
 import { plainStyler, type CmdContext } from '../src/context.js';
 
@@ -77,6 +78,34 @@ describe('invalid query input', () => {
     await expect(grepCommand(ctx, 'alpha', { regex: true })).rejects.toThrow(
       'Regex search requires ripgrep (rg) on PATH',
     );
+  });
+
+  it('treats rg exit 1 with stderr output as a failure, not as no matches', async () => {
+    const ctx = await project();
+    const bin = await mkdtemp(join(tmpdir(), 'codekg-fake-rg-'));
+    roots.push(bin);
+    await writeFile(
+      join(bin, 'rg'),
+      "#!/bin/sh\necho 'rg: synthetic warning' >&2\nexit 1\n",
+      { mode: 0o755 },
+    );
+    vi.stubEnv('PATH', bin + delimiter + (process.env.PATH ?? ''));
+
+    await expect(grepCommand(ctx, 'alpha', { regex: true })).rejects.toThrow(
+      'ripgrep failed: rg: synthetic warning',
+    );
+  });
+
+  it('reports a malformed workspace file as invalid input', async () => {
+    const ctx = await project();
+    await mkdir(join(ctx.projectRoot, '.code-kg'));
+    for (const content of ['{not json', 'null']) {
+      await writeFile(
+        join(ctx.projectRoot, '.code-kg/workspace.json'),
+        content,
+      );
+      await expect(workspaceCommand(ctx, 'list')).rejects.toThrow(InputError);
+    }
   });
 
   it('prints the message without a stack trace from the CLI', async () => {
