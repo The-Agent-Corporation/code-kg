@@ -22,6 +22,8 @@ afterEach(async () => {
 const SOURCES = [
   'src/spawned.ts',
   'src/built.ts',
+  'src/multiline.ts',
+  'src/promisified.ts',
   'src/anchored.ts',
   'src/imported.ts',
   'src/untested.ts',
@@ -31,9 +33,13 @@ const SOURCES = [
 
 const TESTS: Record<string, string> = {
   'tests/spawned.test.ts':
-    'const script = "import(\'./src/spawned.ts\')";\nexport { script };\n',
+    "import { execFileSync } from 'node:child_process';\nexecFileSync(process.execPath, ['-e', \"import('./src/spawned.ts')\"]);\n",
   'tests/built.test.ts':
     "import { execFileSync } from 'node:child_process';\nexecFileSync(process.execPath, ['dist/src/built.js']);\n",
+  'tests/multiline.test.ts':
+    "import { spawnSync } from 'node:child_process';\nspawnSync(\n  process.execPath,\n  ['dist/src/multiline.js', '--flag'],\n);\n",
+  'tests/promisified.test.ts':
+    "import { execFile } from 'node:child_process';\nimport { promisify } from 'node:util';\nawait promisify(execFile)(process.execPath, [\n  '-e',\n  \"import { x } from './src/promisified.ts'; console.log(x);\",\n]);\n",
   'tests/anchored.test.ts':
     "import { join } from 'node:path';\nexport const cli = join(\n  import.meta.dirname,\n  '..',\n  'dist',\n  'src',\n  'anchored.js',\n);\n",
   'tests/imported.test.ts':
@@ -44,10 +50,17 @@ const TESTS: Record<string, string> = {
     "vi.mock('../src/untested.ts', () => ({}));",
     "await writeFile(join(root, 'src/untested.ts'), '');",
     "expect(output).toContain('src/untested.ts');",
+    `expect(output).toContain("import('../src/untested.ts')");`,
+    `const unused = 1; // import('../src/untested.ts')`,
+    `const later = 2; /* execSync('node src/untested.ts') */`,
+    `await writeFile(join(root, 'fixture.js'), "import('../src/untested.ts')");`,
+    `const quotes = /['"]/; expect(output).toContain("require('../src/untested.ts')");`,
+    `const resolved = require.resolve('../src/untested.ts');`,
+    `const script = "import('../src/untested.ts')";`,
     '',
   ].join('\n'),
   'packages/app/tests/helper.test.ts':
-    'const script = "import(\'../src/helper.ts\')";\nexport { script };\n',
+    "import { spawnSync } from 'node:child_process';\nspawnSync('node', ['-e', \"import('../src/helper.ts')\"]);\n",
 };
 
 async function project(): Promise<CmdContext> {
@@ -94,6 +107,8 @@ describe('test coverage from path mentions', () => {
       'tests/anchored.test.ts -> src/anchored.ts INFERRED',
       'tests/built.test.ts -> src/built.ts INFERRED',
       'tests/imported.test.ts -> src/imported.ts EXTRACTED',
+      'tests/multiline.test.ts -> src/multiline.ts INFERRED',
+      'tests/promisified.test.ts -> src/promisified.ts INFERRED',
       'tests/spawned.test.ts -> src/spawned.ts INFERRED',
     ]);
   });

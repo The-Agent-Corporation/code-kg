@@ -100,7 +100,7 @@ export async function gapsCommand(ctx: CmdContext): Promise<CmdResult> {
       '',
       '## Files Covered Only By Inferred Test Edges',
       '',
-      'Tests reference these by path (subprocess, built output, or loader string) rather than importing them. Check that a test really exercises them.',
+      "Tests load these by path (a subprocess call or embedded script, built output, or a path built from the test file's location) rather than importing them. Check that a test really exercises them.",
       '',
       ...bullet(filesWithInferredTestsOnly, 'none detected'),
       '',
