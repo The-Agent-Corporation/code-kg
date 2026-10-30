@@ -1080,16 +1080,31 @@ export async function writeBootstrapPlan(
     '.code-kg',
     'materialization-manifest.json',
   );
-  await mkdir(dirname(manifestTarget), { recursive: true });
-  await writeFile(
-    manifestTarget,
-    JSON.stringify(nextManifest, null, 2) + '\n',
-    'utf-8',
-  );
-  if (currentManifest) {
-    updated.push('.code-kg/materialization-manifest.json');
+  // Keep the timestamp when nothing else changed, so a no-op update leaves
+  // the committed manifest untouched.
+  const unchanged =
+    currentManifest &&
+    (await readFile(manifestTarget, 'utf-8')) ===
+      JSON.stringify(
+        { ...nextManifest, generated_at: currentManifest.generated_at },
+        null,
+        2,
+      ) +
+        '\n';
+  if (unchanged) {
+    skipped.push('.code-kg/materialization-manifest.json');
   } else {
-    written.push('.code-kg/materialization-manifest.json');
+    await mkdir(dirname(manifestTarget), { recursive: true });
+    await writeFile(
+      manifestTarget,
+      JSON.stringify(nextManifest, null, 2) + '\n',
+      'utf-8',
+    );
+    if (currentManifest) {
+      updated.push('.code-kg/materialization-manifest.json');
+    } else {
+      written.push('.code-kg/materialization-manifest.json');
+    }
   }
 
   if (await ensureDefaultGitignore(plan.root)) {

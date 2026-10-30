@@ -286,6 +286,18 @@ describe('code-kg bootstrap', () => {
     expect(gitignore).toContain('lat.md/.cache/');
     expect(gitignore).not.toContain('search.sqlite');
 
+    const manifestFile = join(
+      root,
+      '.code-kg',
+      'materialization-manifest.json',
+    );
+    const firstManifest = await readFile(manifestFile, 'utf-8');
+    const rerun = await writeBootstrapPlan(await createBootstrapPlan(root));
+    expect(rerun).toContain(
+      'kept existing .code-kg/materialization-manifest.json',
+    );
+    expect(await readFile(manifestFile, 'utf-8')).toBe(firstManifest);
+
     const result = await codeKgCheckCommand(ctx(root));
     expect(result.isError).toBeFalsy();
     expect(result.output).toContain('All checks passed');
