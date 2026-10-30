@@ -15,12 +15,21 @@ export async function updateCommand(ctx: CmdContext): Promise<CmdResult> {
     lines.push(`  - and ${changes.length - 12} more changes`);
   }
 
-  if (getLlmKey()) {
+  let llmKey: string | undefined;
+  let llmKeyError: string | undefined;
+  try {
+    llmKey = getLlmKey();
+  } catch (error) {
+    llmKeyError = (error as Error).message;
+  }
+  if (llmKey) {
     const enrich = await enrichCommand(ctx);
     lines.push('', enrich.output);
   } else {
     lines.push(
-      '- llm enrich: skipped (set LAT_LLM_KEY / config llm_key for LLM summaries)',
+      llmKeyError
+        ? `- llm enrich: skipped (${llmKeyError})`
+        : '- llm enrich: skipped (set LAT_LLM_KEY / config llm_key for LLM summaries)',
     );
   }
 

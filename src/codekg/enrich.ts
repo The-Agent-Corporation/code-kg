@@ -208,7 +208,15 @@ function sectionSnippet(
 
 export async function enrichCommand(ctx: CmdContext): Promise<CmdResult> {
   const lines = ['# Code-KG Enrich', ''];
-  const key = getLlmKey();
+  let key: string | undefined;
+  try {
+    key = getLlmKey();
+  } catch (error) {
+    return {
+      output: [...lines, `- skipped: ${(error as Error).message}`].join('\n'),
+      isError: true,
+    };
+  }
   if (!key) {
     return {
       output: [

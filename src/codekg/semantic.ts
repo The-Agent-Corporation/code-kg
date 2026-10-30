@@ -133,7 +133,14 @@ export async function semanticCommand(
   }
 
   if (opts.action === 'enable-local') {
-    saveLocalEmbeddingConfig();
+    try {
+      saveLocalEmbeddingConfig();
+    } catch (error) {
+      return {
+        output: `${(error as Error).message}\nFix or remove the config file, then run \`code-kg semantic enable-local\` again.`,
+        isError: true,
+      };
+    }
     return { output: formatEnableLocal(ctx) };
   }
 
