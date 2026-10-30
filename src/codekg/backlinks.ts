@@ -3,6 +3,7 @@ import { readFile, realpath, writeFile } from 'node:fs/promises';
 import { extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type { CmdContext, CmdResult } from '../context.js';
 import { backlinkAnchorsForSection } from './anchors.js';
+import { writeJsonAtomic } from './cache.js';
 import { sourceHash } from './structural.js';
 import type { MaterializationManifest } from './types.js';
 
@@ -343,11 +344,7 @@ async function writeInsertions(
         }
       }
     }
-    await writeFile(
-      manifestPath(ctx),
-      JSON.stringify(manifest, null, 2) + '\n',
-      'utf-8',
-    );
+    await writeJsonAtomic(manifestPath(ctx), manifest, 2);
   }
 
   written.sort((a, b) =>
