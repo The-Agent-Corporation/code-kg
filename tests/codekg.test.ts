@@ -684,8 +684,9 @@ describe('code-kg bootstrap', () => {
 
       expect(result.isError).toBeTruthy();
       expect(result.output).toContain(
-        'No semantic embedding provider configured',
+        'No semantic embedding provider configured. Run `code-kg semantic enable-local`',
       );
+      expect(result.output).not.toContain('lat init');
     } finally {
       for (const [key, value] of Object.entries(originalEnv)) {
         if (value === undefined) {

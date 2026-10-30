@@ -136,34 +136,14 @@ async function semanticSearchCommand(
   limit: number,
   reindex: boolean,
 ): Promise<CmdResult> {
-  const { getEmbeddingKey } = await import('../config.js');
-  const { cliProgress, runIndex, runSearch } = await import('../cli/search.js');
-  let key: string | undefined;
-  try {
-    key = getEmbeddingKey();
-  } catch (error) {
-    return { output: (error as Error).message, isError: true };
-  }
-  if (!key) {
-    return {
-      output:
-        'No semantic embedding provider configured. Run `code-kg semantic enable-local` for local embeddings, or provide a key via LAT_LLM_KEY, LAT_LLM_KEY_FILE, or LAT_LLM_KEY_HELPER.',
-      isError: true,
-    };
-  }
+  const { cliProgress, searchCommand } = await import('../cli/search.js');
   const progress =
     ctx.mode === 'cli' ? cliProgress(reindex, ctx.styler) : undefined;
-  if (!query) {
-    await runIndex(ctx.latDir, key, progress);
-    return { output: '' };
-  }
-  const result = await runSearch(ctx.latDir, query, key, limit, progress);
-  if (result.matches.length === 0) return { output: 'No results found.' };
-  return {
-    output:
-      formatResultList(ctx, `Search results for "${query}":`, result.matches) +
-      formatCodeKgNavHints(ctx),
-  };
+  return searchCommand(ctx, query, { limit, reindex }, progress, {
+    noProvider: () =>
+      'No semantic embedding provider configured. Run `code-kg semantic enable-local` for local embeddings, or provide a key via LAT_LLM_KEY, LAT_LLM_KEY_FILE, or LAT_LLM_KEY_HELPER.',
+    navHints: formatCodeKgNavHints,
+  });
 }
 
 function withBackendLabel(result: CmdResult, label: string): CmdResult {
