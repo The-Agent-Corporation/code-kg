@@ -67,8 +67,9 @@ entry. When an anchored symbol's body changes, `code-kg drift` names the
 section; reread it, then acknowledge with `code-kg review-source <section>
 --write`.
 
-A section gets one backlink per file, at the first anchored symbol in it; an
-existing `@lat:` comment for the section anywhere in the file counts.
+A section gets one backlink per file, above whichever of its anchored symbols
+comes first in that file; an existing `@lat:` comment for the section anywhere
+in the file counts.
 `apply-backlinks` skips a symbol whose first line continues code from an
 earlier line, such as the end of a multi-line string.
 

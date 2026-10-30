@@ -302,6 +302,23 @@ describe('code-kg anchor', () => {
     );
   });
 
+  it('writes one backlink per file for a section anchored to two symbols in it', async () => {
+    const root = await project();
+    await add(root, SECTION, 'src/greet.ts#wave');
+    await add(root, SECTION, 'greet');
+
+    const applied = await applyBacklinksCommand(ctx(root), { write: true });
+    const again = await applyBacklinksCommand(ctx(root), { write: true });
+    const content = await readFile(join(root, 'src/greet.ts'), 'utf-8');
+
+    expect(applied.output).toContain(
+      `inserted // @lat: [[${SECTION}]] at src/greet.ts:1`,
+    );
+    expect(content).toBe(`// @lat: [[${SECTION}]]\n` + GREET);
+    expect(again.output).not.toContain('inserted');
+    expect((await driftCommand(ctx(root))).output).not.toContain(SECTION);
+  });
+
   it('asks for review only when the anchored symbol changes, and review-source records it', async () => {
     const root = await project();
     await add(root, SECTION, 'greet');
