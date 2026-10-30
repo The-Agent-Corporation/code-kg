@@ -24,6 +24,7 @@ import { createRequire } from "node:module";
 import { contentHash } from "../util/id.js";
 import type { Kind, NodeV1 } from "./types.js";
 import type { ExtractResult, RawEdge } from "./extract.js";
+import { clearStart } from "./clear-start.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -262,6 +263,7 @@ export function extractGeneric(rel: string, source: string, langName: string): E
     nodes.push({
       id, name, kind, path: rel,
       span: `L${startRow + 1}-L${endRow + 1}`,
+      clear_start: clearStart(whole, source),
       signature: sigLine || null, exported: true, origin: "generic",
       body_hash: contentHash(source.slice(whole.startIndex, whole.endIndex)),
       body_text: source.slice(whole.startIndex, whole.endIndex).replace(/\s+/g, " ").slice(0, 5000),
@@ -497,6 +499,7 @@ export interface TsNode {
   namedChildCount?: number;
   namedChild?(i: number): TsNode | null;
   childForFieldName?(field: string): TsNode | null;
+  descendantForIndex(index: number): TsNode | null;
 }
 
 // Some grammars' tags.scm put @definition.<X> on a narrow node (C tags the
@@ -535,6 +538,7 @@ function defScope(node: TsNode, langName?: string): TsNode {
         startPosition: n.startPosition,
         endPosition: body.endPosition,
         parent: n.parent,
+        descendantForIndex: (index: number) => n.descendantForIndex(index),
       };
     }
   }

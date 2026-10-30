@@ -644,6 +644,7 @@ export async function extractProjectGraph(
     }
     node.body_hash =
       raw.kind === 'file' ? node.body_hash : 'sha256:' + raw.body_hash;
+    if (raw.kind !== 'file') node.clear_start = raw.clear_start;
     node.signature = raw.signature ?? undefined;
     node.search_text = raw.body_text ?? node.search_text;
     node.origin = raw.origin;

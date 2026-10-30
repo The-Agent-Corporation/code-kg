@@ -174,6 +174,16 @@ function anchoredTargets(
       });
       continue;
     }
+    if (node.kind !== 'file' && !node.clear_start) {
+      skips.push({
+        file: anchor.file,
+        reason:
+          node.clear_start === false
+            ? `skipped ${anchorName(anchor)}: code from an earlier line continues onto its first line at ${span.file}:${span.start_line}, so a backlink there could land inside a string or comment; start the declaration on its own line`
+            : `skipped ${anchorName(anchor)}: its syntax tree was not available to confirm a safe line for the backlink; anchor the enclosing function, class or file instead`,
+      });
+      continue;
+    }
     targets.push({
       span,
       baseline: graph.source_hashes?.[span.file],

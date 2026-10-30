@@ -58,6 +58,8 @@ export type EntityNode = {
     | 'constant';
   source_file?: string;
   source_span?: SourceSpan;
+  /** A comment line can go directly above the symbol's first line. */
+  clear_start?: boolean;
   confidence: Confidence;
   body_hash?: string;
   signature?: string;

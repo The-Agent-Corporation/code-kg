@@ -327,6 +327,28 @@ describe('code-kg anchor', () => {
     expect(drift.output).not.toContain(shapes);
   });
 
+  it('skips a backlink that would land inside a literal or cannot be checked', async () => {
+    const root = await project();
+    const banner = 'const banner = `hello\n`; function greet() { return banner; }\n';
+    await writeFile(join(root, 'src/banner.js'), banner);
+    await writeFile(join(root, 'src/limit.ts'), 'export const LIMIT = 3;\n');
+    await add(root, SECTION, 'src/banner.js#greet');
+    await add(root, SECTION, 'LIMIT');
+
+    const applied = await applyBacklinksCommand(ctx(root), { write: true });
+
+    expect(applied.output).toContain(
+      'skipped src/banner.js#greet: code from an earlier line continues onto its first line at src/banner.js:2',
+    );
+    expect(applied.output).toContain(
+      'skipped src/limit.ts#LIMIT: its syntax tree was not available',
+    );
+    expect(await readFile(join(root, 'src/banner.js'), 'utf-8')).toBe(banner);
+    expect(await readFile(join(root, 'src/limit.ts'), 'utf-8')).toBe(
+      'export const LIMIT = 3;\n',
+    );
+  });
+
   it('lists anchored sections in code-kg context for the file', async () => {
     const root = await project();
     await add(root, SECTION, 'greet');
