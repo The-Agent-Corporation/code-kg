@@ -10,15 +10,18 @@ import { codeKgSearchCommand } from '../src/codekg/search.js';
 import { flattenSections, loadAllSections } from '../src/lattice.js';
 import { plainStyler, type CmdContext } from '../src/context.js';
 
-const semantic = vi.hoisted(() => ({
-  runSearch: vi.fn(),
-  runIndex: vi.fn(),
-}));
+const semantic = vi.hoisted(() => ({ searchSections: vi.fn() }));
 
-vi.mock('../src/cli/search.js', () => ({
-  runSearch: semantic.runSearch,
-  runIndex: semantic.runIndex,
-  cliProgress: () => undefined,
+vi.mock('../src/search/search.js', () => ({
+  searchSections: semantic.searchSections,
+}));
+vi.mock('../src/search/index.js', () => ({
+  indexSections: async () => ({ added: 0, updated: 0, removed: 0 }),
+}));
+vi.mock('../src/search/db.js', () => ({
+  openDb: () => ({ execute: async () => ({ rows: [{ n: 1 }] }) }),
+  ensureSchema: async () => {},
+  closeDb: async () => {},
 }));
 
 const roots: string[] = [];
@@ -46,8 +49,7 @@ beforeEach(async () => {
   roots.push(configRoot);
   vi.stubEnv('XDG_CONFIG_HOME', configRoot);
   vi.stubEnv('LAT_EMBEDDING_PROVIDER', 'local');
-  semantic.runSearch.mockReset();
-  semantic.runIndex.mockReset();
+  semantic.searchSections.mockReset();
 });
 
 afterEach(async () => {
@@ -59,7 +61,7 @@ afterEach(async () => {
 
 describe('auto-semantic search', () => {
   it('falls back to lexical results when semantic search throws', async () => {
-    semantic.runSearch.mockRejectedValue(new Error('401 Unauthorized'));
+    semantic.searchSections.mockRejectedValue(new Error('401 Unauthorized'));
     const ctx = await project();
 
     const result = await codeKgSearchCommand(ctx, 'entry points', {
@@ -76,7 +78,7 @@ describe('auto-semantic search', () => {
 
 describe('explicit semantic search', () => {
   it('returns an error result instead of throwing', async () => {
-    semantic.runSearch.mockRejectedValue(new Error('fetch failed'));
+    semantic.searchSections.mockRejectedValue(new Error('fetch failed'));
     const ctx = await project();
 
     const result = await codeKgSearchCommand(ctx, 'entry points', {
@@ -112,10 +114,7 @@ describe('explicit semantic search', () => {
   it('suggests Code-KG navigation commands with semantic results', async () => {
     const ctx = await project('cli');
     const [section] = flattenSections(await loadAllSections(ctx.latDir));
-    semantic.runSearch.mockResolvedValue({
-      query: 'entry points',
-      matches: [{ section, reason: 'semantic match' }],
-    });
+    semantic.searchSections.mockResolvedValue([{ id: section.id }]);
 
     const result = await codeKgSearchCommand(ctx, 'entry points', {
       backend: 'semantic',
