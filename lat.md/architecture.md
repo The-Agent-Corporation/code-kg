@@ -27,8 +27,8 @@ No parsed entrypoint files were available for first-hop dependency flow during b
 
 The initial inventory groups files by broad category so later extraction can focus on high-value paths.
 
-- Code files: 100
-- Test files: 23
+- Code files: 101
+- Test files: 24
 - Documentation files: 78
 - Config files: 2
 - Asset files: 2
@@ -36,14 +36,14 @@ The initial inventory groups files by broad category so later extraction can foc
 
 ## Structural Graph
 
-Code-KG extracted a deterministic structural graph with 1135 nodes, 2760 edges, 4 communities using the multi-language-directory-fallback analysis path.
+Code-KG extracted a deterministic structural graph with 1155 nodes, 2806 edges, 4 communities using the multi-language-directory-fallback analysis path.
 
 ## Communities
 
 Directory-based communities provide the first subsystem map until graph clustering is available.
 
-- src: 72 files, 759 symbols, cohesion 0.85
-- tests: 45 files, 218 symbols, cohesion 0.49
+- src: 73 files, 776 symbols, cohesion 0.85
+- tests: 46 files, 219 symbols, cohesion 0.49
 - templates: 2 files, 27 symbols, cohesion 1
 - scripts: 4 files, 4 symbols, cohesion 0.86
 
@@ -86,9 +86,9 @@ Source file `src/lattice.ts` is imported by local files including `src/cli/check
 
 ### src/codekg/cache.ts
 
-Source file `src/codekg/cache.ts` is imported by local files including `src/codekg/agent-context.ts`, `src/codekg/enrich.ts`, and 9 more.
+Source file `src/codekg/cache.ts` is imported by local files including `src/codekg/agent-context.ts`, `src/codekg/backlinks.ts`, and 10 more.
 
-- Imported by: `src/codekg/agent-context.ts`, `src/codekg/enrich.ts`, `src/codekg/graph.ts`, `src/codekg/meaning.ts`, `src/codekg/query.ts`, `src/codekg/review-source.ts`, and 5 more
+- Imported by: `src/codekg/agent-context.ts`, `src/codekg/backlinks.ts`, `src/codekg/enrich.ts`, `src/codekg/graph.ts`, `src/codekg/meaning.ts`, `src/codekg/query.ts`, and 6 more
 
 ### src/codekg/structural.ts
 
@@ -197,7 +197,7 @@ Source file `src/context.ts` contains source symbols. Key symbols: `Styler`, `id
 Source file `src/codekg/graph.ts` contains source symbols. Key symbols: `LOCAL_IMPORT_EXTENSIONS`, `GRAPH_CACHE_PATH`, and 36 more.
 
 - Symbols: `LOCAL_IMPORT_EXTENSIONS (const)`, `GRAPH_CACHE_PATH (const)`, `ImportSpec (type)`, `stableId (function)`, `moduleLabel (function)`, `fileNode (function)`, `moduleNode (function)`, `symbolNode (function)`, and 30 more
-- Imports: `src/codekg/cache.ts`, `src/codekg/discovery.ts`, `src/codekg/structural.ts`, `src/codekg/types.ts`, `src/source-parser.ts`
+- Imports: `src/codekg/cache.ts`, `src/codekg/discovery.ts`, `src/codekg/source-scan.ts`, `src/codekg/structural.ts`, `src/codekg/types.ts`, `src/source-parser.ts`
 - Imported by: `src/codekg/bootstrap.ts`, `src/codekg/cli.ts`, `src/codekg/drift.ts`, `src/codekg/fresh.ts`, `src/codekg/gaps.ts`, `tests/codekg-intelligence.test.ts`, and 2 more
 
 ### src/lattice.ts

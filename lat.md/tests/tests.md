@@ -45,7 +45,7 @@ Test file `tests/agents-edge-cases.test.ts` contains tests and validation symbol
 Test file `tests/backlinks-safety.test.ts` contains tests and validation symbols. Key symbols: `roots`, `BACKLINK`, and 5 more.
 
 - Symbols: `roots (const)`, `BACKLINK (const)`, `ctx (function)`, `project (function)`, `manifestPath (const)`, `readManifest (function)`, `markEditSafe (function)`
-- Imports: `src/codekg/backlinks.ts`, `src/codekg/bootstrap.ts`, `src/codekg/drift.ts`, `src/codekg/structural.ts`, `src/codekg/types.ts`, `src/context.ts`
+- Imports: `src/codekg/backlinks.ts`, `src/codekg/bootstrap.ts`, `src/codekg/drift.ts`, `src/codekg/review-source.ts`, `src/codekg/structural.ts`, `src/codekg/types.ts`, and 1 more
 - Imported by: none detected
 
 ### tests/cases.test.ts
@@ -200,6 +200,14 @@ Test file `tests/search.test.ts` contains tests and validation symbols. Key symb
 - Imports: `src/config.ts`, `src/search/db.ts`, `src/search/index.ts`, `src/search/provider.ts`, `src/search/search.ts`, `tests/rag-replay-server.ts`
 - Imported by: none detected
 
+### tests/source-scan.test.ts
+
+Test file `tests/source-scan.test.ts` contains tests and validation symbols. Key symbols: `texts`.
+
+- Symbols: `texts (const)`
+- Imports: `src/codekg/source-scan.ts`
+- Imported by: none detected
+
 ### tests/trace-depth.test.ts
 
 Test file `tests/trace-depth.test.ts` contains tests and validation symbols. Key symbols: `roots`, `chain`, and 1 more.
@@ -334,6 +342,12 @@ Source file `src/codekg/gaps.ts` is covered by test imports from `tests/codekg.t
 
 - Tests: `tests/codekg.test.ts`, `tests/gaps-inferred.test.ts`
 
+### src/codekg/review-source.ts
+
+Source file `src/codekg/review-source.ts` is covered by test imports from `tests/backlinks-safety.test.ts`, `tests/codekg-intelligence.test.ts`.
+
+- Tests: `tests/backlinks-safety.test.ts`, `tests/codekg-intelligence.test.ts`
+
 ### src/codekg/semantic.ts
 
 Source file `src/codekg/semantic.ts` is covered by test imports from `tests/codekg.test.ts`, `tests/config-corrupt.test.ts`.
@@ -361,12 +375,6 @@ Source file `tests/rag-replay-server.ts` is covered by test imports from `tests/
 ### src/cli/refs.ts
 
 Source file `src/cli/refs.ts` is covered by test imports from `tests/cases.test.ts`.
-
-- Tests: `tests/cases.test.ts`
-
-### src/cli/section.ts
-
-Source file `src/cli/section.ts` is covered by test imports from `tests/cases.test.ts`.
 
 - Tests: `tests/cases.test.ts`
 
