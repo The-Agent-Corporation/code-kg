@@ -7,20 +7,23 @@ import {
   writeBootstrapPlan,
 } from '../src/codekg/bootstrap.js';
 import { codeKgSearchCommand } from '../src/codekg/search.js';
+import { flattenSections, loadAllSections } from '../src/lattice.js';
 import { plainStyler, type CmdContext } from '../src/context.js';
 
 const semantic = vi.hoisted(() => ({
-  searchCommand: vi.fn(),
+  runSearch: vi.fn(),
+  runIndex: vi.fn(),
 }));
 
 vi.mock('../src/cli/search.js', () => ({
-  searchCommand: semantic.searchCommand,
+  runSearch: semantic.runSearch,
+  runIndex: semantic.runIndex,
   cliProgress: () => undefined,
 }));
 
 const roots: string[] = [];
 
-async function project(): Promise<CmdContext> {
+async function project(mode: CmdContext['mode'] = 'mcp'): Promise<CmdContext> {
   const root = await mkdtemp(join(tmpdir(), 'codekg-search-fallback-'));
   roots.push(root);
   await mkdir(join(root, 'src'), { recursive: true });
@@ -34,7 +37,7 @@ async function project(): Promise<CmdContext> {
     latDir: join(root, 'lat.md'),
     projectRoot: root,
     styler: plainStyler,
-    mode: 'mcp',
+    mode,
   };
 }
 
@@ -43,7 +46,8 @@ beforeEach(async () => {
   roots.push(configRoot);
   vi.stubEnv('XDG_CONFIG_HOME', configRoot);
   vi.stubEnv('LAT_EMBEDDING_PROVIDER', 'local');
-  semantic.searchCommand.mockReset();
+  semantic.runSearch.mockReset();
+  semantic.runIndex.mockReset();
 });
 
 afterEach(async () => {
@@ -55,7 +59,7 @@ afterEach(async () => {
 
 describe('auto-semantic search', () => {
   it('falls back to lexical results when semantic search throws', async () => {
-    semantic.searchCommand.mockRejectedValue(new Error('401 Unauthorized'));
+    semantic.runSearch.mockRejectedValue(new Error('401 Unauthorized'));
     const ctx = await project();
 
     const result = await codeKgSearchCommand(ctx, 'entry points', {
@@ -68,26 +72,11 @@ describe('auto-semantic search', () => {
     );
     expect(result.output).toContain('lat.md/architecture#Architecture');
   });
-
-  it('falls back when semantic search reports an error result', async () => {
-    semantic.searchCommand.mockResolvedValue({
-      output: 'LAT_LLM_KEY_FILE (/missing) is empty.',
-      isError: true,
-    });
-    const ctx = await project();
-
-    const result = await codeKgSearchCommand(ctx, 'entry points', {
-      backend: 'auto-semantic',
-    });
-
-    expect(result.isError).toBeFalsy();
-    expect(result.output).toContain('auto-semantic fallback; LAT_LLM_KEY_FILE');
-  });
 });
 
 describe('explicit semantic search', () => {
   it('returns an error result instead of throwing', async () => {
-    semantic.searchCommand.mockRejectedValue(new Error('fetch failed'));
+    semantic.runSearch.mockRejectedValue(new Error('fetch failed'));
     const ctx = await project();
 
     const result = await codeKgSearchCommand(ctx, 'entry points', {
@@ -98,5 +87,42 @@ describe('explicit semantic search', () => {
     expect(result.output).toBe(
       'Backend: semantic\nSemantic search failed: fetch failed',
     );
+  });
+
+  it('points to Code-KG commands when no provider is configured', async () => {
+    for (const name of [
+      'LAT_EMBEDDING_PROVIDER',
+      'LAT_LLM_KEY',
+      'LAT_LLM_KEY_FILE',
+      'LAT_LLM_KEY_HELPER',
+    ]) {
+      vi.stubEnv(name, undefined);
+    }
+    const ctx = await project('cli');
+
+    const result = await codeKgSearchCommand(ctx, 'entry points', {
+      backend: 'semantic',
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.output).toContain('code-kg semantic enable-local');
+    expect(result.output).not.toContain('lat init');
+  });
+
+  it('suggests Code-KG navigation commands with semantic results', async () => {
+    const ctx = await project('cli');
+    const [section] = flattenSections(await loadAllSections(ctx.latDir));
+    semantic.runSearch.mockResolvedValue({
+      query: 'entry points',
+      matches: [{ section, reason: 'semantic match' }],
+    });
+
+    const result = await codeKgSearchCommand(ctx, 'entry points', {
+      backend: 'semantic',
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(result.output).toContain('`code-kg section "section#id"`');
+    expect(result.output).not.toMatch(/`lat (section|search)/);
   });
 });

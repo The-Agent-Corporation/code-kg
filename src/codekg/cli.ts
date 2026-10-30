@@ -119,6 +119,13 @@ async function runCheck(root: string): Promise<CmdResult> {
   });
 }
 
+function latContext(): CmdContext {
+  return resolveContext(
+    program.opts(),
+    'Run `code-kg bootstrap --accept` to create one.',
+  );
+}
+
 function rootOnlyContext(): CmdContext {
   const root = resolve(program.opts().dir ?? process.cwd());
   return {
@@ -249,7 +256,7 @@ semantic
   .command('status')
   .description('Show semantic search provider and vector cache status')
   .action(async () => {
-    const ctx = resolveContext(program.opts());
+    const ctx = latContext();
     const { semanticCommand } = await import('./semantic.js');
     handleResult(await semanticCommand(ctx, { action: 'status' }));
   });
@@ -258,7 +265,7 @@ semantic
   .command('enable-local')
   .description('Use local embeddings for semantic search')
   .action(async () => {
-    const ctx = resolveContext(program.opts());
+    const ctx = latContext();
     const { semanticCommand } = await import('./semantic.js');
     handleResult(await semanticCommand(ctx, { action: 'enable-local' }));
   });
@@ -267,7 +274,7 @@ semantic
   .command('reindex')
   .description('Rebuild the semantic search vector cache')
   .action(async () => {
-    const ctx = resolveContext(program.opts());
+    const ctx = latContext();
     const { semanticCommand } = await import('./semantic.js');
     handleResult(await semanticCommand(ctx, { action: 'reindex' }));
   });
@@ -286,7 +293,7 @@ program
   .option('--limit <n>', 'max results', parsePositiveInteger, 5)
   .option('--reindex', 'rebuild the semantic search index')
   .action(async (query: string | undefined, opts: SearchCliOptions) => {
-    const ctx = resolveContext(program.opts());
+    const ctx = latContext();
     const backend = opts.semantic ? 'semantic' : opts.backend;
     const { codeKgSearchCommand } = await import('./search.js');
     handleResult(
@@ -303,7 +310,7 @@ program
   .description('Show graph, docs, and test context for a file or symbol')
   .argument('<query>', 'file path, symbol, or graph node label')
   .action(async (query: string) => {
-    const ctx = resolveContext(program.opts());
+    const ctx = latContext();
     const { contextCommand } = await import('./context.js');
     handleResult(await contextCommand(ctx, query));
   });
@@ -312,7 +319,7 @@ program
   .command('gaps')
   .description('Report missing knowledge, anchors, and test coverage')
   .action(async () => {
-    const ctx = resolveContext(program.opts());
+    const ctx = latContext();
     const { gapsCommand } = await import('./gaps.js');
     handleResult(await gapsCommand(ctx));
   });
@@ -321,7 +328,7 @@ program
   .command('changed')
   .description('Show Code-KG impact for current git working-tree changes')
   .action(async () => {
-    const ctx = resolveContext(program.opts());
+    const ctx = latContext();
     const { changedCommand } = await import('./changed.js');
     handleResult(await changedCommand(ctx));
   });
@@ -334,7 +341,7 @@ program
     'Skip LLM paragraph enrichment (also set by CODEKG_SKIP_ENRICH=1)',
   )
   .action(async (opts: { enrich: boolean }) => {
-    const ctx = resolveContext(program.opts());
+    const ctx = latContext();
     const { updateCommand } = await import('./update.js');
     handleResult(await updateCommand(ctx, { enrich: opts.enrich }));
   });
@@ -360,7 +367,7 @@ program
     20,
   )
   .action(async (opts) => {
-    const ctx = resolveContext(program.opts());
+    const ctx = latContext();
     if (opts.source) {
       const { enrichSourcesCommand } = await import('./meaning.js');
       handleResult(await enrichSourcesCommand(ctx, opts));
@@ -374,13 +381,14 @@ for (const command of ['locate', 'section', 'refs', 'expand'] as const) {
   const cmd = program.command(command).allowUnknownOption(true);
   cmd.argument('<query>');
   cmd.action(async (query: string) => {
-    const ctx = resolveContext(program.opts());
+    const ctx = latContext();
     if (command === 'locate') {
       const { locateCommand } = await import('../cli/locate.js');
       handleResult(await locateCommand(ctx, query));
     } else if (command === 'section') {
       const { sectionCommand } = await import('../cli/section.js');
-      handleResult(await sectionCommand(ctx, query));
+      const { withCodeKgNavHints } = await import('./search.js');
+      handleResult(withCodeKgNavHints(ctx, await sectionCommand(ctx, query)));
     } else if (command === 'refs') {
       const { refsCommand } = await import('../cli/refs.js');
       handleResult(await refsCommand(ctx, query, 'md+code'));
@@ -395,7 +403,7 @@ program
   .command('check')
   .description('Validate lat.md and Code-KG metadata')
   .action(async () => {
-    const ctx = resolveContext(program.opts());
+    const ctx = latContext();
     handleResult(await codeKgCheckCommand(ctx));
   });
 
@@ -404,7 +412,7 @@ program
   .description('Report drift between code and knowledge base')
   .option('--apply-safe', 'apply safe manifest metadata updates')
   .action(async (opts: DriftOptions) => {
-    const ctx = resolveContext(program.opts());
+    const ctx = latContext();
     const { driftCommand } = await import('./drift.js');
     handleResult(await driftCommand(ctx, opts));
   });
@@ -415,7 +423,7 @@ program
   .option('--preview', 'show manifest status changes without writing')
   .option('--write', 'write manifest status changes')
   .action(async (opts: ReconcileOptions) => {
-    const ctx = resolveContext(program.opts());
+    const ctx = latContext();
     const { reconcileCommand } = await import('./reconcile.js');
     handleResult(await reconcileCommand(ctx, { write: opts.write === true }));
   });
@@ -428,7 +436,7 @@ confidence
   .command('list')
   .description('List inferred and ambiguous manifest relationships')
   .action(async () => {
-    const ctx = resolveContext(program.opts());
+    const ctx = latContext();
     const { confidenceCommand } = await import('./confidence.js');
     handleResult(await confidenceCommand(ctx, { action: 'list' }));
   });
@@ -438,7 +446,7 @@ confidence
   .description('Mark a manifest relationship as accepted')
   .argument('<relationship-id>', 'manifest relationship id')
   .action(async (relationshipId: string) => {
-    const ctx = resolveContext(program.opts());
+    const ctx = latContext();
     const { confidenceCommand } = await import('./confidence.js');
     handleResult(
       await confidenceCommand(ctx, {
@@ -453,7 +461,7 @@ confidence
   .description('Mark a manifest relationship as rejected')
   .argument('<relationship-id>', 'manifest relationship id')
   .action(async (relationshipId: string) => {
-    const ctx = resolveContext(program.opts());
+    const ctx = latContext();
     const { confidenceCommand } = await import('./confidence.js');
     handleResult(
       await confidenceCommand(ctx, {
@@ -471,7 +479,7 @@ confidence
     'mark detected promotion candidates as accepted',
   )
   .action(async (opts: ConfidenceReconcileOptions) => {
-    const ctx = resolveContext(program.opts());
+    const ctx = latContext();
     const { confidenceCommand } = await import('./confidence.js');
     handleResult(
       await confidenceCommand(ctx, {
@@ -489,7 +497,7 @@ suppress
   .command('list')
   .description('List suppressed graph nodes and relationships')
   .action(async () => {
-    const ctx = resolveContext(program.opts());
+    const ctx = latContext();
     const { suppressCommand } = await import('./suppress.js');
     handleResult(await suppressCommand(ctx, { action: 'list' }));
   });
@@ -499,7 +507,7 @@ suppress
   .description('Suppress a graph node candidate')
   .argument('<node-id>', 'graph node id')
   .action(async (id: string) => {
-    const ctx = resolveContext(program.opts());
+    const ctx = latContext();
     const { suppressCommand } = await import('./suppress.js');
     handleResult(await suppressCommand(ctx, { action: 'node', id }));
   });
@@ -509,7 +517,7 @@ suppress
   .description('Suppress a graph relationship candidate')
   .argument('<relationship-id>', 'graph relationship id')
   .action(async (id: string) => {
-    const ctx = resolveContext(program.opts());
+    const ctx = latContext();
     const { suppressCommand } = await import('./suppress.js');
     handleResult(await suppressCommand(ctx, { action: 'relationship', id }));
   });
@@ -519,7 +527,7 @@ suppress
   .description('Clear a suppression tombstone by id')
   .argument('<id>', 'suppressed node or relationship id')
   .action(async (id: string) => {
-    const ctx = resolveContext(program.opts());
+    const ctx = latContext();
     const { suppressCommand } = await import('./suppress.js');
     handleResult(await suppressCommand(ctx, { action: 'clear', id }));
   });
@@ -530,7 +538,7 @@ program
   .option('--preview', 'show source backlinks without writing')
   .option('--write', 'insert source backlinks')
   .action(async (opts: ApplyBacklinksOptions) => {
-    const ctx = resolveContext(program.opts());
+    const ctx = latContext();
     const { applyBacklinksCommand } = await import('./backlinks.js');
     handleResult(
       await applyBacklinksCommand(ctx, { write: opts.write === true }),

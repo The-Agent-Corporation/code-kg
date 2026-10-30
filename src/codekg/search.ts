@@ -5,7 +5,7 @@ import {
   type Section,
   type SectionMatch,
 } from '../lattice.js';
-import { formatResultList } from '../format.js';
+import { formatNavHints, formatResultList } from '../format.js';
 import { hasEmbeddingConfig } from '../config.js';
 
 export type CodeKgSearchBackend =
@@ -36,6 +36,20 @@ function formatCodeKgNavHints(ctx: CmdContext): string {
       : `${s.dim('*')} \`codekg_section\` - show full content with outgoing/incoming refs\n` +
         `${s.dim('*')} \`codekg_search\` - search for something else`;
   return `\n## To navigate further:\n\n${hints}`;
+}
+
+/** Replaces the lat.md runtime's `lat section`/`lat_section` hints. */
+export function withCodeKgNavHints(
+  ctx: CmdContext,
+  result: CmdResult,
+): CmdResult {
+  return {
+    ...result,
+    output: result.output.replace(
+      formatNavHints(ctx),
+      formatCodeKgNavHints(ctx),
+    ),
+  };
 }
 
 function scoreSection(section: Section, query: string): number {
@@ -112,6 +126,42 @@ export function selectCodeKgSearchBackend(
   return { backend: 'local', label: 'local lexical' };
 }
 
+async function semanticSearchCommand(
+  ctx: CmdContext,
+  query: string | undefined,
+  limit: number,
+  reindex: boolean,
+): Promise<CmdResult> {
+  const { getEmbeddingKey } = await import('../config.js');
+  const { cliProgress, runIndex, runSearch } = await import('../cli/search.js');
+  let key: string | undefined;
+  try {
+    key = getEmbeddingKey();
+  } catch (error) {
+    return { output: (error as Error).message, isError: true };
+  }
+  if (!key) {
+    return {
+      output:
+        'No semantic embedding provider configured. Run `code-kg semantic enable-local` for local embeddings, or provide a key via LAT_LLM_KEY, LAT_LLM_KEY_FILE, or LAT_LLM_KEY_HELPER.',
+      isError: true,
+    };
+  }
+  const progress =
+    ctx.mode === 'cli' ? cliProgress(reindex, ctx.styler) : undefined;
+  if (!query) {
+    await runIndex(ctx.latDir, key, progress);
+    return { output: '' };
+  }
+  const result = await runSearch(ctx.latDir, query, key, limit, progress);
+  if (result.matches.length === 0) return { output: 'No results found.' };
+  return {
+    output:
+      formatResultList(ctx, `Search results for "${query}":`, result.matches) +
+      formatCodeKgNavHints(ctx),
+  };
+}
+
 function withBackendLabel(result: CmdResult, label: string): CmdResult {
   if (!result.output) return result;
   return {
@@ -133,16 +183,13 @@ export async function codeKgSearchCommand(
   const limit = opts.limit ?? 5;
 
   if (selected.backend === 'semantic') {
-    const { searchCommand, cliProgress } = await import('../cli/search.js');
     let result: CmdResult;
     try {
-      result = await searchCommand(
+      result = await semanticSearchCommand(
         ctx,
         query,
-        { limit, reindex: opts.reindex },
-        ctx.mode === 'cli'
-          ? cliProgress(opts.reindex === true, ctx.styler)
-          : undefined,
+        limit,
+        opts.reindex === true,
       );
     } catch (error) {
       result = {

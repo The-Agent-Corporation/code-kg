@@ -13,7 +13,7 @@ import { applyBacklinksCommand } from './backlinks.js';
 import { codeKgCheckCommand } from './check.js';
 import { confidenceCommand } from './confidence.js';
 import { driftCommand } from './drift.js';
-import { codeKgSearchCommand } from './search.js';
+import { codeKgSearchCommand, withCodeKgNavHints } from './search.js';
 import { suppressCommand } from './suppress.js';
 import {
   askCommand,
@@ -96,7 +96,9 @@ export function createCodeKgMcpServer(ctx: CmdContext): McpServer {
         .describe('Approximate maximum tokens to return'),
     },
     async ({ query, max_tokens }) =>
-      toMcp(await sectionCommand(ctx, query), { maxTokens: max_tokens }),
+      toMcp(withCodeKgNavHints(ctx, await sectionCommand(ctx, query)), {
+        maxTokens: max_tokens,
+      }),
   );
 
   server.tool(

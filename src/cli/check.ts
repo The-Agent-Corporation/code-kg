@@ -479,7 +479,16 @@ function formatErrorCount(count: number, s: Styler): string {
 
 // --- Unified command functions ---
 
-export async function checkAllCommand(ctx: CmdContext): Promise<CmdResult> {
+export type CheckAllOptions = {
+  /** Which CLI's setup commands to suggest; Code-KG has no `lat init`. */
+  product?: 'lat' | 'code-kg';
+};
+
+export async function checkAllCommand(
+  ctx: CmdContext,
+  opts: CheckAllOptions = {},
+): Promise<CmdResult> {
+  const codeKg = opts.product === 'code-kg';
   const startTime = Date.now();
   const md = await checkMd(ctx.latDir);
   const code = await checkCodeRefs(ctx.latDir);
@@ -500,28 +509,31 @@ export async function checkAllCommand(ctx: CmdContext): Promise<CmdResult> {
     formatFileStats(allFiles, s) + s.dim(` in ${elapsedStr}`),
   ];
 
-  // Init version warning first — user should fix setup before addressing errors
-  const storedVersion = readInitVersion(ctx.latDir);
-  if (storedVersion === null) {
-    lines.push(
-      '',
-      s.yellow('Warning:') +
-        ' No init version recorded — run ' +
-        s.cyan('lat init') +
-        ' to set up agent hooks and configuration.',
-    );
-  } else if (storedVersion < INIT_VERSION) {
-    lines.push(
-      '',
-      s.yellow('Warning:') +
-        ' Your setup is outdated (v' +
-        storedVersion +
-        ' → v' +
-        INIT_VERSION +
-        '). Re-run ' +
-        s.cyan('lat init') +
-        ' to update agent hooks and configuration.',
-    );
+  // Init version warning first — user should fix setup before addressing errors.
+  // Code-KG sets up agents with `code-kg agents install`, not `lat init`.
+  if (!codeKg) {
+    const storedVersion = readInitVersion(ctx.latDir);
+    if (storedVersion === null) {
+      lines.push(
+        '',
+        s.yellow('Warning:') +
+          ' No init version recorded — run ' +
+          s.cyan('lat init') +
+          ' to set up agent hooks and configuration.',
+      );
+    } else if (storedVersion < INIT_VERSION) {
+      lines.push(
+        '',
+        s.yellow('Warning:') +
+          ' Your setup is outdated (v' +
+          storedVersion +
+          ' → v' +
+          INIT_VERSION +
+          '). Re-run ' +
+          s.cyan('lat init') +
+          ' to update agent hooks and configuration.',
+      );
+    }
   }
 
   lines.push(...formatCheckErrors(allErrors, s));
@@ -540,11 +552,18 @@ export async function checkAllCommand(ctx: CmdContext): Promise<CmdResult> {
   const { hasEmbeddingConfig } = await import('../config.js');
   if (!hasEmbeddingConfig()) {
     lines.push(
-      s.yellow('Warning:') +
-        ' No semantic embedding provider configured — semantic search (lat search) will not work.' +
-        ' Set LAT_EMBEDDING_PROVIDER=local, provide a key via LAT_LLM_KEY, LAT_LLM_KEY_FILE, LAT_LLM_KEY_HELPER, or run ' +
-        s.cyan('lat init') +
-        ' to configure.',
+      codeKg
+        ? s.yellow('Warning:') +
+            ' No semantic embedding provider configured — semantic search (' +
+            s.cyan('code-kg search --backend semantic') +
+            ') will not work; lexical search still does. Run ' +
+            s.cyan('code-kg semantic enable-local') +
+            ' for local embeddings, or provide a key via LAT_LLM_KEY, LAT_LLM_KEY_FILE, or LAT_LLM_KEY_HELPER.'
+        : s.yellow('Warning:') +
+            ' No semantic embedding provider configured — semantic search (lat search) will not work.' +
+            ' Set LAT_EMBEDDING_PROVIDER=local, provide a key via LAT_LLM_KEY, LAT_LLM_KEY_FILE, LAT_LLM_KEY_HELPER, or run ' +
+            s.cyan('lat init') +
+            ' to configure.',
     );
   }
 
