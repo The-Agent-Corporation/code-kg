@@ -158,8 +158,8 @@ const QUESTIONS: Array<{ question: string; answers: string[] }> = [
  * Measured on the committed knowledge base. Raise these when ranking or
  * curated sections improve; lowering one needs a reason in the commit.
  */
-const LEXICAL_FLOOR = { recallAt5: 0.25, mrr: 0.17 };
-const SEMANTIC_FLOOR = { recallAt5: 0.625, mrr: 0.469 };
+const LEXICAL_FLOOR = { recallAt5: 0.563, mrr: 0.44 };
+const SEMANTIC_FLOOR = { recallAt5: 0.875, mrr: 0.714 };
 
 type Score = { recallAt5: number; mrr: number; report: string };
 
