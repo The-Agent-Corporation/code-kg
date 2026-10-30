@@ -1211,6 +1211,18 @@ describe('code-kg bootstrap', () => {
       expect(result.output).toContain('semantic reindex: skipped');
       expect(result.output).toContain('code-kg check: passed');
       expect(result.output).toContain('No drift findings');
+
+      await writeFile(
+        join(root, 'lat.md', 'notes.md'),
+        '# Notes\n\nHand-written notes.\n\n## Values\n\nSee [[src/util.ts#missingValue]].\n',
+      );
+      const failed = await updateCommand(ctx(root));
+
+      expect(failed.isError).toBe(true);
+      expect(failed.output).toContain('code-kg check: failed');
+      expect(failed.output).toContain(
+        'broken link [[src/util.ts#missingValue]]',
+      );
     } finally {
       for (const [key, value] of Object.entries(originalEnv)) {
         if (value === undefined) {

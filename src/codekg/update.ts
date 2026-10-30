@@ -63,6 +63,7 @@ export async function updateCommand(
   lines.push(
     check.isError ? '- code-kg check: failed' : '- code-kg check: passed',
   );
+  if (check.isError) lines.push('', check.output.trim());
   const drift = await driftCommand(ctx);
   lines.push('', drift.output);
   return {
