@@ -17,11 +17,18 @@ export async function updateCommand(
 ): Promise<CmdResult> {
   const plan = await createBootstrapPlan(ctx.projectRoot);
   const changes = await writeBootstrapPlan(plan);
+  const unchanged = changes.filter((change) =>
+    change.startsWith('kept existing '),
+  );
+  const notable = changes.filter(
+    (change) => !change.startsWith('kept existing '),
+  );
   const lines = ['# Code-KG Update', '', '- materialized knowledge base'];
-  lines.push(...changes.slice(0, 12).map((change) => `  - ${change}`));
-  if (changes.length > 12) {
-    lines.push(`  - and ${changes.length - 12} more changes`);
+  lines.push(...notable.slice(0, 12).map((change) => `  - ${change}`));
+  if (notable.length > 12) {
+    lines.push(`  - and ${notable.length - 12} more changes`);
   }
+  if (unchanged.length) lines.push(`  - ${unchanged.length} files unchanged`);
 
   const skipEnrich =
     opts.enrich === false || process.env.CODEKG_SKIP_ENRICH === '1';

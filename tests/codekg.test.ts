@@ -1208,6 +1208,8 @@ describe('code-kg bootstrap', () => {
       expect(result.isError).toBeFalsy();
       expect(result.output).toContain('# Code-KG Update');
       expect(result.output).toContain('materialized knowledge base');
+      expect(result.output).toMatch(/- \d+ files unchanged/);
+      expect(result.output).not.toContain('kept existing');
       expect(result.output).toContain('semantic reindex: skipped');
       expect(result.output).toContain('code-kg check: passed');
       expect(result.output).toContain('No drift findings');
