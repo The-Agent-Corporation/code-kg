@@ -45,7 +45,7 @@ Test file `tests/agents-edge-cases.test.ts` contains tests and validation symbol
 Test file `tests/backlinks-safety.test.ts` contains tests and validation symbols. Key symbols: `roots`, `BACKLINK`, and 5 more.
 
 - Symbols: `roots (const)`, `BACKLINK (const)`, `ctx (function)`, `project (function)`, `manifestPath (const)`, `readManifest (function)`, `markEditSafe (function)`
-- Imports: `src/codekg/backlinks.ts`, `src/codekg/bootstrap.ts`, `src/codekg/drift.ts`, `src/codekg/review-source.ts`, `src/codekg/structural.ts`, `src/codekg/types.ts`, and 1 more
+- Imports: `src/codekg/backlinks.ts`, `src/codekg/bootstrap.ts`, `src/codekg/check.ts`, `src/codekg/drift.ts`, `src/codekg/review-source.ts`, `src/codekg/structural.ts`, and 2 more
 - Imported by: none detected
 
 ### tests/cases.test.ts
@@ -246,6 +246,12 @@ Source file `src/code-refs.ts` is covered by test imports from `tests/cases.test
 
 - Tests: `tests/cases.test.ts`, `tests/code-refs-no-match.test.ts`, `tests/input-errors.test.ts`, `tests/walk-symlinks.test.ts`
 
+### src/codekg/check.ts
+
+Source file `src/codekg/check.ts` is covered by test imports from `tests/backlinks-safety.test.ts`, `tests/codekg-messages.test.ts`, and 2 more.
+
+- Tests: `tests/backlinks-safety.test.ts`, `tests/codekg-messages.test.ts`, `tests/codekg.test.ts`, `tests/config-corrupt.test.ts`
+
 ### src/codekg/mcp.ts
 
 Source file `src/codekg/mcp.ts` is covered by test imports from `tests/codekg-intelligence.test.ts`, `tests/codekg-messages.test.ts`, and 2 more.
@@ -257,12 +263,6 @@ Source file `src/codekg/mcp.ts` is covered by test imports from `tests/codekg-in
 Source file `src/codekg/agents.ts` is covered by test imports from `tests/agents-edge-cases.test.ts`, `tests/codekg-intelligence.test.ts`, and 1 more.
 
 - Tests: `tests/agents-edge-cases.test.ts`, `tests/codekg-intelligence.test.ts`, `tests/codekg.test.ts`
-
-### src/codekg/check.ts
-
-Source file `src/codekg/check.ts` is covered by test imports from `tests/codekg-messages.test.ts`, `tests/codekg.test.ts`, and 1 more.
-
-- Tests: `tests/codekg-messages.test.ts`, `tests/codekg.test.ts`, `tests/config-corrupt.test.ts`
 
 ### src/codekg/drift.ts
 

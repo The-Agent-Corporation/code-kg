@@ -36,14 +36,14 @@ The initial inventory groups files by broad category so later extraction can foc
 
 ## Structural Graph
 
-Code-KG extracted a deterministic structural graph with 1155 nodes, 2806 edges, 4 communities using the multi-language-directory-fallback analysis path.
+Code-KG extracted a deterministic structural graph with 1155 nodes, 2809 edges, 4 communities using the multi-language-directory-fallback analysis path.
 
 ## Communities
 
 Directory-based communities provide the first subsystem map until graph clustering is available.
 
 - src: 73 files, 776 symbols, cohesion 0.85
-- tests: 46 files, 219 symbols, cohesion 0.49
+- tests: 46 files, 219 symbols, cohesion 0.48
 - templates: 2 files, 27 symbols, cohesion 1
 - scripts: 4 files, 4 symbols, cohesion 0.86
 
@@ -114,6 +114,12 @@ Source file `src/code-refs.ts` is imported by local files including `src/cli/che
 
 - Imported by: `src/cli/check.ts`, `src/cli/refs.ts`, `src/cli/section.ts`, `src/codekg/bootstrap.ts`, `tests/cases.test.ts`, `tests/code-refs-no-match.test.ts`, and 2 more
 
+### src/codekg/check.ts
+
+Source file `src/codekg/check.ts` is imported by local files including `src/codekg/cli.ts`, `src/codekg/doctor.ts`, and 6 more.
+
+- Imported by: `src/codekg/cli.ts`, `src/codekg/doctor.ts`, `src/codekg/mcp.ts`, `src/codekg/update.ts`, `tests/backlinks-safety.test.ts`, `tests/codekg-messages.test.ts`, and 2 more
+
 ### src/codekg/graph.ts
 
 Source file `src/codekg/graph.ts` is imported by local files including `src/codekg/bootstrap.ts`, `src/codekg/cli.ts`, and 6 more.
@@ -125,12 +131,6 @@ Source file `src/codekg/graph.ts` is imported by local files including `src/code
 Source file `src/search/provider.ts` is imported by local files including `src/cli/init.ts`, `src/cli/search.ts`, and 6 more.
 
 - Imported by: `src/cli/init.ts`, `src/cli/search.ts`, `src/codekg/semantic.ts`, `src/search/embeddings.ts`, `src/search/index.ts`, `src/search/search.ts`, and 2 more
-
-### src/codekg/check.ts
-
-Source file `src/codekg/check.ts` is imported by local files including `src/codekg/cli.ts`, `src/codekg/doctor.ts`, and 5 more.
-
-- Imported by: `src/codekg/cli.ts`, `src/codekg/doctor.ts`, `src/codekg/mcp.ts`, `src/codekg/update.ts`, `tests/codekg-messages.test.ts`, `tests/codekg.test.ts`, and 1 more
 
 ### src/codekg/fresh.ts
 

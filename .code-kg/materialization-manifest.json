@@ -2,7 +2,7 @@
   "version": 1,
   "tool_version": "0.1.0",
   "project_root": ".",
-  "generated_at": "2026-10-30T18:55:40.609Z",
+  "generated_at": "2026-10-30T19:21:38.813Z",
   "sections": {
     "lat": {
       "stable_id": "lat",
@@ -17,7 +17,7 @@
       "source_spans": [],
       "generated_hash": "sha256:212f237fd5441eeee781eee67a19df1991e9243823149aa1e6d8a077be2c4e8c",
       "current_hash": "sha256:212f237fd5441eeee781eee67a19df1991e9243823149aa1e6d8a077be2c4e8c",
-      "last_seen_graph_hash": "sha256:99fc22eb898da5be7ba0a9b23868e4b3d74d4179237a60493adcda99476ca5f9"
+      "last_seen_graph_hash": "sha256:96ccb80ad4fdf13aa4c212652f2c56c718ba985b45fa1e1a24ebce0be44ec668"
     },
     "architecture": {
       "stable_id": "architecture",
@@ -1186,9 +1186,9 @@
         "symbol_tests_walk_symlinks_test_ts_root_const_b0ea8338"
       ],
       "source_spans": [],
-      "generated_hash": "sha256:4add7f857338268755506bf5e70a04918bbcbd066250837d1cf3459afc9ee799",
-      "current_hash": "sha256:4add7f857338268755506bf5e70a04918bbcbd066250837d1cf3459afc9ee799",
-      "last_seen_graph_hash": "sha256:99fc22eb898da5be7ba0a9b23868e4b3d74d4179237a60493adcda99476ca5f9",
+      "generated_hash": "sha256:95a29b51f0bfc76c3fb7ef6ba71356846188ce86db4a30e7c7a47af7258232bd",
+      "current_hash": "sha256:95a29b51f0bfc76c3fb7ef6ba71356846188ce86db4a30e7c7a47af7258232bd",
+      "last_seen_graph_hash": "sha256:96ccb80ad4fdf13aa4c212652f2c56c718ba985b45fa1e1a24ebce0be44ec668",
       "source_hashes": {
         "scripts/cook-test-rag.ts": "sha256:6709c2e93d7de698e0b557bf59029c1b46fade8108aec4d4dbdd499a4ae3e38f",
         "scripts/copy-vendor-assets.mjs": "sha256:379284aa90c7397b7a32513db483ca7c0db85b4d327852be1f4a924267c24c2d",
@@ -1235,7 +1235,7 @@
         "src/codekg/meaning.ts": "sha256:9b249935e184f58f61ad08e30d148c2239c82fdfc5b9ce44cd0607e568a7f341",
         "src/codekg/query.ts": "sha256:c7d8b1f6344a204f2d0ef5fe019c30954b0caa201ce5c65f16cc33d1bcd63e18",
         "src/codekg/reconcile.ts": "sha256:0a460e239de33c97de6766771366fd9bb6241666eeb6f4cbfeb0f1fa2f4bb5d3",
-        "src/codekg/review-source.ts": "sha256:0c75c42e71922b3962ae24a0260d60fb30c877f89b6e9e96b01f354de091b48e",
+        "src/codekg/review-source.ts": "sha256:516a8e32cfb599c27f7f398c2c3ae9169959d6f0f10a62eca907fcd984865722",
         "src/codekg/search.ts": "sha256:71c14729b67a9eed6d4db9ab2ab3cd3dc90a91bc09244640611e70221610620e",
         "src/codekg/semantic.ts": "sha256:a777fffbfafb8fa854ac72fc55add4b2b85409b02b773041112888a4489be845",
         "src/codekg/source-scan.ts": "sha256:791700e1b19e058b5fb8491449080122d66fb5885ffab833f0d92b4d9b12df2d",
@@ -1270,7 +1270,7 @@
         "templates/opencode-plugin.ts": "sha256:a1e1cf08e65701ca917749251d650e5f35adbde5d937636d7d4efc9ed4ced227",
         "templates/pi-extension.ts": "sha256:660701a2b97c42aa838c80db8137f1fab878f2ab43462a61dd0b843e94af79b4",
         "tests/agents-edge-cases.test.ts": "sha256:2d1145aec7d77847297ae71cb72bacc618bfcad4810b29860fce2b9f85995493",
-        "tests/backlinks-safety.test.ts": "sha256:4be36b7809939956cafbbbb20c65dd1be14599287b953dfca6d0a90d2b1ee802",
+        "tests/backlinks-safety.test.ts": "sha256:d9f596129c06b9cafee520a16be0570a8c86a952e92b50641d1ac60f0ec8cfbc",
         "tests/cases.test.ts": "sha256:ca9519d80a422d6693d458a7750e397f1e0a4cace7564d27854721ef262d7596",
         "tests/cases/error-ambiguous-short-ref/src/app.ts": "sha256:ae7aa50a846013c973f716144eaff5ad6aebfa15a43dd60ab238838f6fead300",
         "tests/cases/error-bare-heading-ref/src/app.ts": "sha256:2a6db3cd6edd54a85d46837c97eaf3c9e4af32c97e1b100a669b5999711f7d45",
@@ -1339,9 +1339,9 @@
         "file_tests_cases_test_ts_e3ffc2d7"
       ],
       "source_spans": [],
-      "generated_hash": "sha256:2af9461e40f380a0d79e31b71a6a4be7d53fcaa42adc8dda4dd2238a4acdae8b",
-      "current_hash": "sha256:2af9461e40f380a0d79e31b71a6a4be7d53fcaa42adc8dda4dd2238a4acdae8b",
-      "last_seen_graph_hash": "sha256:99fc22eb898da5be7ba0a9b23868e4b3d74d4179237a60493adcda99476ca5f9"
+      "generated_hash": "sha256:aa7ac6ceda539d904f348e3f8d3056a35df80d1c3595641dda5a27d6cd515e33",
+      "current_hash": "sha256:aa7ac6ceda539d904f348e3f8d3056a35df80d1c3595641dda5a27d6cd515e33",
+      "last_seen_graph_hash": "sha256:96ccb80ad4fdf13aa4c212652f2c56c718ba985b45fa1e1a24ebce0be44ec668"
     },
     "confidence": {
       "stable_id": "confidence",
@@ -1356,7 +1356,7 @@
       "source_spans": [],
       "generated_hash": "sha256:ea881ed52ef1d84ccd03f0bab9674be79a44ead2692635a188371da9389c6c1e",
       "current_hash": "sha256:ea881ed52ef1d84ccd03f0bab9674be79a44ead2692635a188371da9389c6c1e",
-      "last_seen_graph_hash": "sha256:99fc22eb898da5be7ba0a9b23868e4b3d74d4179237a60493adcda99476ca5f9"
+      "last_seen_graph_hash": "sha256:96ccb80ad4fdf13aa4c212652f2c56c718ba985b45fa1e1a24ebce0be44ec668"
     },
     "tests.tests": {
       "stable_id": "tests.tests",
@@ -1369,9 +1369,9 @@
       "source_anchor_policy": "coverage-only",
       "source_node_ids": [],
       "source_spans": [],
-      "generated_hash": "sha256:a6375fdbd341dec8825b85af1f6c25fd89c78aa0c84d5040886095dad9630f6b",
-      "current_hash": "sha256:a6375fdbd341dec8825b85af1f6c25fd89c78aa0c84d5040886095dad9630f6b",
-      "last_seen_graph_hash": "sha256:99fc22eb898da5be7ba0a9b23868e4b3d74d4179237a60493adcda99476ca5f9"
+      "generated_hash": "sha256:72f630a4a0ca633de4eae4e12ad378cfbf2ad1cc9dc816300d88f960d012c3fe",
+      "current_hash": "sha256:72f630a4a0ca633de4eae4e12ad378cfbf2ad1cc9dc816300d88f960d012c3fe",
+      "last_seen_graph_hash": "sha256:96ccb80ad4fdf13aa4c212652f2c56c718ba985b45fa1e1a24ebce0be44ec668"
     },
     "tests.check-code-refs": {
       "stable_id": "tests.check-code-refs",
@@ -1386,7 +1386,7 @@
       "source_spans": [],
       "generated_hash": "sha256:4aa70399cf37aa0391940034376a28fb1f2e925c86f09b0845248fc92820d20b",
       "current_hash": "sha256:4aa70399cf37aa0391940034376a28fb1f2e925c86f09b0845248fc92820d20b",
-      "last_seen_graph_hash": "sha256:99fc22eb898da5be7ba0a9b23868e4b3d74d4179237a60493adcda99476ca5f9"
+      "last_seen_graph_hash": "sha256:96ccb80ad4fdf13aa4c212652f2c56c718ba985b45fa1e1a24ebce0be44ec668"
     },
     "tests.check-index": {
       "stable_id": "tests.check-index",
@@ -1401,7 +1401,7 @@
       "source_spans": [],
       "generated_hash": "sha256:d29c890157cb6818d5e3f4edcfcbe2bdc3224f973b17e63a9a0b881163d00e0b",
       "current_hash": "sha256:d29c890157cb6818d5e3f4edcfcbe2bdc3224f973b17e63a9a0b881163d00e0b",
-      "last_seen_graph_hash": "sha256:99fc22eb898da5be7ba0a9b23868e4b3d74d4179237a60493adcda99476ca5f9"
+      "last_seen_graph_hash": "sha256:96ccb80ad4fdf13aa4c212652f2c56c718ba985b45fa1e1a24ebce0be44ec668"
     },
     "tests.check-md": {
       "stable_id": "tests.check-md",
@@ -1416,7 +1416,7 @@
       "source_spans": [],
       "generated_hash": "sha256:db290ff8ef61a321a08c4a4ed5cdfb679a854b2e56f1c24ac87816216885b08d",
       "current_hash": "sha256:db290ff8ef61a321a08c4a4ed5cdfb679a854b2e56f1c24ac87816216885b08d",
-      "last_seen_graph_hash": "sha256:99fc22eb898da5be7ba0a9b23868e4b3d74d4179237a60493adcda99476ca5f9"
+      "last_seen_graph_hash": "sha256:96ccb80ad4fdf13aa4c212652f2c56c718ba985b45fa1e1a24ebce0be44ec668"
     },
     "tests.check-sections": {
       "stable_id": "tests.check-sections",
@@ -1431,7 +1431,7 @@
       "source_spans": [],
       "generated_hash": "sha256:d2aeaaa456c6665e627e2ad21d31bc85ae34c9625abbd525c3bd57c89ab4756e",
       "current_hash": "sha256:d2aeaaa456c6665e627e2ad21d31bc85ae34c9625abbd525c3bd57c89ab4756e",
-      "last_seen_graph_hash": "sha256:99fc22eb898da5be7ba0a9b23868e4b3d74d4179237a60493adcda99476ca5f9"
+      "last_seen_graph_hash": "sha256:96ccb80ad4fdf13aa4c212652f2c56c718ba985b45fa1e1a24ebce0be44ec668"
     },
     "tests.expand": {
       "stable_id": "tests.expand",
@@ -1446,7 +1446,7 @@
       "source_spans": [],
       "generated_hash": "sha256:020c640f3499289fdd0474c2b230e71399f71b9dd7fd348621917ee886b1fc76",
       "current_hash": "sha256:020c640f3499289fdd0474c2b230e71399f71b9dd7fd348621917ee886b1fc76",
-      "last_seen_graph_hash": "sha256:99fc22eb898da5be7ba0a9b23868e4b3d74d4179237a60493adcda99476ca5f9"
+      "last_seen_graph_hash": "sha256:96ccb80ad4fdf13aa4c212652f2c56c718ba985b45fa1e1a24ebce0be44ec668"
     },
     "tests.hook": {
       "stable_id": "tests.hook",
@@ -1461,7 +1461,7 @@
       "source_spans": [],
       "generated_hash": "sha256:b6d87e3463e49f5b65df6b68ac6aec4fb4c085ff59c3affdcc1a6993b8c0541e",
       "current_hash": "sha256:b6d87e3463e49f5b65df6b68ac6aec4fb4c085ff59c3affdcc1a6993b8c0541e",
-      "last_seen_graph_hash": "sha256:99fc22eb898da5be7ba0a9b23868e4b3d74d4179237a60493adcda99476ca5f9"
+      "last_seen_graph_hash": "sha256:96ccb80ad4fdf13aa4c212652f2c56c718ba985b45fa1e1a24ebce0be44ec668"
     },
     "tests.locate": {
       "stable_id": "tests.locate",
@@ -1476,7 +1476,7 @@
       "source_spans": [],
       "generated_hash": "sha256:0f25b1daaa52dadf94331d72bbfe460a47db0340ab448a350a2102be4416b216",
       "current_hash": "sha256:0f25b1daaa52dadf94331d72bbfe460a47db0340ab448a350a2102be4416b216",
-      "last_seen_graph_hash": "sha256:99fc22eb898da5be7ba0a9b23868e4b3d74d4179237a60493adcda99476ca5f9"
+      "last_seen_graph_hash": "sha256:96ccb80ad4fdf13aa4c212652f2c56c718ba985b45fa1e1a24ebce0be44ec668"
     },
     "tests.mcp": {
       "stable_id": "tests.mcp",
@@ -1491,7 +1491,7 @@
       "source_spans": [],
       "generated_hash": "sha256:deb7d5cd74d405b6e2e1b997771ba7dcec173b1c44f74736188f46c8d06aaa0e",
       "current_hash": "sha256:deb7d5cd74d405b6e2e1b997771ba7dcec173b1c44f74736188f46c8d06aaa0e",
-      "last_seen_graph_hash": "sha256:99fc22eb898da5be7ba0a9b23868e4b3d74d4179237a60493adcda99476ca5f9"
+      "last_seen_graph_hash": "sha256:96ccb80ad4fdf13aa4c212652f2c56c718ba985b45fa1e1a24ebce0be44ec668"
     },
     "tests.ref-extraction": {
       "stable_id": "tests.ref-extraction",
@@ -1506,7 +1506,7 @@
       "source_spans": [],
       "generated_hash": "sha256:751df5f69f0892543d3406b1f5ad4e2582c4d8268f585750da92cc5db5720b40",
       "current_hash": "sha256:751df5f69f0892543d3406b1f5ad4e2582c4d8268f585750da92cc5db5720b40",
-      "last_seen_graph_hash": "sha256:99fc22eb898da5be7ba0a9b23868e4b3d74d4179237a60493adcda99476ca5f9"
+      "last_seen_graph_hash": "sha256:96ccb80ad4fdf13aa4c212652f2c56c718ba985b45fa1e1a24ebce0be44ec668"
     },
     "tests.ref-resolution": {
       "stable_id": "tests.ref-resolution",
@@ -1521,7 +1521,7 @@
       "source_spans": [],
       "generated_hash": "sha256:8a086cb246aa59a602c79e68caa3616a1dd15f4927e477fccaa19c79b285b16c",
       "current_hash": "sha256:8a086cb246aa59a602c79e68caa3616a1dd15f4927e477fccaa19c79b285b16c",
-      "last_seen_graph_hash": "sha256:99fc22eb898da5be7ba0a9b23868e4b3d74d4179237a60493adcda99476ca5f9"
+      "last_seen_graph_hash": "sha256:96ccb80ad4fdf13aa4c212652f2c56c718ba985b45fa1e1a24ebce0be44ec668"
     },
     "tests.refs-e2e": {
       "stable_id": "tests.refs-e2e",
@@ -1536,7 +1536,7 @@
       "source_spans": [],
       "generated_hash": "sha256:16b183dcd6d3d2155dd1988a72b6dc84d3d29378b6039592de7db2ad3662142f",
       "current_hash": "sha256:16b183dcd6d3d2155dd1988a72b6dc84d3d29378b6039592de7db2ad3662142f",
-      "last_seen_graph_hash": "sha256:99fc22eb898da5be7ba0a9b23868e4b3d74d4179237a60493adcda99476ca5f9"
+      "last_seen_graph_hash": "sha256:96ccb80ad4fdf13aa4c212652f2c56c718ba985b45fa1e1a24ebce0be44ec668"
     },
     "tests.search": {
       "stable_id": "tests.search",
@@ -1551,7 +1551,7 @@
       "source_spans": [],
       "generated_hash": "sha256:aa320b571b20467ffb95ff00d23aaf4758594d22ce2b4dd0ea550918f74107a5",
       "current_hash": "sha256:aa320b571b20467ffb95ff00d23aaf4758594d22ce2b4dd0ea550918f74107a5",
-      "last_seen_graph_hash": "sha256:99fc22eb898da5be7ba0a9b23868e4b3d74d4179237a60493adcda99476ca5f9"
+      "last_seen_graph_hash": "sha256:96ccb80ad4fdf13aa4c212652f2c56c718ba985b45fa1e1a24ebce0be44ec668"
     },
     "tests.section": {
       "stable_id": "tests.section",
@@ -1566,7 +1566,7 @@
       "source_spans": [],
       "generated_hash": "sha256:737472fc0e3c740c2a9672114f892c62aae24a84eebe0880248e1d10529a35ed",
       "current_hash": "sha256:737472fc0e3c740c2a9672114f892c62aae24a84eebe0880248e1d10529a35ed",
-      "last_seen_graph_hash": "sha256:99fc22eb898da5be7ba0a9b23868e4b3d74d4179237a60493adcda99476ca5f9"
+      "last_seen_graph_hash": "sha256:96ccb80ad4fdf13aa4c212652f2c56c718ba985b45fa1e1a24ebce0be44ec668"
     },
     "tests.section-parsing": {
       "stable_id": "tests.section-parsing",
@@ -1581,7 +1581,7 @@
       "source_spans": [],
       "generated_hash": "sha256:bdb107aee1e0a11d387aa411d42b93f5548c03f18e6fa52856b311cdbefa7c90",
       "current_hash": "sha256:bdb107aee1e0a11d387aa411d42b93f5548c03f18e6fa52856b311cdbefa7c90",
-      "last_seen_graph_hash": "sha256:99fc22eb898da5be7ba0a9b23868e4b3d74d4179237a60493adcda99476ca5f9"
+      "last_seen_graph_hash": "sha256:96ccb80ad4fdf13aa4c212652f2c56c718ba985b45fa1e1a24ebce0be44ec668"
     },
     "tests.section-preview": {
       "stable_id": "tests.section-preview",
@@ -1596,7 +1596,7 @@
       "source_spans": [],
       "generated_hash": "sha256:f6489db95ab6038be2750127ad290a7fdf6d834cb296af5dcd1c293678205ecb",
       "current_hash": "sha256:f6489db95ab6038be2750127ad290a7fdf6d834cb296af5dcd1c293678205ecb",
-      "last_seen_graph_hash": "sha256:99fc22eb898da5be7ba0a9b23868e4b3d74d4179237a60493adcda99476ca5f9"
+      "last_seen_graph_hash": "sha256:96ccb80ad4fdf13aa4c212652f2c56c718ba985b45fa1e1a24ebce0be44ec668"
     },
     "tests.ts-fallback": {
       "stable_id": "tests.ts-fallback",
@@ -1611,7 +1611,7 @@
       "source_spans": [],
       "generated_hash": "sha256:2eb50b1b8bfd84f431336a70c30ca6a3b883e6af3922068119836026fc517ee1",
       "current_hash": "sha256:2eb50b1b8bfd84f431336a70c30ca6a3b883e6af3922068119836026fc517ee1",
-      "last_seen_graph_hash": "sha256:99fc22eb898da5be7ba0a9b23868e4b3d74d4179237a60493adcda99476ca5f9"
+      "last_seen_graph_hash": "sha256:96ccb80ad4fdf13aa4c212652f2c56c718ba985b45fa1e1a24ebce0be44ec668"
     }
   },
   "relationships": {},

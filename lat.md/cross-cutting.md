@@ -27,8 +27,8 @@ These imports cross the first-pass directory communities and may indicate integr
 - tests/agents-edge-cases.test.ts imports src/context.ts
 - tests/backlinks-safety.test.ts imports src/codekg/backlinks.ts
 - tests/backlinks-safety.test.ts imports src/codekg/bootstrap.ts
+- tests/backlinks-safety.test.ts imports src/codekg/check.ts
 - tests/backlinks-safety.test.ts imports src/codekg/drift.ts
 - tests/backlinks-safety.test.ts imports src/codekg/review-source.ts
 - tests/backlinks-safety.test.ts imports src/codekg/structural.ts
 - tests/backlinks-safety.test.ts imports src/codekg/types.ts
-- tests/backlinks-safety.test.ts imports src/context.ts
