@@ -15,6 +15,7 @@ import { confidenceCommand } from './confidence.js';
 import { driftCommand } from './drift.js';
 import { codeKgSearchCommand, withCodeKgNavHints } from './search.js';
 import { suppressCommand } from './suppress.js';
+import { anchorCommand } from './anchor.js';
 import {
   askCommand,
   mapCommand,
@@ -226,6 +227,21 @@ export function createCodeKgMcpServer(ctx: CmdContext): McpServer {
     },
     async ({ write }) =>
       toMcp(await applyBacklinksCommand(ctx, { write: write === true })),
+  );
+
+  server.tool(
+    'codekg_anchor',
+    'Add, remove, or list the symbols and files a curated section is anchored to; apply-backlinks inserts backlinks at their current location',
+    {
+      section: z.string().min(1).describe('Section id, e.g. concepts#Search'),
+      action: z.enum(['add', 'remove', 'list']).optional().default('add'),
+      target: z
+        .string()
+        .optional()
+        .describe('<file>#<symbol>, a symbol name, a file path, or a node id'),
+    },
+    async ({ section, action, target }) =>
+      toMcp(await anchorCommand(ctx, section, { action, target })),
   );
 
   const budget = z.number().int().min(64).max(32000).optional();

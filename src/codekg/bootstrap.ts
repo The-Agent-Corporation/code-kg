@@ -4,6 +4,7 @@ import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { extname } from 'node:path';
 import { scanCodeRefs } from '../code-refs.js';
+import { isSectionEntry } from './anchors.js';
 import { discoverProject } from './discovery.js';
 import {
   extractProjectGraph,
@@ -1033,6 +1034,8 @@ export async function writeBootstrapPlan(
   if (currentManifest) {
     nextManifest.relationships = currentManifest.relationships;
     nextManifest.suppressed = currentManifest.suppressed;
+    for (const [id, section] of Object.entries(currentManifest.sections))
+      if (isSectionEntry(section)) nextManifest.sections[id] ??= section;
   }
 
   const written: string[] = [];

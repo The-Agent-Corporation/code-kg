@@ -2,10 +2,21 @@ import { existsSync } from 'node:fs';
 import { readFile, realpath, writeFile } from 'node:fs/promises';
 import { extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type { CmdContext, CmdResult } from '../context.js';
-import { backlinkAnchorsForSection } from './anchors.js';
+import {
+  anchorName,
+  anchorSpan,
+  backlinkAnchorsForSection,
+  sourceAnchorPolicy,
+} from './anchors.js';
 import { writeJsonAtomic } from './cache.js';
+import { freshGraph } from './fresh.js';
 import { sourceHash } from './structural.js';
-import type { MaterializationManifest } from './types.js';
+import type {
+  ManifestSection,
+  MaterializationManifest,
+  ProjectGraph,
+  SourceSpan,
+} from './types.js';
 
 type ApplyBacklinksOptions = {
   write: boolean;
@@ -137,6 +148,39 @@ function missingManifest(): CmdResult {
   };
 }
 
+type BacklinkTarget = {
+  span: SourceSpan;
+  /** Content hash the span's line numbers were taken from. */
+  baseline: string | undefined;
+  anchored: boolean;
+};
+
+function anchoredTargets(
+  section: ManifestSection,
+  graph: ProjectGraph | null,
+  skips: BacklinkSkip[],
+): BacklinkTarget[] {
+  if (sourceAnchorPolicy(section) !== 'edit-safe' || !graph) return [];
+  const targets: BacklinkTarget[] = [];
+  for (const anchor of section.source_anchors ?? []) {
+    const node = graph.nodes.find((n) => n.id === anchor.node_id);
+    const span = node && anchorSpan(node);
+    if (!span) {
+      skips.push({
+        file: anchor.file,
+        reason: `skipped ${anchorName(anchor)}: section ${section.stable_id} is anchored to it, but it no longer exists in the source; re-anchor the section with code-kg anchor`,
+      });
+      continue;
+    }
+    targets.push({
+      span,
+      baseline: graph.source_hashes?.[span.file],
+      anchored: true,
+    });
+  }
+  return targets;
+}
+
 async function backlinkPlan(
   ctx: CmdContext,
   manifest: MaterializationManifest,
@@ -144,18 +188,28 @@ async function backlinkPlan(
   const insertions: BacklinkInsertion[] = [];
   const skips: BacklinkSkip[] = [];
   const seen = new Set<string>();
+  const active = Object.values(manifest.sections).filter(
+    (section) =>
+      section.status !== 'suppressed' && section.status !== 'orphaned',
+  );
+  const graph = active.some((section) => section.source_anchors?.length)
+    ? await freshGraph(ctx.projectRoot)
+    : null;
 
-  for (const section of Object.values(manifest.sections)) {
-    if (section.status === 'suppressed' || section.status === 'orphaned') {
-      continue;
-    }
-
-    const spans = [...backlinkAnchorsForSection(section)].sort((a, b) =>
-      a.file === b.file
-        ? a.start_line - b.start_line
-        : a.file.localeCompare(b.file),
+  for (const section of active) {
+    const targets = [
+      ...backlinkAnchorsForSection(section).map((span) => ({
+        span,
+        baseline: section.source_hashes?.[span.file],
+        anchored: false,
+      })),
+      ...anchoredTargets(section, graph, skips),
+    ].sort((a, b) =>
+      a.span.file === b.span.file
+        ? a.span.start_line - b.span.start_line
+        : a.span.file.localeCompare(b.span.file),
     );
-    for (const span of spans) {
+    for (const { span, baseline, anchored } of targets) {
       const pathReason = skippedPathReason(span.file);
       if (pathReason) {
         skips.push({ file: span.file, reason: pathReason });
@@ -197,19 +251,22 @@ async function backlinkPlan(
 
       // Span line numbers are only trustworthy for the content they were
       // recorded against; a stale line can fall inside a string literal.
-      const recordedHash = section.source_hashes?.[span.file];
       const currentHash = sourceHash(content);
-      if (!recordedHash) {
+      if (!baseline) {
         skips.push({
           file: span.file,
-          reason: `skipped ${span.file}: section ${section.stable_id} has no recorded source hash for it, so its span line numbers cannot be verified; record fresh spans before inserting backlinks`,
+          reason: anchored
+            ? `skipped ${span.file}: it is not in the extracted source graph`
+            : `skipped ${span.file}: section ${section.stable_id} has no recorded source hash for it, so its span line numbers cannot be verified; record fresh spans or anchor the section with code-kg anchor`,
         });
         continue;
       }
-      if (recordedHash !== currentHash) {
+      if (baseline !== currentHash) {
         skips.push({
           file: span.file,
-          reason: `skipped ${span.file}: changed since section ${section.stable_id} recorded its source spans; record fresh spans before inserting backlinks`,
+          reason: anchored
+            ? `skipped ${span.file}: changed while its symbols were being located; rerun apply-backlinks`
+            : `skipped ${span.file}: changed since section ${section.stable_id} recorded its source spans; record fresh spans or anchor the section with code-kg anchor`,
         });
         continue;
       }

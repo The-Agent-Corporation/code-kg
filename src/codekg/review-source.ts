@@ -88,7 +88,7 @@ export async function reviewSourceCommand(
         ? ''
         : ' With no spans left, it ' +
           (write ? 'is now' : 'would become') +
-          ' coverage-only. Record fresh spans before marking it edit-safe again.')
+          ' coverage-only. Use `code-kg anchor` to make it edit-safe with anchors that follow the source.')
     : '';
   return {
     output:

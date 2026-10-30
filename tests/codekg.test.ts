@@ -488,7 +488,7 @@ describe('code-kg bootstrap', () => {
 
     expect(result.isError).toBeTruthy();
     expect(result.output).toContain(
-      'Manifest section architecture is edit-safe but has no source_spans.',
+      'Manifest section architecture is edit-safe but has no source_spans or source_anchors.',
     );
   });
 

@@ -5,7 +5,12 @@ import { checkAllCommand } from '../cli/check.js';
 import type { CmdContext, CmdResult } from '../context.js';
 import { flattenSections, loadAllSections } from '../lattice.js';
 import { walkEntries } from '../walk.js';
-import type { MaterializationManifest, SourceSpan } from './types.js';
+import { anchorName } from './anchors.js';
+import type {
+  MaterializationManifest,
+  SourceAnchor,
+  SourceSpan,
+} from './types.js';
 
 async function hasGeneratedMarkers(latDir: string): Promise<boolean> {
   if (!existsSync(latDir)) return false;
@@ -76,11 +81,21 @@ async function validateSourceSpan(
   return errors;
 }
 
+function validSourceAnchor(anchor: unknown): anchor is SourceAnchor {
+  const value = anchor as SourceAnchor | null;
+  return (
+    typeof value?.node_id === 'string' &&
+    typeof value.file === 'string' &&
+    (value.symbol === undefined || typeof value.symbol === 'string')
+  );
+}
+
 async function validateManifestAnchors(
   ctx: CmdContext,
   manifest: MaterializationManifest,
 ): Promise<string[]> {
   const errors: string[] = [];
+  let graphNodes: Set<string> | undefined;
   for (const [stableId, section] of Object.entries(manifest.sections)) {
     const policy = section.source_anchor_policy ?? 'coverage-only';
     const spans = Array.isArray(section.source_spans)
@@ -95,18 +110,48 @@ async function validateManifestAnchors(
     if (!Array.isArray(section.source_spans)) {
       errors.push(`Manifest section ${stableId} must contain source_spans.`);
     }
+    if (
+      section.source_anchors !== undefined &&
+      !(
+        Array.isArray(section.source_anchors) &&
+        section.source_anchors.every(validSourceAnchor)
+      )
+    ) {
+      errors.push(
+        `Manifest section ${stableId} has invalid source_anchors; each needs a node_id and a file.`,
+      );
+      continue;
+    }
+    const anchors = section.source_anchors ?? [];
     if (policy === 'coverage-only' && spans.length > 0) {
       errors.push(
         `Manifest section ${stableId} is coverage-only but has source_spans.`,
       );
     }
-    if (policy === 'edit-safe' && spans.length === 0) {
+    if (policy === 'coverage-only' && anchors.length > 0) {
       errors.push(
-        `Manifest section ${stableId} is edit-safe but has no source_spans.`,
+        `Manifest section ${stableId} is coverage-only but has source_anchors.`,
+      );
+    }
+    if (policy === 'edit-safe' && spans.length === 0 && anchors.length === 0) {
+      errors.push(
+        `Manifest section ${stableId} is edit-safe but has no source_spans or source_anchors.`,
       );
     }
     for (const span of spans) {
       errors.push(...(await validateSourceSpan(ctx, stableId, span)));
+    }
+    if (anchors.length && !graphNodes) {
+      const { freshGraph } = await import('./fresh.js');
+      graphNodes = new Set(
+        (await freshGraph(ctx.projectRoot)).nodes.map((node) => node.id),
+      );
+    }
+    for (const anchor of anchors) {
+      if (graphNodes?.has(anchor.node_id)) continue;
+      errors.push(
+        `Manifest section ${stableId} is anchored to ${anchorName(anchor)}, which no longer exists in the source; re-anchor it with code-kg anchor, or remove the anchor with code-kg anchor "${section.public_section_id}" --remove "${anchor.node_id}".`,
+      );
     }
   }
   return errors;

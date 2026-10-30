@@ -27,6 +27,13 @@ export type SourceSpan = {
   end_line: number;
 };
 
+/** A graph node pinned by `code-kg anchor`; `symbol` is absent for a file. */
+export type SourceAnchor = {
+  node_id: string;
+  file: string;
+  symbol?: string;
+};
+
 export type Confidence = 'EXTRACTED' | 'INFERRED' | 'AMBIGUOUS';
 
 export type EntityNode = {
@@ -138,6 +145,8 @@ export type ManifestSection = {
   source_anchor_policy?: 'coverage-only' | 'edit-safe';
   source_node_ids: string[];
   source_spans: SourceSpan[];
+  /** Symbols or files whose current location receives this section's backlinks. */
+  source_anchors?: SourceAnchor[];
   generated_hash: string;
   current_hash: string;
   last_seen_graph_hash: string;

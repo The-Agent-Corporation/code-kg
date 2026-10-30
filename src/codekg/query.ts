@@ -13,6 +13,7 @@ import { currentMeanings } from './meaning.js';
 import { visibleGraph } from './visibility.js';
 import { InputError } from './errors.js';
 import { STOP_WORDS } from './search.js';
+import { manifestOwner } from './anchors.js';
 import type {
   EntityNode,
   MaterializationManifest,
@@ -255,9 +256,7 @@ export async function ask(
       .split('\n')
       .slice(section.startLine - 1, section.endLine)
       .join('\n');
-    const owner = Object.values(manifest?.sections ?? {}).find(
-      (s) => s.file === section.filePath,
-    );
+    const owner = manifestOwner(manifest, section);
     if (owner?.status === 'suppressed' || owner?.status === 'orphaned')
       continue;
     if (
