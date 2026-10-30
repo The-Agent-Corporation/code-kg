@@ -42,10 +42,10 @@ Test file `tests/agents-edge-cases.test.ts` contains tests and validation symbol
 
 ### tests/backlinks-safety.test.ts
 
-Test file `tests/backlinks-safety.test.ts` contains tests and validation symbols. Key symbols: `roots`, `BACKLINK`, and 4 more.
+Test file `tests/backlinks-safety.test.ts` contains tests and validation symbols. Key symbols: `roots`, `BACKLINK`, and 5 more.
 
-- Symbols: `roots (const)`, `BACKLINK (const)`, `ctx (function)`, `project (function)`, `manifestPath (const)`, `markEditSafe (function)`
-- Imports: `src/codekg/backlinks.ts`, `src/codekg/bootstrap.ts`, `src/codekg/drift.ts`, `src/codekg/types.ts`, `src/context.ts`
+- Symbols: `roots (const)`, `BACKLINK (const)`, `ctx (function)`, `project (function)`, `manifestPath (const)`, `readManifest (function)`, `markEditSafe (function)`
+- Imports: `src/codekg/backlinks.ts`, `src/codekg/bootstrap.ts`, `src/codekg/drift.ts`, `src/codekg/structural.ts`, `src/codekg/types.ts`, `src/context.ts`
 - Imported by: none detected
 
 ### tests/cases.test.ts
@@ -93,7 +93,7 @@ Test file `tests/codekg.test.ts` contains tests and validation symbols. Key symb
 Test file `tests/config-corrupt.test.ts` contains tests and validation symbols. Key symbols: `roots`, `CORRUPT`, and 1 more.
 
 - Symbols: `roots (const)`, `CORRUPT (const)`, `project (function)`
-- Imports: `src/codekg/bootstrap.ts`, `src/codekg/enrich.ts`, `src/codekg/search.ts`, `src/codekg/semantic.ts`, `src/config.ts`, `src/context.ts`
+- Imports: `src/codekg/bootstrap.ts`, `src/codekg/check.ts`, `src/codekg/enrich.ts`, `src/codekg/search.ts`, `src/codekg/semantic.ts`, `src/config.ts`, and 1 more
 - Imported by: none detected
 
 ### tests/enrich.test.ts
@@ -106,17 +106,17 @@ Test file `tests/enrich.test.ts` contains tests and validation symbols. Key symb
 
 ### tests/gaps-inferred.test.ts
 
-Test file `tests/gaps-inferred.test.ts` contains tests and validation symbols. Key symbols: `roots`, `project`.
+Test file `tests/gaps-inferred.test.ts` contains tests and validation symbols. Key symbols: `roots`, `SOURCES`, and 3 more.
 
-- Symbols: `roots (const)`, `project (function)`
-- Imports: `src/codekg/bootstrap.ts`, `src/codekg/gaps.ts`, `src/codekg/graph.ts`, `src/context.ts`
+- Symbols: `roots (const)`, `SOURCES (const)`, `TESTS (const)`, `project (function)`, `section (function)`
+- Imports: `src/codekg/bootstrap.ts`, `src/codekg/context.ts`, `src/codekg/gaps.ts`, `src/codekg/graph.ts`, `src/context.ts`
 - Imported by: none detected
 
 ### tests/git-hooks.test.ts
 
-Test file `tests/git-hooks.test.ts` contains tests and validation symbols. Key symbols: `gitInit`, `git`.
+Test file `tests/git-hooks.test.ts` contains tests and validation symbols. Key symbols: `gitInit`, `git`, and 1 more.
 
-- Symbols: `gitInit (function)`, `git (function)`
+- Symbols: `gitInit (function)`, `git (function)`, `commit (function)`
 - Imports: `src/codekg/git-hooks.ts`
 - Imported by: none detected
 
@@ -149,7 +149,7 @@ Test file `tests/init-version.test.ts` contains tests and validation symbols. Ke
 Test file `tests/input-errors.test.ts` contains tests and validation symbols. Key symbols: `roots`, `ripgrepInstalled`, and 2 more.
 
 - Symbols: `roots (const)`, `ripgrepInstalled (const)`, `cliPath (const)`, `project (function)`
-- Imports: `src/code-refs.ts`, `src/codekg/errors.ts`, `src/codekg/query.ts`, `src/context.ts`
+- Imports: `src/code-refs.ts`, `src/codekg/errors.ts`, `src/codekg/query.ts`, `src/codekg/workspace.ts`, `src/context.ts`
 - Imported by: none detected
 
 ### tests/lattice.test.ts
@@ -250,6 +250,12 @@ Source file `src/codekg/agents.ts` is covered by test imports from `tests/agents
 
 - Tests: `tests/agents-edge-cases.test.ts`, `tests/codekg-intelligence.test.ts`, `tests/codekg.test.ts`
 
+### src/codekg/check.ts
+
+Source file `src/codekg/check.ts` is covered by test imports from `tests/codekg-messages.test.ts`, `tests/codekg.test.ts`, and 1 more.
+
+- Tests: `tests/codekg-messages.test.ts`, `tests/codekg.test.ts`, `tests/config-corrupt.test.ts`
+
 ### src/codekg/drift.ts
 
 Source file `src/codekg/drift.ts` is covered by test imports from `tests/backlinks-safety.test.ts`, `tests/codekg-intelligence.test.ts`, and 1 more.
@@ -273,6 +279,12 @@ Source file `src/codekg/query.ts` is covered by test imports from `tests/codekg-
 Source file `src/codekg/search.ts` is covered by test imports from `tests/codekg.test.ts`, `tests/config-corrupt.test.ts`, and 1 more.
 
 - Tests: `tests/codekg.test.ts`, `tests/config-corrupt.test.ts`, `tests/search-fallback.test.ts`
+
+### src/codekg/structural.ts
+
+Source file `src/codekg/structural.ts` is covered by test imports from `tests/backlinks-safety.test.ts`, `tests/codekg-intelligence.test.ts`, and 1 more.
+
+- Tests: `tests/backlinks-safety.test.ts`, `tests/codekg-intelligence.test.ts`, `tests/enrich.test.ts`
 
 ### src/codekg/types.ts
 
@@ -304,11 +316,11 @@ Source file `src/codekg/cache.ts` is covered by test imports from `tests/codekg-
 
 - Tests: `tests/codekg-intelligence.test.ts`, `tests/enrich.test.ts`
 
-### src/codekg/check.ts
+### src/codekg/context.ts
 
-Source file `src/codekg/check.ts` is covered by test imports from `tests/codekg-messages.test.ts`, `tests/codekg.test.ts`.
+Source file `src/codekg/context.ts` is covered by test imports from `tests/codekg.test.ts`, `tests/gaps-inferred.test.ts`.
 
-- Tests: `tests/codekg-messages.test.ts`, `tests/codekg.test.ts`
+- Tests: `tests/codekg.test.ts`, `tests/gaps-inferred.test.ts`
 
 ### src/codekg/enrich.ts
 
@@ -328,11 +340,11 @@ Source file `src/codekg/semantic.ts` is covered by test imports from `tests/code
 
 - Tests: `tests/codekg.test.ts`, `tests/config-corrupt.test.ts`
 
-### src/codekg/structural.ts
+### src/codekg/workspace.ts
 
-Source file `src/codekg/structural.ts` is covered by test imports from `tests/codekg-intelligence.test.ts`, `tests/enrich.test.ts`.
+Source file `src/codekg/workspace.ts` is covered by test imports from `tests/codekg-intelligence.test.ts`, `tests/input-errors.test.ts`.
 
-- Tests: `tests/codekg-intelligence.test.ts`, `tests/enrich.test.ts`
+- Tests: `tests/codekg-intelligence.test.ts`, `tests/input-errors.test.ts`
 
 ### src/config.ts
 
@@ -346,23 +358,11 @@ Source file `tests/rag-replay-server.ts` is covered by test imports from `tests/
 
 - Tests: `tests/mcp.test.ts`, `tests/search.test.ts`
 
-### src/cli/index.ts
-
-Source file `src/cli/index.ts` is covered by test imports from `tests/parser.test.ts`.
-
-- Tests: `tests/parser.test.ts`
-
 ### src/cli/refs.ts
 
 Source file `src/cli/refs.ts` is covered by test imports from `tests/cases.test.ts`.
 
 - Tests: `tests/cases.test.ts`
-
-### src/cli/search.ts
-
-Source file `src/cli/search.ts` is covered by test imports from `tests/search-fallback.test.ts`.
-
-- Tests: `tests/search-fallback.test.ts`
 
 ### src/cli/section.ts
 

@@ -13,9 +13,9 @@ Use this section for auth, persistence, configuration, background work, observab
 - src/codekg/agents.ts (file)
 - src/context.ts (file)
 - tests/codekg-intelligence.test.ts (file)
+- src/codekg/graph.ts (file)
 - src/lattice.ts (file)
 - src/cli/init.ts (file)
-- src/codekg/graph.ts (file)
 - tests/cases.test.ts (file)
 
 ## Cross-Community Imports
@@ -28,7 +28,7 @@ These imports cross the first-pass directory communities and may indicate integr
 - tests/backlinks-safety.test.ts imports src/codekg/backlinks.ts
 - tests/backlinks-safety.test.ts imports src/codekg/bootstrap.ts
 - tests/backlinks-safety.test.ts imports src/codekg/drift.ts
+- tests/backlinks-safety.test.ts imports src/codekg/structural.ts
 - tests/backlinks-safety.test.ts imports src/codekg/types.ts
 - tests/backlinks-safety.test.ts imports src/context.ts
 - tests/cases.test.ts imports src/cli/check.ts
-- tests/cases.test.ts imports src/cli/refs.ts

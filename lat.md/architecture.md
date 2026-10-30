@@ -36,14 +36,14 @@ The initial inventory groups files by broad category so later extraction can foc
 
 ## Structural Graph
 
-Code-KG extracted a deterministic structural graph with 1111 nodes, 2673 edges, 4 communities using the multi-language-directory-fallback analysis path.
+Code-KG extracted a deterministic structural graph with 1135 nodes, 2760 edges, 4 communities using the multi-language-directory-fallback analysis path.
 
 ## Communities
 
 Directory-based communities provide the first subsystem map until graph clustering is available.
 
-- src: 72 files, 740 symbols, cohesion 0.86
-- tests: 45 files, 213 symbols, cohesion 0.5
+- src: 72 files, 759 symbols, cohesion 0.85
+- tests: 45 files, 218 symbols, cohesion 0.49
 - templates: 2 files, 27 symbols, cohesion 1
 - scripts: 4 files, 4 symbols, cohesion 0.86
 
@@ -58,9 +58,9 @@ High-degree nodes may deserve review as important entry points, bridges, or util
 - src/codekg/agents.ts (file)
 - src/context.ts (file)
 - tests/codekg-intelligence.test.ts (file)
+- src/codekg/graph.ts (file)
 - src/lattice.ts (file)
 - src/cli/init.ts (file)
-- src/codekg/graph.ts (file)
 
 ## Dependency Hotspots
 
@@ -90,17 +90,17 @@ Source file `src/codekg/cache.ts` is imported by local files including `src/code
 
 - Imported by: `src/codekg/agent-context.ts`, `src/codekg/enrich.ts`, `src/codekg/graph.ts`, `src/codekg/meaning.ts`, `src/codekg/query.ts`, `src/codekg/review-source.ts`, and 5 more
 
+### src/codekg/structural.ts
+
+Source file `src/codekg/structural.ts` is imported by local files including `src/codekg/agent-context.ts`, `src/codekg/backlinks.ts`, and 9 more.
+
+- Imported by: `src/codekg/agent-context.ts`, `src/codekg/backlinks.ts`, `src/codekg/discovery.ts`, `src/codekg/enrich.ts`, `src/codekg/graph.ts`, `src/codekg/meaning.ts`, and 5 more
+
 ### src/config.ts
 
 Source file `src/config.ts` is imported by local files including `scripts/cook-test-rag.ts`, `src/cli/hook.ts`, and 9 more.
 
 - Imported by: `scripts/cook-test-rag.ts`, `src/cli/hook.ts`, `src/cli/init.ts`, `src/codekg/enrich.ts`, `src/codekg/query.ts`, `src/codekg/search.ts`, and 5 more
-
-### src/codekg/structural.ts
-
-Source file `src/codekg/structural.ts` is imported by local files including `src/codekg/agent-context.ts`, `src/codekg/backlinks.ts`, and 8 more.
-
-- Imported by: `src/codekg/agent-context.ts`, `src/codekg/backlinks.ts`, `src/codekg/discovery.ts`, `src/codekg/enrich.ts`, `src/codekg/graph.ts`, `src/codekg/meaning.ts`, and 4 more
 
 ### src/codekg/bootstrap.ts
 
@@ -126,17 +126,17 @@ Source file `src/search/provider.ts` is imported by local files including `src/c
 
 - Imported by: `src/cli/init.ts`, `src/cli/search.ts`, `src/codekg/semantic.ts`, `src/search/embeddings.ts`, `src/search/index.ts`, `src/search/search.ts`, and 2 more
 
+### src/codekg/check.ts
+
+Source file `src/codekg/check.ts` is imported by local files including `src/codekg/cli.ts`, `src/codekg/doctor.ts`, and 5 more.
+
+- Imported by: `src/codekg/cli.ts`, `src/codekg/doctor.ts`, `src/codekg/mcp.ts`, `src/codekg/update.ts`, `tests/codekg-messages.test.ts`, `tests/codekg.test.ts`, and 1 more
+
 ### src/codekg/fresh.ts
 
 Source file `src/codekg/fresh.ts` is imported by local files including `src/codekg/agent-context.ts`, `src/codekg/changed.ts`, and 5 more.
 
 - Imported by: `src/codekg/agent-context.ts`, `src/codekg/changed.ts`, `src/codekg/context.ts`, `src/codekg/meaning.ts`, `src/codekg/query.ts`, `src/codekg/review-source.ts`, and 1 more
-
-### src/codekg/check.ts
-
-Source file `src/codekg/check.ts` is imported by local files including `src/codekg/cli.ts`, `src/codekg/doctor.ts`, and 4 more.
-
-- Imported by: `src/codekg/cli.ts`, `src/codekg/doctor.ts`, `src/codekg/mcp.ts`, `src/codekg/update.ts`, `tests/codekg-messages.test.ts`, `tests/codekg.test.ts`
 
 ### src/codekg/query.ts
 
@@ -178,9 +178,9 @@ Source file `src/codekg/bootstrap.ts` contains source symbols. Key symbols: `Mer
 
 ### src/codekg/agents.ts
 
-Source file `src/codekg/agents.ts` contains source symbols. Key symbols: `SECTION_START`, `SECTION_END`, and 55 more.
+Source file `src/codekg/agents.ts` contains source symbols. Key symbols: `SECTION_START`, `SECTION_END`, and 56 more.
 
-- Symbols: `SECTION_START (const)`, `SECTION_END (const)`, `CODEX_HOOK_COMMAND (const)`, `CODEX_HOOK_MATCHER (const)`, `GENERIC_SEARCH_COMMAND (const)`, `HookCommandSelection (type)`, `AgentsOptions (type)`, `HookCheckOptions (type)`, and 49 more
+- Symbols: `SECTION_START (const)`, `SECTION_END (const)`, `CODEX_HOOK_COMMAND (const)`, `CODEX_HOOK_MATCHER (const)`, `GENERIC_SEARCH_COMMAND (const)`, `HookCommandSelection (type)`, `AgentsOptions (type)`, `HookCheckOptions (type)`, and 50 more
 - Imports: `src/codekg/discovery.ts`, `src/codekg/git-hooks.ts`, `src/codekg/semantic.ts`, `src/context.ts`
 - Imported by: `tests/agents-edge-cases.test.ts`, `tests/codekg-intelligence.test.ts`, `tests/codekg.test.ts`
 
@@ -191,6 +191,14 @@ Source file `src/context.ts` contains source symbols. Key symbols: `Styler`, `id
 - Symbols: `Styler (type)`, `identity (const)`, `plainStyler (const)`, `CmdContext (type)`, `CmdResult (type)`
 - Imports: none detected
 - Imported by: `src/cli/check.ts`, `src/cli/context.ts`, `src/cli/expand.ts`, `src/cli/hook.ts`, `src/cli/index.ts`, `src/cli/locate.ts`, and 41 more
+
+### src/codekg/graph.ts
+
+Source file `src/codekg/graph.ts` contains source symbols. Key symbols: `LOCAL_IMPORT_EXTENSIONS`, `GRAPH_CACHE_PATH`, and 36 more.
+
+- Symbols: `LOCAL_IMPORT_EXTENSIONS (const)`, `GRAPH_CACHE_PATH (const)`, `ImportSpec (type)`, `stableId (function)`, `moduleLabel (function)`, `fileNode (function)`, `moduleNode (function)`, `symbolNode (function)`, and 30 more
+- Imports: `src/codekg/cache.ts`, `src/codekg/discovery.ts`, `src/codekg/structural.ts`, `src/codekg/types.ts`, `src/source-parser.ts`
+- Imported by: `src/codekg/bootstrap.ts`, `src/codekg/cli.ts`, `src/codekg/drift.ts`, `src/codekg/fresh.ts`, `src/codekg/gaps.ts`, `tests/codekg-intelligence.test.ts`, and 2 more
 
 ### src/lattice.ts
 
@@ -207,14 +215,6 @@ Source file `src/cli/init.ts` contains source symbols. Key symbols: `confirm`, `
 - Symbols: `confirm (function)`, `prompt (function)`, `loaderExecArgs (function)`, `resolveLatBin (function)`, `LatCommandStyle (type)`, `latBinString (function)`, `styledMcpCommand (function)`, `latHookCommand (function)`, and 31 more
 - Imports: `src/cli/checklist-menu.ts`, `src/cli/gen.ts`, `src/cli/select-menu.ts`, `src/cli/templates.ts`, `src/config.ts`, `src/init-version.ts`, and 2 more
 - Imported by: none detected
-
-### src/codekg/graph.ts
-
-Source file `src/codekg/graph.ts` contains source symbols. Key symbols: `LOCAL_IMPORT_EXTENSIONS`, `GRAPH_CACHE_PATH`, and 26 more.
-
-- Symbols: `LOCAL_IMPORT_EXTENSIONS (const)`, `GRAPH_CACHE_PATH (const)`, `ImportSpec (type)`, `stableId (function)`, `moduleLabel (function)`, `fileNode (function)`, `moduleNode (function)`, `symbolNode (function)`, and 20 more
-- Imports: `src/codekg/cache.ts`, `src/codekg/discovery.ts`, `src/codekg/structural.ts`, `src/codekg/types.ts`, `src/source-parser.ts`
-- Imported by: `src/codekg/bootstrap.ts`, `src/codekg/cli.ts`, `src/codekg/drift.ts`, `src/codekg/fresh.ts`, `src/codekg/gaps.ts`, `tests/codekg-intelligence.test.ts`, and 2 more
 
 ### scripts/cook-test-rag.ts
 
