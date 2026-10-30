@@ -54,6 +54,17 @@ describe('readHookInput', () => {
 
     await expect(pending).resolves.toBe('not json');
   });
+
+  it('decodes a multibyte character split across chunks', async () => {
+    const stream = new PassThrough();
+    const pending = readHookInput(stream, 60_000);
+    const bytes = Buffer.from('{"prompt":"café"}');
+    const split = bytes.indexOf(0xc3) + 1;
+    stream.write(bytes.subarray(0, split));
+    stream.write(bytes.subarray(split));
+
+    await expect(pending).resolves.toBe('{"prompt":"café"}');
+  });
 });
 
 function runWithOpenStdin(

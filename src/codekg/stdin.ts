@@ -39,11 +39,13 @@ export function readHookInput(
       clearTimeout(timer);
       timer = setTimeout(finish, idleMs);
     };
-    const onData = (chunk: Buffer | string) => {
-      input += String(chunk);
+    const onData = (chunk: string) => {
+      input += chunk;
       if (isCompleteJson(input)) finish();
       else arm();
     };
+    // Decodes multibyte characters split across chunks.
+    stream.setEncoding('utf8');
     stream.on('data', onData);
     stream.once('end', finish);
     stream.once('error', finish);
