@@ -1,5 +1,12 @@
 import { constants as fsConstants, existsSync } from 'node:fs';
-import { access, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import {
+  access,
+  mkdir,
+  readFile,
+  rm,
+  rmdir,
+  writeFile,
+} from 'node:fs/promises';
 import { delimiter, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { CmdContext, CmdResult } from '../context.js';
@@ -360,6 +367,14 @@ async function uninstallCodexHook(projectRoot: string): Promise<string> {
     delete nextHooks.PreToolUse;
   }
   const next: CodexHooksConfig = { ...config, hooks: nextHooks };
+  if (
+    Object.keys(nextHooks).length === 0 &&
+    Object.keys(next).every((key) => key === 'hooks')
+  ) {
+    await rm(hooksPath);
+    await rmdir(join(projectRoot, '.codex')).catch(() => undefined);
+    return 'removed Codex hook';
+  }
   await writeFile(hooksPath, JSON.stringify(next, null, 2) + '\n');
   return 'removed Codex hook';
 }
@@ -421,17 +436,35 @@ async function agentsStatusCommand(ctx: CmdContext): Promise<CmdResult> {
   return { output: lines.join('\n') };
 }
 
+async function unterminatedAgentsBlock(
+  projectRoot: string,
+): Promise<string | null> {
+  const content = await readText(join(projectRoot, 'AGENTS.md'));
+  if (content === null) return null;
+  const start = content.indexOf(SECTION_START);
+  if (start === -1 || content.includes(SECTION_END, start)) return null;
+  return `AGENTS.md has \`${SECTION_START}\` without a matching \`${SECTION_END}\`; nothing was changed. Close or remove the partial Code-KG block, then re-run.`;
+}
+
 export async function agentsCommand(
   ctx: CmdContext,
   opts: AgentsOptions,
 ): Promise<CmdResult> {
   if (opts.action === 'status') return agentsStatusCommand(ctx);
 
+  const unterminated = await unterminatedAgentsBlock(ctx.projectRoot);
+  if (unterminated) {
+    return {
+      output: ['# Code-KG Agents', '', `- ${unterminated}`].join('\n'),
+      isError: true,
+    };
+  }
+
   const changes =
     opts.action === 'install'
       ? await (async () => {
           const hookSelection = await selectHookCommand();
-          return [
+          const installed = [
             await installAgentsMd(
               ctx.projectRoot,
               hookSelection.fallbackInvocation,
@@ -439,6 +472,12 @@ export async function agentsCommand(
             await installCodexHook(ctx.projectRoot, hookSelection.hookCommand),
             await installGitHook(ctx.projectRoot),
           ];
+          if (hookSelection.fallbackInvocation) {
+            installed.push(
+              `warning: \`code-kg\` is not on PATH, so AGENTS.md and .codex/hooks.json use this machine's path (${hookSelection.fallbackInvocation}). Run \`code-kg install-global\` and re-run \`code-kg agents install\` before committing them.`,
+            );
+          }
+          return installed;
         })()
       : [
           await uninstallAgentsMd(ctx.projectRoot),
