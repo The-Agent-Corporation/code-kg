@@ -59,7 +59,7 @@ export async function reviewSourceCommand(
     );
     section.current_hash = sourceHash(content);
     section.status = 'curated';
-    await writeJsonAtomic(path, manifest);
+    await writeJsonAtomic(path, manifest, 2);
   }
   return {
     output:

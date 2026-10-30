@@ -151,6 +151,8 @@ describe('fresh structural intelligence', () => {
       (await driftCommand(ctx(root), { applySafe: false })).output,
     ).not.toMatch(/source content changed/i);
     expect(await readFile(path, 'utf8')).toBe(prose);
+    const reviewed = await readFile(manifestPath(root), 'utf8');
+    expect(reviewed).toBe(JSON.stringify(JSON.parse(reviewed), null, 2) + '\n');
   });
   it.each([
     ['example.py', 'def greet(name):\n    return name\n', 'greet'],
