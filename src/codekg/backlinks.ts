@@ -37,6 +37,8 @@ type BacklinkSkip = {
 type BacklinkPlan = {
   insertions: BacklinkInsertion[];
   skips: BacklinkSkip[];
+  /** The graph anchors were located in, when any section has anchors. */
+  graph: ProjectGraph | null;
 };
 
 const SLASH_COMMENT_EXTENSIONS = new Set([
@@ -284,10 +286,13 @@ async function backlinkPlan(
   insertions.sort((a, b) =>
     a.file === b.file ? a.line - b.line : a.file.localeCompare(b.file),
   );
-  return { insertions, skips };
+  return { insertions, skips, graph };
 }
 
-function formatPlan(plan: BacklinkPlan, write: boolean): string {
+function formatPlan(
+  plan: Pick<BacklinkPlan, 'insertions' | 'skips'>,
+  write: boolean,
+): string {
   const lines = ['# Code-KG Apply Backlinks', ''];
   if (plan.insertions.length === 0 && plan.skips.length === 0) {
     lines.push('No backlink changes.');
@@ -336,10 +341,37 @@ export function insertCommentLine(
   );
 }
 
+/**
+ * An inserted comment changes the hash of an anchored file, and of an anchored
+ * symbol whose body contains it. Anchors reviewed against the pre-insert
+ * content move to the new hash, as span baselines do.
+ */
+async function rehashAnchors(
+  ctx: CmdContext,
+  manifest: MaterializationManifest,
+  before: ProjectGraph | null,
+  files: Set<string>,
+): Promise<void> {
+  const anchors = Object.values(manifest.sections)
+    .flatMap((section) => section.source_anchors ?? [])
+    .filter((anchor) => files.has(anchor.file));
+  if (!before || !anchors.length) return;
+  const hashes = (graph: ProjectGraph) =>
+    new Map(graph.nodes.map((node) => [node.id, node.body_hash]));
+  const previous = hashes(before);
+  const next = hashes(await freshGraph(ctx.projectRoot));
+  for (const anchor of anchors) {
+    const hash = next.get(anchor.node_id);
+    if (hash && anchor.hash === previous.get(anchor.node_id))
+      anchor.hash = hash;
+  }
+}
+
 async function writeInsertions(
   ctx: CmdContext,
   manifest: MaterializationManifest,
   insertions: BacklinkInsertion[],
+  graph: ProjectGraph | null,
 ): Promise<{ written: BacklinkInsertion[]; skips: BacklinkSkip[] }> {
   const written: BacklinkInsertion[] = [];
   const skips: BacklinkSkip[] = [];
@@ -408,6 +440,7 @@ async function writeInsertions(
         }
       }
     }
+    await rehashAnchors(ctx, manifest, graph, new Set(rehashed.keys()));
     await writeJsonAtomic(manifestPath(ctx), manifest, 2);
   }
 
@@ -433,6 +466,7 @@ export async function applyBacklinksCommand(
     ctx,
     manifest,
     plan.insertions,
+    plan.graph,
   );
   return {
     output: formatPlan(

@@ -86,6 +86,7 @@ function validSourceAnchor(anchor: unknown): anchor is SourceAnchor {
   return (
     typeof value?.node_id === 'string' &&
     typeof value.file === 'string' &&
+    typeof value.hash === 'string' &&
     (value.symbol === undefined || typeof value.symbol === 'string')
   );
 }
@@ -118,7 +119,7 @@ async function validateManifestAnchors(
       )
     ) {
       errors.push(
-        `Manifest section ${stableId} has invalid source_anchors; each needs a node_id and a file.`,
+        `Manifest section ${stableId} has invalid source_anchors; each needs a node_id, a file and a hash.`,
       );
       continue;
     }

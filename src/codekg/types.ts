@@ -32,6 +32,8 @@ export type SourceAnchor = {
   node_id: string;
   file: string;
   symbol?: string;
+  /** The node's `body_hash` when the section was last reviewed against it. */
+  hash: string;
 };
 
 export type Confidence = 'EXTRACTED' | 'INFERRED' | 'AMBIGUOUS';
@@ -145,7 +147,10 @@ export type ManifestSection = {
   source_anchor_policy?: 'coverage-only' | 'edit-safe';
   source_node_ids: string[];
   source_spans: SourceSpan[];
-  /** Symbols or files whose current location receives this section's backlinks. */
+  /**
+   * Symbols or files whose current location receives this section's
+   * backlinks. Drift compares each anchor's own hash, not `source_hashes`.
+   */
   source_anchors?: SourceAnchor[];
   generated_hash: string;
   current_hash: string;

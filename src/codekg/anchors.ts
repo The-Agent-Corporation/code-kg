@@ -44,9 +44,36 @@ export function manifestOwner(
 
 export function sourceAnchor(node: EntityNode): SourceAnchor {
   const file = node.source_file ?? node.label;
+  const hash = node.body_hash ?? '';
   return node.kind === 'file'
-    ? { node_id: node.id, file }
-    : { node_id: node.id, file, symbol: node.label };
+    ? { node_id: node.id, file, hash }
+    : { node_id: node.id, file, symbol: node.label, hash };
+}
+
+/** Graph nodes a section documents, through coverage evidence or anchors. */
+export function sectionNodeIds(section: ManifestSection): string[] {
+  return [
+    ...section.source_node_ids,
+    ...(section.source_anchors ?? []).map((anchor) => anchor.node_id),
+  ];
+}
+
+/**
+ * Anchors whose node is gone, and anchors whose node's body changed since the
+ * section was last reviewed against it.
+ */
+export function anchorChanges(
+  section: ManifestSection,
+  nodes: Map<string, EntityNode>,
+): { missing: SourceAnchor[]; changed: SourceAnchor[] } {
+  const missing: SourceAnchor[] = [];
+  const changed: SourceAnchor[] = [];
+  for (const anchor of section.source_anchors ?? []) {
+    const node = nodes.get(anchor.node_id);
+    if (!node) missing.push(anchor);
+    else if (node.body_hash !== anchor.hash) changed.push(anchor);
+  }
+  return { missing, changed };
 }
 
 export function anchorName(anchor: SourceAnchor): string {

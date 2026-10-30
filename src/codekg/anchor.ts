@@ -186,9 +186,14 @@ async function listAnchors(
     ...anchors.map((anchor) => {
       const node = nodes.get(anchor.node_id);
       const span = node && anchorSpan(node);
-      return span
-        ? `- ${anchorName(anchor)} at ${span.file}:${span.start_line}`
-        : `- ${anchorName(anchor)} is missing from the source; remove it with \`code-kg anchor ${quote(section.id)} --remove ${quote(anchor.node_id)}\``;
+      if (!span)
+        return `- ${anchorName(anchor)} is missing from the source; remove it with \`code-kg anchor ${quote(section.id)} --remove ${quote(anchor.node_id)}\``;
+      return (
+        `- ${anchorName(anchor)} at ${span.file}:${span.start_line}` +
+        (node.body_hash === anchor.hash
+          ? ''
+          : ` (changed since the section was reviewed; review it, then run \`code-kg review-source ${quote(entry!.stable_id)} --write\`)`)
+      );
     }),
   ]);
 }
@@ -221,17 +226,6 @@ export async function anchorCommand(
     if (!entry || typeof anchor === 'string')
       return reply([typeof anchor === 'string' ? anchor : 'No anchors.'], true);
     entry.source_anchors = entry.source_anchors!.filter((a) => a !== anchor);
-    if (isSectionEntry(entry)) {
-      entry.source_node_ids = entry.source_node_ids.filter(
-        (id) => id !== anchor.node_id,
-      );
-      const files = new Set(entry.source_anchors.map((a) => a.file));
-      entry.source_hashes = Object.fromEntries(
-        Object.entries(entry.source_hashes ?? {}).filter(([file]) =>
-          files.has(file),
-        ),
-      );
-    }
     if (!entry.source_anchors.length) {
       delete entry.source_anchors;
       if (!entry.source_spans.length)
@@ -250,24 +244,15 @@ export async function anchorCommand(
   const node = resolveNode(graph, opts.target);
   if (typeof node === 'string') return reply([node], true);
   const span = anchorSpan(node);
-  const hash = span && graph.source_hashes?.[span.file];
-  if (!span || !hash)
-    return reply(
-      [`${anchorName(sourceAnchor(node))} has no source location.`],
-      true,
-    );
-  const entry = target.entry ?? (await sectionEntry(ctx, section));
   const anchor = sourceAnchor(node);
+  if (!span || !anchor.hash)
+    return reply([`${anchorName(anchor)} has no source location.`], true);
+  const entry = target.entry ?? (await sectionEntry(ctx, section));
   if (entry.source_anchors?.some((a) => a.node_id === node.id))
     return reply([
       `${section.id} is already anchored to ${anchorName(anchor)}.`,
     ]);
   entry.source_anchors = [...(entry.source_anchors ?? []), anchor];
-  if (!entry.source_node_ids.includes(node.id))
-    entry.source_node_ids.push(node.id);
-  // An older recorded hash means the section was last reviewed against older
-  // content; keeping it lets drift ask for that review.
-  entry.source_hashes = { [span.file]: hash, ...entry.source_hashes };
   entry.source_anchor_policy = 'edit-safe';
   manifest.sections[target.key] = entry;
   await writeJsonAtomic(path, manifest, 2);

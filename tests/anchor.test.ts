@@ -12,6 +12,7 @@ import {
   writeBootstrapPlan,
 } from '../src/codekg/bootstrap.js';
 import { codeKgCheckCommand } from '../src/codekg/check.js';
+import { contextCommand } from '../src/codekg/context.js';
 import { driftCommand } from '../src/codekg/drift.js';
 import { createCodeKgMcpServer } from '../src/codekg/mcp.js';
 import { reviewSourceCommand } from '../src/codekg/review-source.js';
@@ -182,13 +183,22 @@ describe('code-kg anchor', () => {
     );
 
     const check = await codeKgCheckCommand(ctx(root));
+    const drift = await driftCommand(ctx(root));
     const preview = await applyBacklinksCommand(ctx(root), { write: false });
     const list = await anchorCommand(ctx(root), SECTION, { action: 'list' });
+    const review = await reviewSourceCommand(ctx(root), SECTION, true);
     const removed = await anchorCommand(ctx(root), SECTION, {
       action: 'remove',
       target: 'greet',
     });
 
+    expect(drift.output).toContain(
+      `- Manifest section ${SECTION} is anchored to src/greet.ts#greet, which disappeared from the fresh graph`,
+    );
+    expect(review.isError).toBe(true);
+    expect(review.output).toContain(
+      'Resolve missing source coverage before review: src/greet.ts#greet',
+    );
     expect(check.isError).toBe(true);
     expect(check.output).toContain(
       `Manifest section ${SECTION} is anchored to src/greet.ts#greet, which no longer exists in the source`,
@@ -226,7 +236,7 @@ describe('code-kg anchor', () => {
       `Manifest section ${SECTION} is coverage-only but has source_anchors.`,
     );
     expect(check.output).toContain(
-      'Manifest section architecture has invalid source_anchors; each needs a node_id and a file.',
+      'Manifest section architecture has invalid source_anchors; each needs a node_id, a file and a hash.',
     );
   });
 
@@ -256,24 +266,74 @@ describe('code-kg anchor', () => {
     );
   });
 
-  it('asks for review when an anchored file changes, and review-source keeps the anchors', async () => {
+  it('asks for review only when the anchored symbol changes, and review-source records it', async () => {
     const root = await project();
     await add(root, SECTION, 'greet');
+    await writeFile(
+      join(root, 'src/greet.ts'),
+      GREET.replace('return 1', 'return 3'),
+    );
+    const unrelated = await driftCommand(ctx(root));
     await writeFile(join(root, 'src/greet.ts'), GREET.replace('hi', 'hello'));
 
     const stale = await driftCommand(ctx(root));
+    const list = await anchorCommand(ctx(root), SECTION, { action: 'list' });
     const review = await reviewSourceCommand(ctx(root), SECTION, true);
     const fresh = await driftCommand(ctx(root));
 
-    expect(stale.output).toMatch(
-      /Source content changed: src\/greet\.ts; review knowledge sections .*lat\.md\/notes#Notes#Greeting/,
+    expect(unrelated.output).not.toContain(SECTION);
+    expect(stale.output).toContain(
+      `- Anchored source changed: src/greet.ts#greet; review knowledge section ${SECTION}, then run code-kg review-source "${SECTION}" --write.`,
     );
-    expect(review.isError).toBeFalsy();
-    expect(review.output).not.toContain('coverage-only');
+    expect(list.output).toContain(
+      '- src/greet.ts#greet at src/greet.ts:1 (changed since the section was reviewed',
+    );
+    expect(review.output).toContain(
+      `Acknowledged source review for ${SECTION} (1 anchors).`,
+    );
     expect(fresh.output).not.toContain(SECTION);
-    expect(
-      (await readManifest(root)).sections[SECTION].source_anchor_policy,
-    ).toBe('edit-safe');
+    expect((await readManifest(root)).sections[SECTION]).toMatchObject({
+      source_anchor_policy: 'edit-safe',
+      source_node_ids: [],
+      source_hashes: {},
+    });
+  });
+
+  it('keeps anchor baselines current when backlinks are written into anchored code', async () => {
+    const root = await project();
+    await writeFile(
+      join(root, 'src/shape.ts'),
+      'export class Shape {\n  area() {\n    return 0;\n  }\n}\n',
+    );
+    await writeFile(
+      join(root, 'lat.md/notes.md'),
+      '# Notes\n\nHand-written notes.\n\n## Greeting\n\nHow greeting works.\n\n## Shapes\n\nHow shapes work.\n',
+    );
+    const shapes = 'lat.md/notes#Notes#Shapes';
+    await add(root, SECTION, 'src/other.ts');
+    await add(root, shapes, 'Shape');
+    await add(root, SECTION, 'area');
+
+    const applied = await applyBacklinksCommand(ctx(root), { write: true });
+    const drift = await driftCommand(ctx(root));
+
+    expect(applied.output).toContain(
+      `inserted // @lat: [[${SECTION}]] at src/shape.ts:2`,
+    );
+    expect(applied.output).toContain(
+      `inserted // @lat: [[${SECTION}]] at src/other.ts:1`,
+    );
+    expect(drift.output).not.toContain(SECTION);
+    expect(drift.output).not.toContain(shapes);
+  });
+
+  it('lists anchored sections in code-kg context for the file', async () => {
+    const root = await project();
+    await add(root, SECTION, 'greet');
+
+    const context = await contextCommand(ctx(root), 'src/greet.ts');
+
+    expect(context.output).toContain(SECTION);
   });
 
   it('is available through MCP', async () => {
