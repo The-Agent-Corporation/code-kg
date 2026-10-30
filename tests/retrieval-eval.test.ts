@@ -3,7 +3,10 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { Client } from '@libsql/client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { rankSectionsLexically } from '../src/codekg/search.js';
+import {
+  rankSectionsLexically,
+  readSectionBodies,
+} from '../src/codekg/search.js';
 import {
   flattenSections,
   loadAllSections,
@@ -158,7 +161,7 @@ const QUESTIONS: Array<{ question: string; answers: string[] }> = [
  * Measured on the committed knowledge base. Raise these when ranking or
  * curated sections improve; lowering one needs a reason in the commit.
  */
-const LEXICAL_FLOOR = { recallAt5: 0.563, mrr: 0.44 };
+const LEXICAL_FLOOR = { recallAt5: 0.813, mrr: 0.69 };
 const SEMANTIC_FLOOR = { recallAt5: 0.875, mrr: 0.714 };
 
 type Score = { recallAt5: number; mrr: number; report: string };
@@ -182,9 +185,11 @@ function score(rankings: string[][]): Score {
 
 const repoLatDir = join(import.meta.dirname, '..', 'lat.md');
 let sections: Section[];
+let bodies: Map<string, string>;
 
 beforeAll(async () => {
   sections = flattenSections(await loadAllSections(repoLatDir));
+  bodies = await readSectionBodies(repoLatDir, sections);
 });
 
 describe('retrieval eval (lexical)', () => {
@@ -199,7 +204,7 @@ describe('retrieval eval (lexical)', () => {
   it('stays at or above the recorded floor', () => {
     const result = score(
       QUESTIONS.map(({ question }) =>
-        rankSectionsLexically(sections, question, 10).map(
+        rankSectionsLexically(sections, question, 10, bodies).map(
           (section) => section.id,
         ),
       ),

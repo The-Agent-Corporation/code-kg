@@ -45,7 +45,7 @@ Every graph edge carries a confidence. `EXTRACTED` edges come from static syntax
 
 `code-kg search` is lexical by default and works offline. `--backend semantic` uses embeddings, `auto-semantic` uses them when a provider is configured and falls back to lexical otherwise, and `hybrid` runs `ask`.
 
-- Lexical ranking scores each section's id, heading and leading paragraph; see [[src/codekg/search.ts#rankSectionsLexically]].
+- Lexical ranking scores each section's id, heading, leading paragraph and the rest of its body, and drops question words such as "how" and "the"; see [[src/codekg/search.ts#rankSectionsLexically]].
 - Semantic search embeds sections with a local model (`Xenova/bge-small-en-v1.5`, enabled by `code-kg semantic enable-local`) or a remote provider keyed by `LAT_LLM_KEY` (OpenAI `sk-…`, Vercel `vck_…`). The vector index is `lat.md/.cache/vectors.db`.
 - With no provider, explicit semantic search returns an error naming the setup command. `auto-semantic` falls back instead, also when semantic search throws, and its `Backend:` line says why; see [[src/codekg/search.ts#codeKgSearchCommand]].
 - `tests/retrieval-eval.test.ts` measures ranking changes with recall@5 and mean reciprocal rank over this repository's questions.

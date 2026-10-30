@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import type { CmdContext, CmdResult } from '../context.js';
 import {
   flattenSections,
@@ -52,21 +54,57 @@ export function withCodeKgNavHints(
   };
 }
 
-function scoreSection(section: Section, query: string): number {
+/** Question words that match nearly every section's prose. */
+export const STOP_WORDS = new Set(
+  'a an and are as at be by can do does for from how i in is it its of on or that the this to what when where which who why with'.split(
+    ' ',
+  ),
+);
+
+function scoreSection(section: Section, query: string, body = ''): number {
   const q = query.toLowerCase();
   const id = section.id.toLowerCase();
   const heading = section.heading.toLowerCase();
-  const body = section.firstParagraph.toLowerCase();
+  const lead = section.firstParagraph.toLowerCase();
+  const text = body.toLowerCase();
   let score = 0;
   if (id.includes(q)) score += 8;
   if (heading.includes(q)) score += 6;
-  if (body.includes(q)) score += 4;
-  for (const token of q.split(/\s+/).filter(Boolean)) {
+  if (lead.includes(q)) score += 4;
+  const tokens = new Set(
+    q.split(/\s+/).filter((token) => token && !STOP_WORDS.has(token)),
+  );
+  for (const token of tokens) {
     if (id.includes(token)) score += 2;
     if (heading.includes(token)) score += 2;
-    if (body.includes(token)) score += 1;
+    if (lead.includes(token)) score += 1;
+    if (text.includes(token)) score += 1;
   }
   return score;
+}
+
+/** Each section's text below its heading, keyed by section id. */
+export async function readSectionBodies(
+  latDir: string,
+  sections: Section[],
+): Promise<Map<string, string>> {
+  const root = dirname(latDir);
+  const files = new Map<string, string[]>();
+  const bodies = new Map<string, string>();
+  for (const section of sections) {
+    let lines = files.get(section.filePath);
+    if (!lines) {
+      lines = (await readFile(join(root, section.filePath), 'utf8')).split(
+        '\n',
+      );
+      files.set(section.filePath, lines);
+    }
+    bodies.set(
+      section.id,
+      lines.slice(section.startLine, section.endLine).join('\n'),
+    );
+  }
+  return bodies;
 }
 
 /** Sections matching `query` lexically, best first. */
@@ -74,11 +112,12 @@ export function rankSectionsLexically(
   sections: Section[],
   query: string,
   limit: number,
+  bodies: Map<string, string> = new Map(),
 ): Section[] {
   return sections
     .map((section) => ({
       section,
-      score: scoreSection(section, query),
+      score: scoreSection(section, query, bodies.get(section.id)),
     }))
     .filter((entry) => entry.score > 0)
     .sort(
@@ -102,6 +141,7 @@ export async function localSearchCommand(
     sections,
     query,
     limit,
+    await readSectionBodies(ctx.latDir, sections),
   ).map((section) => ({ section, reason: 'local lexical match' }));
 
   if (matches.length === 0) {

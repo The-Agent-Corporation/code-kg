@@ -12,6 +12,7 @@ import { sourceHash } from './structural.js';
 import { currentMeanings } from './meaning.js';
 import { visibleGraph } from './visibility.js';
 import { InputError } from './errors.js';
+import { STOP_WORDS } from './search.js';
 import type {
   EntityNode,
   MaterializationManifest,
@@ -43,17 +44,12 @@ export type QueryResult = {
   warnings: string[];
   backend: string;
 };
-const STOP = new Set(
-  'a an and are at be by can do does for from how i in is it of on or the this to what where which who with'.split(
-    ' ',
-  ),
-);
 export function tokenize(text: string): string[] {
   return text
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
     .toLowerCase()
     .split(/[^a-z0-9]+/)
-    .filter((token) => token.length > 1 && !STOP.has(token));
+    .filter((token) => token.length > 1 && !STOP_WORDS.has(token));
 }
 export function withinScope(path: string, scope?: string): boolean {
   if (!scope || scope === '.') return true;
