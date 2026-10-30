@@ -202,9 +202,9 @@ Test file `tests/parser.test.ts` contains tests and validation symbols. Key symb
 
 ### tests/retrieval-eval.test.ts
 
-Test file `tests/retrieval-eval.test.ts` contains tests and validation symbols. Key symbols: `A`, `T`, and 10 more.
+Test file `tests/retrieval-eval.test.ts` contains tests and validation symbols. Key symbols: `A`, `T`, and 11 more.
 
-- Symbols: `A (const)`, `T (const)`, `C (const)`, `QUESTIONS (const)`, `LEXICAL_FLOOR (const)`, `SEMANTIC_FLOOR (const)`, `Score (type)`, `score (function)`, and 4 more
+- Symbols: `A (const)`, `T (const)`, `C (const)`, `QUESTIONS (const)`, `LEXICAL_FLOOR (const)`, `SEMANTIC_FLOOR (const)`, `SLACK (const)`, `Score (type)`, and 5 more
 - Imports: `src/codekg/search.ts`, `src/lattice.ts`, `src/search/db.ts`, `src/search/index.ts`, `src/search/provider.ts`, `src/search/search.ts`
 - Imported by: none detected
 

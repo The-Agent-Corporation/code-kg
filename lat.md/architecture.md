@@ -36,14 +36,14 @@ The initial inventory groups files by broad category so later extraction can foc
 
 ## Structural Graph
 
-Code-KG extracted a deterministic structural graph with 1213 nodes, 3022 edges, 4 communities using the multi-language-directory-fallback analysis path.
+Code-KG extracted a deterministic structural graph with 1214 nodes, 3026 edges, 4 communities using the multi-language-directory-fallback analysis path.
 
 ## Communities
 
 Directory-based communities provide the first subsystem map until graph clustering is available.
 
 - src: 74 files, 807 symbols, cohesion 0.83
-- tests: 49 files, 242 symbols, cohesion 0.47
+- tests: 49 files, 243 symbols, cohesion 0.47
 - templates: 2 files, 27 symbols, cohesion 1
 - scripts: 4 files, 4 symbols, cohesion 0.86
 
@@ -150,11 +150,11 @@ Source file `src/codekg/search.ts` is imported by local files including `src/cod
 
 - Imported by: `src/codekg/cli.ts`, `src/codekg/mcp.ts`, `src/codekg/query.ts`, `tests/codekg.test.ts`, `tests/config-corrupt.test.ts`, `tests/retrieval-eval.test.ts`, and 1 more
 
-### src/codekg/drift.ts
+### src/walk.ts
 
-Source file `src/codekg/drift.ts` is imported by local files including `src/codekg/mcp.ts`, `src/codekg/update.ts`, and 4 more.
+Source file `src/walk.ts` is imported by local files including `src/cli/check.ts`, `src/code-refs.ts`, and 5 more.
 
-- Imported by: `src/codekg/mcp.ts`, `src/codekg/update.ts`, `tests/anchor.test.ts`, `tests/backlinks-safety.test.ts`, `tests/codekg-intelligence.test.ts`, `tests/codekg.test.ts`
+- Imported by: `src/cli/check.ts`, `src/code-refs.ts`, `src/codekg/bootstrap.ts`, `src/codekg/check.ts`, `src/codekg/discovery.ts`, `src/lattice.ts`, and 1 more
 
 ## Source File Highlights
 
@@ -173,7 +173,7 @@ Source file `src/codekg/cli.ts` contains source symbols. Key symbols: `PreviewAc
 Source file `src/codekg/bootstrap.ts` contains source symbols. Key symbols: `MergeProposal`, `SECTION_HEADINGS`, and 55 more.
 
 - Symbols: `MergeProposal (type)`, `SECTION_HEADINGS (const)`, `DEFAULT_GITIGNORE_LINES (const)`, `SOURCE_FILE_HIGHLIGHT_LIMIT (const)`, `TEST_FILE_HIGHLIGHT_LIMIT (const)`, `SOURCE_SYMBOL_LIMIT (const)`, `SOURCE_IMPORT_LIMIT (const)`, `hash (function)`, and 49 more
-- Imports: `src/code-refs.ts`, `src/codekg/anchors.ts`, `src/codekg/discovery.ts`, `src/codekg/graph.ts`, `src/codekg/limits.ts`, `src/codekg/types.ts`
+- Imports: `src/code-refs.ts`, `src/codekg/anchors.ts`, `src/codekg/discovery.ts`, `src/codekg/graph.ts`, `src/codekg/limits.ts`, `src/codekg/types.ts`, and 1 more
 - Imported by: `src/codekg/cli.ts`, `src/codekg/update.ts`, `tests/anchor.test.ts`, `tests/backlinks-safety.test.ts`, `tests/codekg-intelligence.test.ts`, `tests/codekg-messages.test.ts`, and 5 more
 
 ### src/context.ts
