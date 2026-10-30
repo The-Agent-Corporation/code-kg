@@ -235,8 +235,10 @@ Run the opt-in local retrieval eval with:
 LAT_TEST_LOCAL_EMBEDDINGS=1 pnpm vitest run tests/search.test.ts --testNamePattern "local embeddings eval"
 ```
 
-`tests/retrieval-eval.test.ts` asks 16 questions about this repository against
+`tests/retrieval-eval.test.ts` asks 17 questions about this repository against
 its committed `lat.md/` and reports recall@5 and mean reciprocal rank. The
-lexical half runs in the normal suite and fails if either number drops below
-its recorded floor. The semantic half runs with `LAT_TEST_LOCAL_EMBEDDINGS=1`.
-Raise the floors when ranking or curated sections improve.
+lexical half runs in the normal suite and fails if either number drops more
+than 0.03 below its recorded floor, which leaves room for generated sections
+reshuffling after a code change. The semantic half runs with
+`LAT_TEST_LOCAL_EMBEDDINGS=1`. Raise the floors when ranking or curated sections
+improve.

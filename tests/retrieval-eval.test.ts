@@ -167,6 +167,12 @@ const QUESTIONS: Array<{ question: string; answers: string[] }> = [
  */
 const LEXICAL_FLOOR = { recallAt5: 0.824, mrr: 0.708 };
 const SEMANTIC_FLOOR = { recallAt5: 0.882, mrr: 0.698 };
+/**
+ * Generated per-file sections are top-N lists that reshuffle as the code
+ * changes, so a run may fall this far below a floor. One question leaving
+ * the top 5 costs 1/17, more than this.
+ */
+const SLACK = 0.03;
 
 type Score = { recallAt5: number; mrr: number; report: string };
 
@@ -197,12 +203,16 @@ beforeAll(async () => {
 });
 
 describe('retrieval eval (lexical)', () => {
-  it('names only sections that exist', () => {
+  it('names curated sections that exist, and an existing answer for every question', () => {
     const ids = new Set(sections.map((section) => section.id));
-    const missing = QUESTIONS.flatMap(({ answers }) => answers).filter(
-      (id) => !ids.has(id),
+    const missingCurated = QUESTIONS.flatMap(({ answers }) => answers).filter(
+      (id) => id.startsWith(C) && !ids.has(id),
     );
-    expect(missing).toStrictEqual([]);
+    const unanswerable = QUESTIONS.filter(
+      ({ answers }) => !answers.some((id) => ids.has(id)),
+    ).map(({ question }) => question);
+    expect(missingCurated).toStrictEqual([]);
+    expect(unanswerable).toStrictEqual([]);
   });
 
   it('stays at or above the recorded floor', () => {
@@ -215,9 +225,11 @@ describe('retrieval eval (lexical)', () => {
     );
 
     expect(result.recallAt5, result.report).toBeGreaterThanOrEqual(
-      LEXICAL_FLOOR.recallAt5,
+      LEXICAL_FLOOR.recallAt5 - SLACK,
     );
-    expect(result.mrr, result.report).toBeGreaterThanOrEqual(LEXICAL_FLOOR.mrr);
+    expect(result.mrr, result.report).toBeGreaterThanOrEqual(
+      LEXICAL_FLOOR.mrr - SLACK,
+    );
     console.info(
       `lexical recall@5=${result.recallAt5} mrr=${result.mrr}\n${result.report}`,
     );
@@ -266,10 +278,10 @@ describe.skipIf(process.env.LAT_TEST_LOCAL_EMBEDDINGS !== '1')(
         `semantic recall@5=${result.recallAt5} mrr=${result.mrr}\n${result.report}`,
       );
       expect(result.recallAt5, result.report).toBeGreaterThanOrEqual(
-        SEMANTIC_FLOOR.recallAt5,
+        SEMANTIC_FLOOR.recallAt5 - SLACK,
       );
       expect(result.mrr, result.report).toBeGreaterThanOrEqual(
-        SEMANTIC_FLOOR.mrr,
+        SEMANTIC_FLOOR.mrr - SLACK,
       );
     }, 300_000);
   },
