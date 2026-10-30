@@ -20,11 +20,13 @@ import { searchSections } from '../src/search/search.js';
  */
 const A = 'lat.md/architecture#Architecture#';
 const T = 'lat.md/tests/tests#Tests#';
+const C = 'lat.md/concepts#Concepts#';
 const QUESTIONS: Array<{ question: string; answers: string[] }> = [
   {
     question:
       'how are human edits preserved when the knowledge base is regenerated',
     answers: [
+      `${C}Merge-Safe Materialization`,
       `${A}Source File Highlights#src/codekg/bootstrap.ts`,
       `${A}Dependency Hotspots#src/codekg/bootstrap.ts`,
     ],
@@ -32,21 +34,29 @@ const QUESTIONS: Array<{ question: string; answers: string[] }> = [
   {
     question: 'what does edit-safe mean for a section',
     answers: [
+      `${C}Source Anchor Policies`,
       `${A}Dependency Hotspots#src/codekg/types.ts`,
       `${T}Test Coverage Links#src/codekg/backlinks.ts`,
     ],
   },
   {
     question: 'when does drift report a warning',
-    answers: [`${T}Test Coverage Links#src/codekg/drift.ts`],
+    answers: [
+      `${C}Drift and Source Review`,
+      `${T}Test Coverage Links#src/codekg/drift.ts`,
+    ],
   },
   {
     question: 'how do I acknowledge that a section was reviewed against source',
-    answers: [`${T}Test Coverage Links#src/codekg/review-source.ts`],
+    answers: [
+      `${C}Drift and Source Review`,
+      `${T}Test Coverage Links#src/codekg/review-source.ts`,
+    ],
   },
   {
     question: 'how does apply-backlinks insert @lat comments into source files',
     answers: [
+      `${C}Source Anchor Policies`,
       `${T}Test Coverage Links#src/codekg/backlinks.ts`,
       `${T}Source Test Highlights#tests/backlinks-safety.test.ts`,
     ],
@@ -54,6 +64,7 @@ const QUESTIONS: Array<{ question: string; answers: string[] }> = [
   {
     question: 'what happens when no embedding provider is configured',
     answers: [
+      `${C}Search Backends`,
       `${T}Test Coverage Links#src/codekg/search.ts`,
       `${T}Test Coverage Links#src/config.ts`,
       `${A}Dependency Hotspots#src/config.ts`,
@@ -63,6 +74,7 @@ const QUESTIONS: Array<{ question: string; answers: string[] }> = [
   {
     question: 'which search backends can code-kg search use',
     answers: [
+      `${C}Search Backends`,
       `${T}Test Coverage Links#src/codekg/search.ts`,
       `${T}Source Test Highlights#tests/search-fallback.test.ts`,
     ],
@@ -70,6 +82,7 @@ const QUESTIONS: Array<{ question: string; answers: string[] }> = [
   {
     question: 'how are inferred test edges different from extracted imports',
     answers: [
+      `${C}Relationship Confidence`,
       `${A}Source File Highlights#src/codekg/graph.ts`,
       `${A}Dependency Hotspots#src/codekg/graph.ts`,
       `${T}Source Test Highlights#tests/gaps-inferred.test.ts`,
@@ -78,11 +91,15 @@ const QUESTIONS: Array<{ question: string; answers: string[] }> = [
   },
   {
     question: 'what does the pre-commit hook do',
-    answers: [`${T}Source Test Highlights#tests/git-hooks.test.ts`],
+    answers: [
+      `${C}Agent Guidance and Hooks`,
+      `${T}Source Test Highlights#tests/git-hooks.test.ts`,
+    ],
   },
   {
     question: 'how is the AGENTS.md guidance block installed',
     answers: [
+      `${C}Agent Guidance and Hooks`,
       `${A}Source File Highlights#src/codekg/agents.ts`,
       `${T}Test Coverage Links#src/codekg/agents.ts`,
       `${T}Source Test Highlights#tests/agents-edge-cases.test.ts`,
@@ -98,6 +115,7 @@ const QUESTIONS: Array<{ question: string; answers: string[] }> = [
   {
     question: 'how is the structural graph extracted from source code',
     answers: [
+      `${C}Structural Extraction`,
       `${A}Structural Graph`,
       `${A}Source File Highlights#src/codekg/graph.ts`,
       `${A}Dependency Hotspots#src/codekg/graph.ts`,
@@ -122,13 +140,17 @@ const QUESTIONS: Array<{ question: string; answers: string[] }> = [
   {
     question: 'what is the materialization manifest',
     answers: [
+      `${C}Merge-Safe Materialization`,
       `${A}Dependency Hotspots#src/codekg/types.ts`,
       `${A}Source File Highlights#src/codekg/bootstrap.ts`,
     ],
   },
   {
     question: 'how does a hook read its payload from stdin',
-    answers: [`${T}Source Test Highlights#tests/hook-stdin.test.ts`],
+    answers: [
+      `${C}Agent Guidance and Hooks`,
+      `${T}Source Test Highlights#tests/hook-stdin.test.ts`,
+    ],
   },
 ];
 
