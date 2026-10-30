@@ -212,6 +212,12 @@ AGENTS.md                    optional generated agent guidance
 convention: `<dir>/<dir>.md`. Code-KG should not introduce `index.md` unless
 lat.md validation is intentionally changed.
 
+Hand-written files at the top of `lat.md/` (and directories with a
+`<dir>/<dir>.md` index) are never written by materialization and have no
+manifest entry. The generated root index lists them after its own links, using
+each file's leading sentence, so adding a curated file does not require editing
+the generated root.
+
 ### Ignored by Default
 
 ```text
