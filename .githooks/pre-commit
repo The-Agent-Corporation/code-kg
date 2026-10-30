@@ -5,6 +5,11 @@
 # generated sections, rebuilds the semantic index, validates, and stages the
 # tracked KB files so the knowledge update rides the SAME commit as the code.
 #
+# Regeneration reads the working tree, so unstaged source edits are reflected
+# in the knowledge base. LLM paragraph enrichment is skipped here; run
+# `code-kg update` yourself, or commit with CODEKG_SKIP_ENRICH=0, to include it.
+# A remote embedding provider, if configured, is still called for the reindex.
+#
 # Bypass for a single commit with:  git commit --no-verify
 
 # Nothing to do if the code-kg CLI isn't on PATH.
@@ -19,10 +24,22 @@ if [ ! -d "$repo_root/lat.md" ]; then
   exit 0
 fi
 
+# Auto-staging is only safe when every pending knowledge-base change comes from
+# this hook; otherwise `git add` would sweep unstaged hand edits into the commit.
+kb_paths="lat.md .code-kg/materialization-manifest.json"
+kb_dirty=""
+# shellcheck disable=SC2086
+if ! git -C "$repo_root" diff --quiet -- $kb_paths ||
+  [ -n "$(git -C "$repo_root" ls-files --others --exclude-standard -- $kb_paths)" ]; then
+  kb_dirty=1
+fi
+
 echo "[code-kg] syncing knowledge graph (materialize + semantic reindex + check + drift)..."
 
 # `code-kg update` exits non-zero only when `check` fails (broken links / invalid
 # metadata). Drift is advisory and does NOT block the commit.
+CODEKG_SKIP_ENRICH="${CODEKG_SKIP_ENRICH:-1}"
+export CODEKG_SKIP_ENRICH
 if ! code-kg --dir "$repo_root" update; then
   echo ""
   echo "[code-kg] update failed: 'code-kg check' did not pass (see output above)."
@@ -30,8 +47,15 @@ if ! code-kg --dir "$repo_root" update; then
   exit 1
 fi
 
-# Stage the regenerated, tracked knowledge-base files into this commit.
-git -C "$repo_root" add lat.md ".code-kg/materialization-manifest.json" 2>/dev/null
+if [ -n "$kb_dirty" ]; then
+  echo "[code-kg] NOTE: lat.md/ or the manifest had unstaged changes before this commit,"
+  echo "[code-kg]       so the refreshed knowledge base was NOT staged. Review it with"
+  echo "[code-kg]       'git diff -- lat.md .code-kg' and stage what belongs in a commit."
+else
+  # Stage the regenerated, tracked knowledge-base files into this commit.
+  # shellcheck disable=SC2086
+  git -C "$repo_root" add -- $kb_paths 2>/dev/null
+fi
 
 # Sections you hand-edited are never overwritten — instead a candidate lands in
 # merge-proposals/ for manual review. Surface that so it isn't missed.

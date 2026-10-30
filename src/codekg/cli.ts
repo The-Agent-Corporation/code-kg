@@ -329,10 +329,14 @@ program
 program
   .command('update')
   .description('Refresh generated knowledge, semantic index, check, and drift')
-  .action(async () => {
+  .option(
+    '--no-enrich',
+    'Skip LLM paragraph enrichment (also set by CODEKG_SKIP_ENRICH=1)',
+  )
+  .action(async (opts: { enrich: boolean }) => {
     const ctx = resolveContext(program.opts());
     const { updateCommand } = await import('./update.js');
-    handleResult(await updateCommand(ctx));
+    handleResult(await updateCommand(ctx, { enrich: opts.enrich }));
   });
 
 program
