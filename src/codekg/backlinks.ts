@@ -112,13 +112,20 @@ async function projectFile(root: string, file: string): Promise<string | null> {
 }
 
 const CODING_COOKIE = /^[ \t\f]*#.*?coding[:=]/;
+const BLANK_OR_COMMENT = /^[ \t\f]*(#.*)?$/;
 
-/** A shebang and an encoding declaration only work on the first lines. */
+/**
+ * A shebang only works on line 1. An encoding declaration works on line 1, or
+ * on line 2 when line 1 is blank or a comment (PEP 263).
+ */
 function backlinkLine(content: string, line: number): number {
-  const [first = '', second = ''] = content.split('\n', 2);
-  let header = 0;
-  if (first.startsWith('#!')) header = 1;
-  if (CODING_COOKIE.test(header === 0 ? first : second)) header++;
+  const [first = '', second = ''] = content
+    .split('\n', 2)
+    .map((text) => text.replace(/\r$/, ''));
+  let header = first.startsWith('#!') ? 1 : 0;
+  if (CODING_COOKIE.test(first)) header = 1;
+  else if (BLANK_OR_COMMENT.test(first) && CODING_COOKIE.test(second))
+    header = 2;
   return Math.max(line, header + 1);
 }
 

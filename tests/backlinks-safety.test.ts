@@ -247,6 +247,25 @@ describe('apply-backlinks --write safety', () => {
       `${header}# @lat: [[lat.md/architecture#Architecture]]\nprint(1)\n`,
     );
   });
+
+  it.each([
+    ['a banner comment', '# Build helper\n# coding: latin-1\nprint(1)\n', 3],
+    ['a blank line', '\n# -*- coding: utf-8 -*-\nprint(1)\n', 3],
+    ['a CRLF banner', '# Build helper\r\n# coding=utf-8\r\nprint(1)\r\n', 3],
+    ['code', 'x = 1\n# coding: utf-8\nprint(1)\n', 1],
+  ])(
+    'keeps a line-2 encoding declaration after %s only when Python honors it',
+    async (_, source, line) => {
+      const root = await project({ 'bin/run.py': source });
+      await markEditSafe(root, [
+        { file: 'bin/run.py', start_line: 1, end_line: 3 },
+      ]);
+
+      const result = await applyBacklinksCommand(ctx(root), { write: true });
+
+      expect(result.output).toContain(`at bin/run.py:${line}`);
+    },
+  );
 });
 
 describe('insertCommentLine', () => {
