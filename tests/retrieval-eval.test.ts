@@ -57,6 +57,10 @@ const QUESTIONS: Array<{ question: string; answers: string[] }> = [
     ],
   },
   {
+    question: 'how does a curated section become edit-safe',
+    answers: [`${C}Section Anchors`, `${C}Source Anchor Policies`],
+  },
+  {
     question: 'how does apply-backlinks insert @lat comments into source files',
     answers: [
       `${C}Source Anchor Policies`,
@@ -161,8 +165,8 @@ const QUESTIONS: Array<{ question: string; answers: string[] }> = [
  * Measured on the committed knowledge base. Raise these when ranking or
  * curated sections improve; lowering one needs a reason in the commit.
  */
-const LEXICAL_FLOOR = { recallAt5: 0.813, mrr: 0.69 };
-const SEMANTIC_FLOOR = { recallAt5: 0.875, mrr: 0.714 };
+const LEXICAL_FLOOR = { recallAt5: 0.824, mrr: 0.708 };
+const SEMANTIC_FLOOR = { recallAt5: 0.882, mrr: 0.698 };
 
 type Score = { recallAt5: number; mrr: number; report: string };
 
