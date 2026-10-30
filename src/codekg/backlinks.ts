@@ -94,7 +94,10 @@ function isInside(root: string, target: string): boolean {
   );
 }
 
-/** Resolves a manifest-relative path, refusing anything outside the project. */
+/**
+ * Resolves a manifest-relative path to its real location, refusing anything
+ * outside the project. Missing files resolve to their unresolved path.
+ */
 async function projectFile(root: string, file: string): Promise<string | null> {
   if (isAbsolute(file)) return null;
   const target = resolve(root, file);
@@ -104,7 +107,18 @@ async function projectFile(root: string, file: string): Promise<string | null> {
     realpath(root),
     realpath(target),
   ]);
-  return isInside(realRoot, realTarget) ? target : null;
+  return isInside(realRoot, realTarget) ? realTarget : null;
+}
+
+const CODING_COOKIE = /^[ \t\f]*#.*?coding[:=]/;
+
+/** A shebang and an encoding declaration only work on the first lines. */
+function backlinkLine(content: string, line: number): number {
+  const [first = '', second = ''] = content.split('\n', 2);
+  let header = 0;
+  if (first.startsWith('#!')) header = 1;
+  if (CODING_COOKIE.test(header === 0 ? first : second)) header++;
+  return Math.max(line, header + 1);
 }
 
 function missingManifest(): CmdResult {
@@ -195,7 +209,7 @@ async function backlinkPlan(
       seen.add(key);
       insertions.push({
         file: span.file,
-        line: span.start_line,
+        line: backlinkLine(content, span.start_line),
         comment,
         expectedHash: currentHash,
       });
@@ -264,7 +278,10 @@ async function writeInsertions(
 ): Promise<{ written: BacklinkInsertion[]; skips: BacklinkSkip[] }> {
   const written: BacklinkInsertion[] = [];
   const skips: BacklinkSkip[] = [];
-  const rehashed = new Map<string, { before: string; after: string }>();
+  const rehashed = new Map<
+    string,
+    { before: string; after: string; lines: number[] }
+  >();
   const byFile = new Map<string, BacklinkInsertion[]>();
   for (const insertion of insertions) {
     if (!byFile.has(insertion.file)) byFile.set(insertion.file, []);
@@ -272,7 +289,14 @@ async function writeInsertions(
   }
 
   for (const [file, fileInsertions] of byFile) {
-    const target = join(ctx.projectRoot, file);
+    const target = await projectFile(ctx.projectRoot, file);
+    if (!target || !existsSync(target)) {
+      skips.push({
+        file,
+        reason: `skipped ${file}: it moved or now resolves outside the project root`,
+      });
+      continue;
+    }
     const content = await readFile(target, 'utf-8');
     const before = sourceHash(content);
     if (fileInsertions.some((entry) => entry.expectedHash !== before)) {
@@ -294,17 +318,28 @@ async function writeInsertions(
 
     if (pending.length > 0) {
       await writeFile(target, next, 'utf-8');
-      rehashed.set(file, { before, after: sourceHash(next) });
+      rehashed.set(file, {
+        before,
+        after: sourceHash(next),
+        lines: pending.map((entry) => entry.line),
+      });
     }
   }
 
-  // The inserted comments are the only change to these files, so sections
-  // whose baseline matched the pre-insert content stay in sync.
+  // The inserted comments are the only change to these files, so a section
+  // whose baseline matched the pre-insert content stays valid once its spans
+  // move down past the inserted lines. Its hash must not move without them.
   if (rehashed.size > 0) {
     for (const section of Object.values(manifest.sections)) {
-      for (const [file, { before, after }] of rehashed) {
-        if (section.source_hashes?.[file] === before) {
-          section.source_hashes[file] = after;
+      for (const [file, { before, after, lines }] of rehashed) {
+        if (section.source_hashes?.[file] !== before) continue;
+        section.source_hashes[file] = after;
+        for (const span of section.source_spans ?? []) {
+          if (span.file !== file) continue;
+          const shift = (at: number) =>
+            lines.filter((line) => line <= at).length;
+          span.end_line += shift(span.end_line);
+          span.start_line += shift(span.start_line);
         }
       }
     }

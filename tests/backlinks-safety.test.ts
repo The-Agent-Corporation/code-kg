@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -11,6 +12,7 @@ import {
   insertCommentLine,
 } from '../src/codekg/backlinks.js';
 import { driftCommand } from '../src/codekg/drift.js';
+import { sourceHash } from '../src/codekg/structural.js';
 import { plainStyler, type CmdContext } from '../src/context.js';
 import type {
   MaterializationManifest,
@@ -49,15 +51,34 @@ async function project(files: Record<string, string>): Promise<string> {
 const manifestPath = (root: string) =>
   join(root, '.code-kg', 'materialization-manifest.json');
 
-async function markEditSafe(root: string, spans: SourceSpan[]): Promise<void> {
-  const manifest = JSON.parse(
+async function readManifest(root: string): Promise<MaterializationManifest> {
+  return JSON.parse(
     await readFile(manifestPath(root), 'utf-8'),
   ) as MaterializationManifest;
-  const section = manifest.sections.architecture;
-  section.status = 'curated';
+}
+
+async function markEditSafe(
+  root: string,
+  spans: SourceSpan[],
+  key = 'architecture',
+  status: 'curated' | 'suppressed' = 'curated',
+): Promise<string> {
+  const manifest = await readManifest(root);
+  const section = manifest.sections[key];
+  section.status = status;
   section.source_anchor_policy = 'edit-safe';
   section.source_spans = spans;
+  section.source_hashes ??= {};
+  for (const span of spans) {
+    const path = join(root, span.file);
+    if (!section.source_hashes[span.file] && existsSync(path)) {
+      section.source_hashes[span.file] = sourceHash(
+        await readFile(path, 'utf-8'),
+      );
+    }
+  }
   await writeFile(manifestPath(root), JSON.stringify(manifest, null, 2) + '\n');
+  return section.public_section_id;
 }
 
 describe('apply-backlinks --write safety', () => {
@@ -137,6 +158,54 @@ describe('apply-backlinks --write safety', () => {
 
     expect(await readFile(join(root, 'src/a.ts'), 'utf-8')).toContain(BACKLINK);
     expect(drift.output).not.toContain('Source content changed: src/a.ts');
+  });
+
+  it('moves the spans of sections it skipped so a later run stays aligned', async () => {
+    const root = await project({
+      'src/a.ts':
+        'export const a = 1;\nexport function b() {\n  return 2;\n}\n',
+    });
+    await markEditSafe(root, [
+      { file: 'src/a.ts', start_line: 1, end_line: 1 },
+    ]);
+    const other = Object.keys((await readManifest(root)).sections).find(
+      (key) => key !== 'architecture',
+    )!;
+    const otherId = await markEditSafe(
+      root,
+      [{ file: 'src/a.ts', start_line: 2, end_line: 4 }],
+      other,
+      'suppressed',
+    );
+
+    await applyBacklinksCommand(ctx(root), { write: true });
+    expect(
+      (await readManifest(root)).sections[other].source_spans,
+    ).toStrictEqual([{ file: 'src/a.ts', start_line: 3, end_line: 5 }]);
+
+    const manifest = await readManifest(root);
+    manifest.sections[other].status = 'curated';
+    await writeFile(manifestPath(root), JSON.stringify(manifest, null, 2));
+    await applyBacklinksCommand(ctx(root), { write: true });
+
+    expect(await readFile(join(root, 'src/a.ts'), 'utf-8')).toBe(
+      `${BACKLINK}\nexport const a = 1;\n// @lat: [[${otherId}]]\nexport function b() {\n  return 2;\n}\n`,
+    );
+  });
+
+  it('keeps a shebang and an encoding declaration on the first lines', async () => {
+    const header = '#!/usr/bin/env python3\n# -*- coding: utf-8 -*-\n';
+    const root = await project({ 'bin/run.py': `${header}print(1)\n` });
+    await markEditSafe(root, [
+      { file: 'bin/run.py', start_line: 1, end_line: 3 },
+    ]);
+
+    const result = await applyBacklinksCommand(ctx(root), { write: true });
+
+    expect(result.output).toContain('at bin/run.py:3');
+    expect(await readFile(join(root, 'bin/run.py'), 'utf-8')).toBe(
+      `${header}# @lat: [[lat.md/architecture#Architecture]]\nprint(1)\n`,
+    );
   });
 });
 
