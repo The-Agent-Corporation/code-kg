@@ -1081,7 +1081,17 @@ async function setupSemanticSearch(
   rl: ReturnType<typeof createInterface> | null,
 ): Promise<void> {
   // Use the centralized key resolution (env var → file → helper → config)
-  const existingKey = getEmbeddingKey();
+  let existingKey: string | undefined;
+  try {
+    existingKey = getEmbeddingKey();
+  } catch (err) {
+    console.log('');
+    console.log(
+      styleText('red', (err as Error).message) +
+        ' Skipping semantic search setup; fix the configuration and run lat init again.',
+    );
+    return;
+  }
   if (existingKey) {
     console.log('');
     console.log(

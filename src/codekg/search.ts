@@ -6,7 +6,7 @@ import {
   type SectionMatch,
 } from '../lattice.js';
 import { formatNavHints, formatResultList } from '../format.js';
-import { hasEmbeddingConfig } from '../config.js';
+import { embeddingConfigError, hasEmbeddingConfig } from '../config.js';
 
 export type CodeKgSearchBackend =
   | 'local'
@@ -108,6 +108,12 @@ export async function localSearchCommand(
   };
 }
 
+function fallbackLabel(reason: string | null): string {
+  if (!reason) return 'local lexical (auto-semantic fallback)';
+  const brief = reason.replace(/\s+/g, ' ').trim().slice(0, 160);
+  return `local lexical (auto-semantic fallback; ${brief})`;
+}
+
 export function selectCodeKgSearchBackend(
   opts: CodeKgSearchOptions = {},
 ): SearchBackendSelection {
@@ -118,10 +124,8 @@ export function selectCodeKgSearchBackend(
     if (hasEmbeddingConfig()) {
       return { backend: 'semantic', label: 'semantic (auto-semantic)' };
     }
-    return {
-      backend: 'local',
-      label: 'local lexical (auto-semantic fallback)',
-    };
+    const error = embeddingConfigError();
+    return { backend: 'local', label: fallbackLabel(error) };
   }
   return { backend: 'local', label: 'local lexical' };
 }
@@ -198,10 +202,9 @@ export async function codeKgSearchCommand(
       };
     }
     if (result.isError && opts.backend === 'auto-semantic' && query?.trim()) {
-      const reason = result.output.replace(/\s+/g, ' ').trim().slice(0, 160);
       return withBackendLabel(
         await localSearchCommand(ctx, query, limit),
-        `local lexical (auto-semantic fallback; ${reason})`,
+        fallbackLabel(result.output),
       );
     }
     return withBackendLabel(result, selected.label);

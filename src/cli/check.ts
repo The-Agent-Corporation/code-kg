@@ -549,8 +549,16 @@ export async function checkAllCommand(
 
   lines.push(s.green('All checks passed'));
 
-  const { hasEmbeddingConfig } = await import('../config.js');
-  if (!hasEmbeddingConfig()) {
+  const { embeddingConfigError, hasEmbeddingConfig } =
+    await import('../config.js');
+  const configError = embeddingConfigError();
+  if (configError) {
+    lines.push(
+      s.yellow('Warning:') +
+        ` Could not read the semantic embedding configuration: ${configError.replace(/\.?$/, '.')}` +
+        ' Semantic search will not work until this is fixed; lexical search still does.',
+    );
+  } else if (!hasEmbeddingConfig()) {
     lines.push(
       codeKg
         ? s.yellow('Warning:') +

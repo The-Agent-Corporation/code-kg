@@ -7,6 +7,7 @@ import {
   hasEmbeddingConfig,
   readConfig,
 } from '../src/config.js';
+import { codeKgCheckCommand } from '../src/codekg/check.js';
 import { codeKgSearchCommand } from '../src/codekg/search.js';
 import { enrichCommand } from '../src/codekg/enrich.js';
 import { semanticCommand } from '../src/codekg/semantic.js';
@@ -76,7 +77,18 @@ describe('a corrupt lat config file', () => {
     });
 
     expect(result.isError).toBeFalsy();
-    expect(result.output).toContain('Backend: local lexical');
+    expect(result.output).toContain(
+      'Backend: local lexical (auto-semantic fallback; Failed to parse config',
+    );
+  });
+
+  it('names the unreadable config in the check warning', async () => {
+    const result = await codeKgCheckCommand(await project());
+
+    expect(result.output).toContain(
+      'Could not read the semantic embedding configuration: Failed to parse config',
+    );
+    expect(result.output).not.toContain('No semantic embedding provider');
   });
 
   it('reports the problem from semantic and enrich commands', async () => {

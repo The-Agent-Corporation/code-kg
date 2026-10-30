@@ -173,3 +173,13 @@ export function hasEmbeddingConfig(): boolean {
     return false;
   }
 }
+
+/** Why the embedding configuration cannot be resolved, or null if it can. */
+export function embeddingConfigError(): string | null {
+  try {
+    getEmbeddingKey();
+    return null;
+  } catch (error) {
+    return (error as Error).message;
+  }
+}
