@@ -62,8 +62,14 @@ export async function reviewSourceCommand(
           (f) => section.source_hashes?.[f] !== graph.source_hashes![f],
         )
       : [];
+  const keptSpans = section.source_spans.filter(
+    (s) => !staleSpanFiles.includes(s.file),
+  );
   if (write) {
-    if (staleSpanFiles.length) section.source_anchor_policy = 'coverage-only';
+    if (staleSpanFiles.length) {
+      section.source_spans = keptSpans;
+      if (!keptSpans.length) section.source_anchor_policy = 'coverage-only';
+    }
     section.source_hashes = Object.fromEntries(
       files.map((f) => [f, graph.source_hashes![f]]),
     );
@@ -73,11 +79,16 @@ export async function reviewSourceCommand(
   }
   const downgrade = staleSpanFiles.length
     ? '\n' +
-      (write ? 'Downgraded ' : 'Would downgrade ') +
+      (write ? 'Dropped ' : 'Would drop ') +
       stableId +
-      ' to coverage-only: its edit-safe source spans were recorded against older content of ' +
+      "'s source spans in " +
       staleSpanFiles.join(', ') +
-      '. Record fresh spans before marking it edit-safe again.'
+      ': they were recorded against older content.' +
+      (keptSpans.length
+        ? ''
+        : ' With no spans left, it ' +
+          (write ? 'is now' : 'would become') +
+          ' coverage-only. Record fresh spans before marking it edit-safe again.')
     : '';
   return {
     output:

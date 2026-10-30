@@ -170,8 +170,9 @@ nodes, spans, or prior hashes. Missing coverage or extraction errors block revie
 acknowledgement. Normal retrieval, hooks, and cache refresh never perform it.
 
 Review acknowledges prose, not line numbers. If an `edit-safe` section's span
-files changed since its spans were recorded, `--write` downgrades the section to
-`coverage-only` so `apply-backlinks --write` cannot insert at stale lines.
+files changed since its spans were recorded, `--write` drops the spans in those
+files so `apply-backlinks --write` cannot insert at stale lines. A section left
+with no spans becomes `coverage-only`.
 
 ## Agent Integration
 

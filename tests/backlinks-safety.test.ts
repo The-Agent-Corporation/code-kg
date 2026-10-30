@@ -11,6 +11,7 @@ import {
   applyBacklinksCommand,
   insertCommentLine,
 } from '../src/codekg/backlinks.js';
+import { codeKgCheckCommand } from '../src/codekg/check.js';
 import { driftCommand } from '../src/codekg/drift.js';
 import { reviewSourceCommand } from '../src/codekg/review-source.js';
 import { sourceHash } from '../src/codekg/structural.js';
@@ -207,16 +208,41 @@ describe('apply-backlinks --write safety', () => {
 
     const review = await reviewSourceCommand(ctx(root), 'architecture', true);
     const result = await applyBacklinksCommand(ctx(root), { write: true });
+    const section = (await readManifest(root)).sections.architecture;
 
     expect(review.isError).toBeFalsy();
     expect(review.output).toContain(
-      'Downgraded architecture to coverage-only: its edit-safe source spans were recorded against older content of src/a.ts',
+      "Dropped architecture's source spans in src/a.ts: they were recorded against older content. With no spans left, it is now coverage-only.",
     );
-    expect(
-      (await readManifest(root)).sections.architecture.source_anchor_policy,
-    ).toBe('coverage-only');
+    expect(section.source_anchor_policy).toBe('coverage-only');
+    expect(section.source_spans).toStrictEqual([]);
+    expect((await codeKgCheckCommand(ctx(root))).isError).toBeFalsy();
     expect(result.output).toContain('No backlink changes.');
     expect(await readFile(join(root, 'src/a.ts'), 'utf-8')).toBe(shifted);
+  });
+
+  it('drops only the stale spans when review-source --write refreshes hashes', async () => {
+    const root = await project({
+      'src/a.ts': 'export const a = 1;\n',
+      'src/b.ts': 'export const b = 2;\n',
+    });
+    const fresh = { file: 'src/b.ts', start_line: 1, end_line: 1 };
+    await markEditSafe(root, [
+      { file: 'src/a.ts', start_line: 1, end_line: 1 },
+      fresh,
+    ]);
+    await writeFile(join(root, 'src/a.ts'), '// moved\nexport const a = 1;\n');
+
+    const review = await reviewSourceCommand(ctx(root), 'architecture', true);
+    const section = (await readManifest(root)).sections.architecture;
+
+    expect(review.output).toContain(
+      "Dropped architecture's source spans in src/a.ts: they were recorded against older content.",
+    );
+    expect(review.output).not.toContain('coverage-only');
+    expect(section.source_anchor_policy).toBe('edit-safe');
+    expect(section.source_spans).toStrictEqual([fresh]);
+    expect((await codeKgCheckCommand(ctx(root))).isError).toBeFalsy();
   });
 
   it('keeps an edit-safe section whose spans still match after review-source', async () => {
