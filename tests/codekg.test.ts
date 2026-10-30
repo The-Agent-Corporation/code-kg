@@ -704,6 +704,7 @@ describe('code-kg bootstrap', () => {
     expect(hooks.hooks.PreToolUse[0].matcher).toContain('Grep');
     expect(hooks.hooks.PreToolUse[0].matcher).toContain('Read');
     expect(hooks.hooks.PreToolUse[0].hooks[0].command).toContain('hook-check');
+    expect(hooks.hooks.PreToolUse[0].hooks[0].timeout).toBe(10);
   });
 
   it('uses code-kg on PATH for installed Codex hooks when available', async () => {

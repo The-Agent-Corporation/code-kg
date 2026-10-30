@@ -287,7 +287,7 @@ async function installCodexHook(
     : [];
   preToolUse.push({
     matcher: CODEX_HOOK_MATCHER,
-    hooks: [{ type: 'command', command: hookCommand }],
+    hooks: [{ type: 'command', command: hookCommand, timeout: 10 }],
   });
   const next: CodexHooksConfig = {
     ...config,

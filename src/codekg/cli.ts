@@ -106,12 +106,8 @@ function parseSearchBackend(value: string): CodeKgSearchBackend {
 }
 
 async function readStdinIfAvailable(): Promise<string | undefined> {
-  if (process.stdin.isTTY) return undefined;
-  let input = '';
-  for await (const chunk of process.stdin) {
-    input += String(chunk);
-  }
-  return input || undefined;
+  const { readHookInput } = await import('./stdin.js');
+  return readHookInput(process.stdin);
 }
 
 async function runCheck(root: string): Promise<CmdResult> {
