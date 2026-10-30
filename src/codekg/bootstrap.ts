@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { extname } from 'node:path';
 import { scanCodeRefs } from '../code-refs.js';
@@ -419,15 +419,66 @@ No test-to-source import relationships were detected during bootstrap.
     .trimEnd();
 }
 
-function rootIndex(discovery: DiscoveryResult): string {
+const GENERATED_ROOT_ENTRIES: Array<[stem: string, summary: string]> = [
+  ['architecture', 'Repository structure and entry points.'],
+  ['cross-cutting', 'Shared concerns and likely integration paths.'],
+  ['confidence', 'Review queue for uncertain generated knowledge.'],
+  ['tests', 'Test layout and validation notes.'],
+];
+
+type RootEntry = { stem: string; summary: string };
+
+function leadingSentence(markdown: string): string {
+  const paragraph = markdown
+    .split(/\n\s*\n/)
+    .map((block) =>
+      block
+        .split('\n')
+        .filter((line) => !/^\s*(#|<!--)/.test(line))
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim(),
+    )
+    .find(Boolean);
+  if (!paragraph) return 'Curated knowledge.';
+  return /^.*?[.!?](?=\s|$)/.exec(paragraph)?.[0] ?? paragraph;
+}
+
+/**
+ * Hand-written files and directories at the top of `lat.md/`. The root index
+ * must list them, and listing them here keeps the root generated, so its
+ * snapshot keeps refreshing instead of turning into merge proposals.
+ */
+async function curatedRootEntries(root: string): Promise<RootEntry[]> {
+  const latDir = join(root, 'lat.md');
+  if (!existsSync(latDir)) return [];
+  const generated = new Set(['lat', ...GENERATED_ROOT_ENTRIES.map(([s]) => s)]);
+  const entries: RootEntry[] = [];
+  for (const entry of await readdir(latDir, { withFileTypes: true })) {
+    if (entry.name.startsWith('.')) continue;
+    const index = entry.isDirectory()
+      ? join(latDir, entry.name, `${entry.name}.md`)
+      : entry.isFile() && entry.name.endsWith('.md')
+        ? join(latDir, entry.name)
+        : null;
+    const stem = entry.name.replace(/\.md$/, '');
+    if (!index || generated.has(stem)) continue;
+    const content = existsSync(index) ? await readFile(index, 'utf-8') : '';
+    entries.push({ stem, summary: leadingSentence(content) });
+  }
+  return entries.sort((a, b) => a.stem.localeCompare(b.stem));
+}
+
+function rootIndex(discovery: DiscoveryResult, curated: RootEntry[]): string {
+  const links = [
+    ...GENERATED_ROOT_ENTRIES.map(([stem, summary]) => ({ stem, summary })),
+    ...curated,
+  ].map(({ stem, summary }) => `- [[${stem}]] - ${summary}`);
   return `# Code-KG Knowledge Base
 
 This knowledge base was bootstrapped from local repository discovery and should be curated as the code changes.
 
-- [[architecture]] - Repository structure and entry points.
-- [[cross-cutting]] - Shared concerns and likely integration paths.
-- [[confidence]] - Review queue for uncertain generated knowledge.
-- [[tests]] - Test layout and validation notes.
+${links.join('\n')}
 
 ## Repository Snapshot
 
@@ -891,7 +942,7 @@ export async function createBootstrapPlan(
   const files: BootstrapFile[] = [
     {
       path: 'lat.md/lat.md',
-      content: rootIndex(discovery),
+      content: rootIndex(discovery, await curatedRootEntries(root)),
       committed: true,
     },
     {
