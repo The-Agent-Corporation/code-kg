@@ -789,4 +789,10 @@ program
     handleResult(await grepCommand(rootOnlyContext(), pattern, opts));
   });
 
-await program.parseAsync();
+try {
+  await program.parseAsync();
+} catch (error) {
+  if ((error as Error).name !== 'InputError') throw error;
+  console.error((error as Error).message);
+  process.exit(1);
+}

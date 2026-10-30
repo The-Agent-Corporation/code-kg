@@ -9,6 +9,7 @@ import {
   type QueryOptions,
   type QueryResult,
 } from './query.js';
+import { InputError } from './errors.js';
 
 type Workspace = { version: 1; repositories: { name: string; path: string }[] };
 export const workspacePath = (root: string) =>
@@ -34,12 +35,12 @@ async function readWorkspace(root: string): Promise<Workspace | null> {
         isAbsolute(r.path),
     )
   )
-    throw new Error('Invalid Code-KG workspace configuration.');
+    throw new InputError('Invalid Code-KG workspace configuration.');
   if (
     new Set(data.repositories.map((r) => r.name)).size !==
     data.repositories.length
   )
-    throw new Error('Workspace repository names must be unique.');
+    throw new InputError('Workspace repository names must be unique.');
   return data;
 }
 export async function workspaceCommand(
@@ -53,14 +54,16 @@ export async function workspaceCommand(
   };
   if (action === 'add') {
     for (const directory of directories) {
-      const path = await realpath(resolve(ctx.projectRoot, directory));
-      if (!(await stat(path)).isDirectory())
-        throw new Error('Not a repository directory: ' + directory);
+      const path = await realpath(resolve(ctx.projectRoot, directory)).catch(
+        () => null,
+      );
+      if (!path || !(await stat(path)).isDirectory())
+        throw new InputError('Not a repository directory: ' + directory);
       const name = basename(path).replace(/[^a-zA-Z0-9_-]/g, '-');
       const prior = config.repositories.find((r) => r.name === name);
       const local = relative(await realpath(ctx.projectRoot), path) || '.';
       if (prior && prior.path !== local)
-        throw new Error('Duplicate workspace name: ' + name);
+        throw new InputError('Duplicate workspace name: ' + name);
       if (!prior) config.repositories.push({ name, path: local });
     }
     await writeJsonAtomic(workspacePath(ctx.projectRoot), config);
@@ -88,7 +91,7 @@ export async function askWorkspace(
   withinScope('', opts.in);
   const config = await readWorkspace(root);
   if (!config?.repositories.length)
-    throw new Error(
+    throw new InputError(
       'Register repositories with code-kg workspace add <directories...>.',
     );
   const hits: QueryResult['hits'] = [],
@@ -127,7 +130,7 @@ export async function askWorkspace(
     }
   }
   if (!successful)
-    throw new Error(
+    throw new InputError(
       warnings.join('\n') || 'No repository matches the workspace scope.',
     );
   hits.sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));

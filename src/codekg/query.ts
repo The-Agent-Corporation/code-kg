@@ -11,6 +11,7 @@ import { readJson } from './cache.js';
 import { sourceHash } from './structural.js';
 import { currentMeanings } from './meaning.js';
 import { visibleGraph } from './visibility.js';
+import { InputError } from './errors.js';
 import type {
   EntityNode,
   MaterializationManifest,
@@ -58,13 +59,13 @@ export function withinScope(path: string, scope?: string): boolean {
   if (!scope || scope === '.') return true;
   const clean = posix.normalize(scope.replace(/\\/g, '/')).replace(/\/$/, '');
   if (clean.startsWith('/') || clean === '..' || clean.startsWith('../')) {
-    throw new Error('Scope must be a project-relative path.');
+    throw new InputError('Scope must be a project-relative path.');
   }
   return path === clean || path.startsWith(clean + '/');
 }
 export function bounded(text: string, maxTokens = 3000): string {
   if (!Number.isInteger(maxTokens) || maxTokens < 64 || maxTokens > 32000)
-    throw new Error('max_tokens must be an integer between 64 and 32000.');
+    throw new InputError('max_tokens must be an integer between 64 and 32000.');
   const max = maxTokens * 4;
   return text.length <= max
     ? text
@@ -136,13 +137,13 @@ export async function ask(
   query: string,
   opts: QueryOptions = {},
 ): Promise<QueryResult> {
-  if (!query.trim()) throw new Error('Provide a search query.');
+  if (!query.trim()) throw new InputError('Provide a search query.');
   withinScope('', opts.in);
   if (
     opts.limit !== undefined &&
     (!Number.isInteger(opts.limit) || opts.limit < 1 || opts.limit > 100)
   )
-    throw new Error('Limit must be between 1 and 100.');
+    throw new InputError('Limit must be between 1 and 100.');
   const graph = await visibleGraph(root, await freshGraph(root));
   const meanings = await currentMeanings(root, graph);
   const manifest = await readJson<MaterializationManifest>(
@@ -391,7 +392,7 @@ export async function trace(
   }[] = [];
   const depth = opts.depth ?? 1;
   if ((!Number.isInteger(depth) || depth < 1) && depth !== Infinity)
-    throw new Error('Depth must be a positive integer or all.');
+    throw new InputError('Depth must be a positive integer or all.');
   const incoming = opts.direction !== 'out';
   for (let d = 1; frontier.size && d <= depth; d++) {
     const next = new Set<string>();
@@ -591,7 +592,7 @@ export async function grepCommand(
   pattern: string,
   opts: QueryOptions & { regex?: boolean; ignoreCase?: boolean } = {},
 ): Promise<CmdResult> {
-  if (!pattern) throw new Error('Provide a search pattern.');
+  if (!pattern) throw new InputError('Provide a search pattern.');
   withinScope('', opts.in);
   const graph = await visibleGraph(
     ctx.projectRoot,
@@ -642,10 +643,22 @@ export async function grepCommand(
           }
         }
       } catch (error) {
-        if ((error as any).code !== 1)
-          throw new Error(
-            'Regex search requires ripgrep: ' + (error as Error).message,
+        const failure = error as { code?: number | string; stderr?: string };
+        if (failure.code === 1) continue;
+        if (failure.code === 'ENOENT')
+          throw new InputError(
+            'Regex search requires ripgrep (rg) on PATH; omit --regex for a literal search.',
           );
+        const detail = (failure.stderr ?? '').trim();
+        if (/regex parse error/i.test(detail))
+          throw new InputError(
+            'Invalid regex: ' +
+              detail.replace(/^rg: regex parse error:\s*/i, ''),
+          );
+        throw new Error(
+          'ripgrep failed' +
+            (detail ? ': ' + detail : ' with exit code ' + failure.code),
+        );
       }
     }
   } else
