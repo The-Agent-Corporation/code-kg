@@ -65,11 +65,13 @@ export async function reviewSourceCommand(
   const keptSpans = section.source_spans.filter(
     (s) => !staleSpanFiles.includes(s.file),
   );
+  const downgraded =
+    staleSpanFiles.length > 0 &&
+    !keptSpans.length &&
+    !section.source_anchors?.length;
   if (write) {
-    if (staleSpanFiles.length) {
-      section.source_spans = keptSpans;
-      if (!keptSpans.length) section.source_anchor_policy = 'coverage-only';
-    }
+    if (staleSpanFiles.length) section.source_spans = keptSpans;
+    if (downgraded) section.source_anchor_policy = 'coverage-only';
     section.source_hashes = Object.fromEntries(
       files.map((f) => [f, graph.source_hashes![f]]),
     );
@@ -84,7 +86,7 @@ export async function reviewSourceCommand(
       "'s source spans in " +
       staleSpanFiles.join(', ') +
       ': they were recorded against older content.' +
-      (keptSpans.length
+      (!downgraded
         ? ''
         : ' With no spans left, it ' +
           (write ? 'is now' : 'would become') +

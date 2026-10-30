@@ -144,6 +144,35 @@ describe('code-kg anchor', () => {
     expect((await codeKgCheckCommand(ctx(root))).isError).toBeFalsy();
   });
 
+  it('stays edit-safe through its anchors when review-source drops stale spans', async () => {
+    const root = await project();
+    await reviewSourceCommand(ctx(root), 'architecture', true);
+    await add(root, 'lat.md/architecture#Architecture', 'greet');
+    const manifest = await readManifest(root);
+    manifest.sections.architecture.source_spans = [
+      { file: 'src/other.ts', start_line: 1, end_line: 1 },
+    ];
+    await writeFile(
+      join(root, '.code-kg/materialization-manifest.json'),
+      JSON.stringify(manifest, null, 2) + '\n',
+    );
+    await writeFile(
+      join(root, 'src/other.ts'),
+      '// moved\nexport function wave() {\n  return 2;\n}\n',
+    );
+
+    const review = await reviewSourceCommand(ctx(root), 'architecture', true);
+    const section = (await readManifest(root)).sections.architecture;
+
+    expect(review.output).toContain(
+      "Dropped architecture's source spans in src/other.ts",
+    );
+    expect(review.output).not.toContain('coverage-only');
+    expect(section.source_spans).toStrictEqual([]);
+    expect(section.source_anchor_policy).toBe('edit-safe');
+    expect((await codeKgCheckCommand(ctx(root))).isError).toBeFalsy();
+  });
+
   it('reports an anchor whose symbol is gone until it is removed', async () => {
     const root = await project();
     await add(root, SECTION, 'greet');
