@@ -36,13 +36,13 @@ The initial inventory groups files by broad category so later extraction can foc
 
 ## Structural Graph
 
-Code-KG extracted a deterministic structural graph with 1215 nodes, 3036 edges, 4 communities using the multi-language-directory-fallback analysis path.
+Code-KG extracted a deterministic structural graph with 1216 nodes, 3039 edges, 4 communities using the multi-language-directory-fallback analysis path.
 
 ## Communities
 
 Directory-based communities provide the first subsystem map until graph clustering is available.
 
-- src: 74 files, 808 symbols, cohesion 0.83
+- src: 74 files, 809 symbols, cohesion 0.83
 - tests: 49 files, 243 symbols, cohesion 0.46
 - templates: 2 files, 27 symbols, cohesion 1
 - scripts: 4 files, 4 symbols, cohesion 0.86
@@ -52,8 +52,8 @@ Directory-based communities provide the first subsystem map until graph clusteri
 High-degree nodes may deserve review as important entry points, bridges, or utility hotspots.
 
 - tests/codekg.test.ts (file)
-- src/codekg/cli.ts (file)
 - src/codekg/bootstrap.ts (file)
+- src/codekg/cli.ts (file)
 - src (module)
 - src/context.ts (file)
 - src/codekg/agents.ts (file)
@@ -160,6 +160,14 @@ Source file `src/codekg/search.ts` is imported by local files including `src/cod
 
 These generated highlights come from deterministic file, symbol, and import extraction so agents can search source-shaped concepts before opening raw files.
 
+### src/codekg/bootstrap.ts
+
+Source file `src/codekg/bootstrap.ts` contains source symbols. Key symbols: `MergeProposal`, `SECTION_HEADINGS`, and 56 more.
+
+- Symbols: `MergeProposal (type)`, `SECTION_HEADINGS (const)`, `DEFAULT_GITIGNORE_LINES (const)`, `SOURCE_FILE_HIGHLIGHT_LIMIT (const)`, `TEST_FILE_HIGHLIGHT_LIMIT (const)`, `SOURCE_SYMBOL_LIMIT (const)`, `SOURCE_IMPORT_LIMIT (const)`, `hash (function)`, and 50 more
+- Imports: `src/code-refs.ts`, `src/codekg/anchors.ts`, `src/codekg/discovery.ts`, `src/codekg/graph.ts`, `src/codekg/limits.ts`, `src/codekg/types.ts`, and 1 more
+- Imported by: `src/codekg/cli.ts`, `src/codekg/update.ts`, `tests/anchor.test.ts`, `tests/backlinks-safety.test.ts`, `tests/codekg-intelligence.test.ts`, `tests/codekg-messages.test.ts`, and 5 more
+
 ### src/codekg/cli.ts
 
 Source file `src/codekg/cli.ts` contains source symbols. Key symbols: `PreviewAcceptOptions`, `ExtractOptions`, and 23 more.
@@ -167,14 +175,6 @@ Source file `src/codekg/cli.ts` contains source symbols. Key symbols: `PreviewAc
 - Symbols: `PreviewAcceptOptions (type)`, `ExtractOptions (type)`, `DriftOptions (type)`, `ReconcileOptions (type)`, `ConfidenceReconcileOptions (type)`, `ApplyBacklinksOptions (type)`, `SearchCliOptions (type)`, `InstallGlobalOptions (type)`, and 17 more
 - Imports: `src/cli/context.ts`, `src/codekg/bootstrap.ts`, `src/codekg/check.ts`, `src/codekg/graph.ts`, `src/codekg/search.ts`, `src/context.ts`
 - Imported by: none detected
-
-### src/codekg/bootstrap.ts
-
-Source file `src/codekg/bootstrap.ts` contains source symbols. Key symbols: `MergeProposal`, `SECTION_HEADINGS`, and 55 more.
-
-- Symbols: `MergeProposal (type)`, `SECTION_HEADINGS (const)`, `DEFAULT_GITIGNORE_LINES (const)`, `SOURCE_FILE_HIGHLIGHT_LIMIT (const)`, `TEST_FILE_HIGHLIGHT_LIMIT (const)`, `SOURCE_SYMBOL_LIMIT (const)`, `SOURCE_IMPORT_LIMIT (const)`, `hash (function)`, and 49 more
-- Imports: `src/code-refs.ts`, `src/codekg/anchors.ts`, `src/codekg/discovery.ts`, `src/codekg/graph.ts`, `src/codekg/limits.ts`, `src/codekg/types.ts`, and 1 more
-- Imported by: `src/codekg/cli.ts`, `src/codekg/update.ts`, `tests/anchor.test.ts`, `tests/backlinks-safety.test.ts`, `tests/codekg-intelligence.test.ts`, `tests/codekg-messages.test.ts`, and 5 more
 
 ### src/context.ts
 
