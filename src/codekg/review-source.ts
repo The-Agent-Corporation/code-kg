@@ -101,11 +101,16 @@ export async function reviewSourceCommand(
           (write ? 'is now' : 'would become') +
           ' coverage-only. Use `code-kg anchor` to make it edit-safe with anchors that follow the source.')
     : '';
+  const count = (n: number, noun: string) =>
+    `${n} ${noun}${n === 1 ? '' : 's'}`;
   const coverage = anchors.length
-    ? [files.length && `${files.length} files`, `${anchors.length} anchors`]
+    ? [
+        files.length && count(files.length, 'file'),
+        count(anchors.length, 'anchor'),
+      ]
         .filter(Boolean)
         .join(', ')
-    : `${files.length} files`;
+    : count(files.length, 'file');
   return {
     output:
       (write ? 'Acknowledged' : 'Would acknowledge') +

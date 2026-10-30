@@ -342,7 +342,7 @@ describe('code-kg anchor', () => {
       '- src/greet.ts#greet at src/greet.ts:1 (changed since the section was reviewed',
     );
     expect(review.output).toContain(
-      `Acknowledged source review for ${SECTION} (1 anchors).`,
+      `Acknowledged source review for ${SECTION} (1 anchor).`,
     );
     expect(fresh.output).not.toContain(SECTION);
     expect((await readManifest(root)).sections[SECTION]).toMatchObject({
