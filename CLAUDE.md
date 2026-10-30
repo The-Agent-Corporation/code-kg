@@ -32,7 +32,7 @@ pnpm vitest run tests/search.test.ts --testNamePattern "local embeddings eval"
 The CLI entrypoint after build is `node dist/src/codekg/cli.js <command>` (this is the `code-kg` binary defined in `package.json` `bin`). See `README.md` for the full command list and `docs/USAGE.md` for the tested happy path.
 
 Opt-in tests gated behind env flags (skipped by default):
-- `LAT_TEST_LOCAL_EMBEDDINGS=1` — runs the real local-embedding retrieval eval (downloads a model).
+- `LAT_TEST_LOCAL_EMBEDDINGS=1` — runs the real local-embedding retrieval evals (downloads a model), including the semantic half of `tests/retrieval-eval.test.ts`. Its lexical half always runs and enforces recall@5 / MRR floors over this repo's `lat.md/`.
 
 ## Architecture
 

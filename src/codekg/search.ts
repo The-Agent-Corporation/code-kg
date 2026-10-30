@@ -69,6 +69,25 @@ function scoreSection(section: Section, query: string): number {
   return score;
 }
 
+/** Sections matching `query` lexically, best first. */
+export function rankSectionsLexically(
+  sections: Section[],
+  query: string,
+  limit: number,
+): Section[] {
+  return sections
+    .map((section) => ({
+      section,
+      score: scoreSection(section, query),
+    }))
+    .filter((entry) => entry.score > 0)
+    .sort(
+      (a, b) => b.score - a.score || a.section.id.localeCompare(b.section.id),
+    )
+    .slice(0, limit)
+    .map((entry) => entry.section);
+}
+
 export async function localSearchCommand(
   ctx: CmdContext,
   query: string | undefined,
@@ -79,20 +98,11 @@ export async function localSearchCommand(
   }
 
   const sections = flattenSections(await loadAllSections(ctx.latDir));
-  const matches: SectionMatch[] = sections
-    .map((section) => ({
-      section,
-      score: scoreSection(section, query),
-    }))
-    .filter((entry) => entry.score > 0)
-    .sort(
-      (a, b) => b.score - a.score || a.section.id.localeCompare(b.section.id),
-    )
-    .slice(0, limit)
-    .map((entry) => ({
-      section: entry.section,
-      reason: 'local lexical match',
-    }));
+  const matches: SectionMatch[] = rankSectionsLexically(
+    sections,
+    query,
+    limit,
+  ).map((section) => ({ section, reason: 'local lexical match' }));
 
   if (matches.length === 0) {
     return {
