@@ -194,14 +194,14 @@ async function backlinkPlan(
       if (!recordedHash) {
         skips.push({
           file: span.file,
-          reason: `skipped ${span.file}: section ${section.stable_id} has no recorded source hash for it; review it with \`code-kg review-source ${section.stable_id} --write\` first`,
+          reason: `skipped ${span.file}: section ${section.stable_id} has no recorded source hash for it, so its span line numbers cannot be verified; record fresh spans before inserting backlinks`,
         });
         continue;
       }
       if (recordedHash !== currentHash) {
         skips.push({
           file: span.file,
-          reason: `skipped ${span.file}: changed since section ${section.stable_id} recorded its source spans; review the section and refresh its spans before inserting backlinks`,
+          reason: `skipped ${span.file}: changed since section ${section.stable_id} recorded its source spans; record fresh spans before inserting backlinks`,
         });
         continue;
       }

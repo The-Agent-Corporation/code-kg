@@ -12,6 +12,7 @@ import {
   insertCommentLine,
 } from '../src/codekg/backlinks.js';
 import { driftCommand } from '../src/codekg/drift.js';
+import { reviewSourceCommand } from '../src/codekg/review-source.js';
 import { sourceHash } from '../src/codekg/structural.js';
 import { plainStyler, type CmdContext } from '../src/context.js';
 import type {
@@ -191,6 +192,45 @@ describe('apply-backlinks --write safety', () => {
     expect(await readFile(join(root, 'src/a.ts'), 'utf-8')).toBe(
       `${BACKLINK}\nexport const a = 1;\n// @lat: [[${otherId}]]\nexport function b() {\n  return 2;\n}\n`,
     );
+  });
+
+  it('does not trust stale spans after review-source --write refreshes hashes', async () => {
+    const root = await project({
+      'src/a.ts': 'export function b() {\n  return 2;\n}\n',
+    });
+    await markEditSafe(root, [
+      { file: 'src/a.ts', start_line: 2, end_line: 2 },
+    ]);
+    const shifted =
+      'export const s = `one\ntwo`;\nexport function b() {\n  return 2;\n}\n';
+    await writeFile(join(root, 'src/a.ts'), shifted);
+
+    const review = await reviewSourceCommand(ctx(root), 'architecture', true);
+    const result = await applyBacklinksCommand(ctx(root), { write: true });
+
+    expect(review.isError).toBeFalsy();
+    expect(review.output).toContain(
+      'Downgraded architecture to coverage-only: its edit-safe source spans were recorded against older content of src/a.ts',
+    );
+    expect(
+      (await readManifest(root)).sections.architecture.source_anchor_policy,
+    ).toBe('coverage-only');
+    expect(result.output).toContain('No backlink changes.');
+    expect(await readFile(join(root, 'src/a.ts'), 'utf-8')).toBe(shifted);
+  });
+
+  it('keeps an edit-safe section whose spans still match after review-source', async () => {
+    const root = await project({ 'src/a.ts': 'export const a = 1;\n' });
+    await markEditSafe(root, [
+      { file: 'src/a.ts', start_line: 1, end_line: 1 },
+    ]);
+
+    const review = await reviewSourceCommand(ctx(root), 'architecture', true);
+
+    expect(review.output).not.toContain('coverage-only');
+    expect(
+      (await readManifest(root)).sections.architecture.source_anchor_policy,
+    ).toBe('edit-safe');
   });
 
   it('keeps a shebang and an encoding declaration on the first lines', async () => {

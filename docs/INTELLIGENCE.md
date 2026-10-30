@@ -169,6 +169,10 @@ confidence. Other section stable IDs require source coverage in their manifest
 nodes, spans, or prior hashes. Missing coverage or extraction errors block review
 acknowledgement. Normal retrieval, hooks, and cache refresh never perform it.
 
+Review acknowledges prose, not line numbers. If an `edit-safe` section's span
+files changed since its spans were recorded, `--write` downgrades the section to
+`coverage-only` so `apply-backlinks --write` cannot insert at stale lines.
+
 ## Agent Integration
 
 New MCP tools are `codekg_ask`, `codekg_trace_calls`, `codekg_repo_map`,

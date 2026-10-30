@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { CmdContext, CmdResult } from '../context.js';
+import { sourceAnchorPolicy } from './anchors.js';
 import { readJson, writeJsonAtomic } from './cache.js';
 import { freshGraph } from './fresh.js';
 import type { MaterializationManifest } from './types.js';
@@ -53,7 +54,16 @@ export async function reviewSourceCommand(
       output: 'Section has no source coverage to review.',
       isError: true,
     };
+  // Refreshed hashes would vouch for span line numbers recorded against older
+  // content, and apply-backlinks trusts spans whose file hash matches.
+  const staleSpanFiles =
+    sourceAnchorPolicy(section) === 'edit-safe'
+      ? [...new Set(section.source_spans.map((s) => s.file))].filter(
+          (f) => section.source_hashes?.[f] !== graph.source_hashes![f],
+        )
+      : [];
   if (write) {
+    if (staleSpanFiles.length) section.source_anchor_policy = 'coverage-only';
     section.source_hashes = Object.fromEntries(
       files.map((f) => [f, graph.source_hashes![f]]),
     );
@@ -61,6 +71,14 @@ export async function reviewSourceCommand(
     section.status = 'curated';
     await writeJsonAtomic(path, manifest, 2);
   }
+  const downgrade = staleSpanFiles.length
+    ? '\n' +
+      (write ? 'Downgraded ' : 'Would downgrade ') +
+      stableId +
+      ' to coverage-only: its edit-safe source spans were recorded against older content of ' +
+      staleSpanFiles.join(', ') +
+      '. Record fresh spans before marking it edit-safe again.'
+    : '';
   return {
     output:
       (write ? 'Acknowledged' : 'Would acknowledge') +
@@ -69,6 +87,7 @@ export async function reviewSourceCommand(
       ' (' +
       files.length +
       ' files).\n' +
-      'Section prose and relationship confidence are unchanged.',
+      'Section prose and relationship confidence are unchanged.' +
+      downgrade,
   };
 }
