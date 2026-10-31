@@ -14,7 +14,17 @@ Each generated file in `lat.md/` has an entry in `.code-kg/materialization-manif
 - No longer produced: a `generated` entry becomes `orphaned`.
 - A file that no longer needs its merge proposal, because it is `generated` again or matches the candidate, has the old proposal removed.
 
-Hand-written files such as this one have no manifest entry and are never written; the generated root index lists them. When nothing else changed, the manifest keeps its `generated_at`, so a no-op update leaves it untouched. The implementation map is [[architecture#Architecture#Source File Highlights#src/codekg/bootstrap.ts]].
+Hand-written files such as this one have no manifest entry and are never written; the generated root index lists them. When nothing else changed, the manifest keeps its `generated_at`, so a no-op update leaves it untouched. The implementation map is [[files#Source Files#src/codekg/bootstrap.ts]].
+
+## File Cards
+
+`lat.md/files.md` has a generated card for every parsed source and test file, so a file can be found by what it does and not only by its name. [[src/codekg/cards.ts#filesFile]] builds it on `bootstrap` and `update`.
+
+- A card opens with the file's leading comment, or a sentence naming its first symbols. It lists the symbols with the first sentence of each doc comment, the CLI and MCP commands whose handlers call into the file, its tests, and its imports and importers. A test file's card lists its test names and the files they check.
+- Commands come from Commander `.command()` chains and MCP `.tool()` and `.registerTool()` calls. A function that more than five commands call is a shared helper and attributes none of them.
+- Cards name symbols instead of giving line numbers, so a card changes only when the file's symbols, docs or relations do.
+- Files under a test directory that nothing imports are fixtures and get no card.
+- `files.md` is merge-safe like the other generated files: a hand edit stops its refresh. Put notes about a file in a hand-written section that links to its card.
 
 ## Drift and Source Review
 
@@ -59,7 +69,7 @@ Every graph edge carries a confidence. `EXTRACTED` edges come from static syntax
 - Lexical ranking scores each section's id, heading, leading paragraph and the rest of its body, and drops question words such as "how" and "the"; see [[src/codekg/search.ts#rankSectionsLexically]].
 - Semantic search embeds sections with a local model (`Xenova/bge-small-en-v1.5`, enabled by `code-kg semantic enable-local`) or a remote provider keyed by `LAT_LLM_KEY` (OpenAI `sk-…`, Vercel `vck_…`). The vector index is `lat.md/.cache/vectors.db`.
 - With no provider, explicit semantic search returns an error naming the setup command. `auto-semantic` falls back instead, also when semantic search throws, and its `Backend:` line says why; see [[src/codekg/search.ts#codeKgSearchCommand]].
-- `tests/retrieval-eval.test.ts` measures ranking changes with recall@5 and mean reciprocal rank over this repository's questions.
+- `tests/retrieval-eval.test.ts` measures ranking changes with recall@5 and mean reciprocal rank over this repository's questions. A held-out set, each answered by a source file, covers features the knowledge base was not written against; it measures `ask` too, and is never used to choose what to document or how to rank.
 
 ## Agent Guidance and Hooks
 

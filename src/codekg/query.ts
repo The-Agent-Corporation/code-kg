@@ -255,6 +255,9 @@ export async function ask(
   }
   const knowledgeFiles = new Map<string, string>();
   const graphNodes = new Map(graph.nodes.map((node) => [node.id, node]));
+  const graphFiles = new Set(
+    graph.nodes.filter((n) => n.kind === 'file').map((n) => n.source_file),
+  );
   for (const section of sections) {
     let body = knowledgeFiles.get(section.filePath);
     if (body === undefined) {
@@ -268,12 +271,15 @@ export async function ask(
     const owner = manifestOwner(manifest, section);
     if (owner?.status === 'suppressed' || owner?.status === 'orphaned')
       continue;
+    // A section headed by a source path, such as a file card, is about that file.
     if (
       opts.in &&
-      !withinScope(section.filePath, opts.in) &&
-      !(owner ? sectionNodeIds(owner) : []).some((id) =>
-        nodes.some((n) => n.id === id),
-      )
+      !(graphFiles.has(section.heading)
+        ? withinScope(section.heading, opts.in)
+        : withinScope(section.filePath, opts.in) ||
+          (owner ? sectionNodeIds(owner) : []).some((id) =>
+            nodes.some((n) => n.id === id),
+          ))
     )
       continue;
     const words = new Set(tokenize(section.heading + ' ' + text));

@@ -362,29 +362,20 @@ describe('code-kg bootstrap', () => {
     );
 
     await writeBootstrapPlan(await createBootstrapPlan(root));
-    const architecture = await readFile(
-      join(root, 'lat.md', 'architecture.md'),
-      'utf-8',
-    );
-    const tests = await readFile(
-      join(root, 'lat.md', 'tests', 'tests.md'),
-      'utf-8',
-    );
+    const files = await readFile(join(root, 'lat.md', 'files.md'), 'utf-8');
     const search = await localSearchCommand(
       ctx(root),
       'memory endpoint tests',
       5,
     );
 
-    expect(architecture).toContain('## Source File Highlights');
-    expect(architecture).toContain('### apps/api/memory.py');
-    expect(architecture).toContain('memory_context_endpoint');
-    expect(tests).toContain('## Source Test Highlights');
-    expect(tests).toContain('### tests/test_memory.py');
-    expect(tests).toContain('test_memory_context_endpoint');
+    expect(files).toContain('## apps/api/memory.py');
+    expect(files).toContain('memory_context_endpoint');
+    expect(files).toContain('## tests/test_memory.py');
+    expect(files).toContain('- Test: test_memory_context_endpoint');
     expect(search.isError).toBeFalsy();
     expect(search.output).toContain(
-      'lat.md/tests/tests#Tests#Source Test Highlights#tests/test_memory.py',
+      'lat.md/files#Source Files#tests/test_memory.py',
     );
   });
 
@@ -1264,7 +1255,7 @@ describe('code-kg bootstrap', () => {
       expect(result.output).toContain('lat.md/: found');
       expect(result.output).toContain('code-kg check: passed');
       expect(result.output).toContain('materialization-manifest.json: found');
-      expect(result.output).toContain('manifest sections: generated=5');
+      expect(result.output).toContain('manifest sections: generated=6');
       expect(result.output).toContain('.code-kg/cache/: ignored');
       expect(result.output).toContain('AGENTS.md guidance: installed');
       expect(result.output).toContain('Codex hook: installed');
@@ -1796,10 +1787,7 @@ describe('code-kg bootstrap', () => {
       join(root, 'lat.md', 'architecture.md'),
       'utf-8',
     );
-    const tests = await readFile(
-      join(root, 'lat.md', 'tests', 'tests.md'),
-      'utf-8',
-    );
+    const files = await readFile(join(root, 'lat.md', 'files.md'), 'utf-8');
     const search = await localSearchCommand(
       ctx(root),
       'what tests cover memory',
@@ -1809,12 +1797,11 @@ describe('code-kg bootstrap', () => {
     expect(architecture).toContain('## Entry Point Flow');
     expect(architecture).toContain('### apps/api/main.py');
     expect(architecture).toContain('apps/api/memory.py');
-    expect(tests).toContain('## Test Coverage Links');
-    expect(tests).toContain('### apps/api/memory.py');
-    expect(tests).toContain('tests/test_memory.py');
+    expect(files).toContain('## apps/api/memory.py');
+    expect(files).toContain('- Tested by: `tests/test_memory.py`');
     expect(search.isError).toBeFalsy();
     expect(search.output).toContain(
-      'lat.md/tests/tests#Tests#Test Coverage Links#apps/api/memory.py',
+      'lat.md/files#Source Files#apps/api/memory.py',
     );
   });
 

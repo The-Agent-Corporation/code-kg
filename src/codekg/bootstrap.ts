@@ -6,6 +6,7 @@ import { extname } from 'node:path';
 import { scanCodeRefs } from '../code-refs.js';
 import { walkEntries } from '../walk.js';
 import { isSectionEntry } from './anchors.js';
+import { filesFile } from './cards.js';
 import { discoverProject } from './discovery.js';
 import {
   extractProjectGraph,
@@ -35,6 +36,7 @@ type MergeProposal = {
 const SECTION_HEADINGS: Record<string, string[]> = {
   lat: ['Code-KG Knowledge Base'],
   architecture: ['Architecture'],
+  files: ['Source Files'],
   'cross-cutting': ['Cross-Cutting Concerns'],
   confidence: ['Confidence Review'],
   'tests.tests': ['Tests'],
@@ -45,9 +47,6 @@ const DEFAULT_GITIGNORE_LINES = [
   '.code-kg/tmp/',
   'lat.md/.cache/',
 ];
-const SOURCE_FILE_HIGHLIGHT_LIMIT = 15;
-const TEST_FILE_HIGHLIGHT_LIMIT = 25;
-const SOURCE_SYMBOL_LIMIT = 8;
 const SOURCE_IMPORT_LIMIT = 6;
 
 function hash(content: string): string {
@@ -95,21 +94,6 @@ function graphFileNodes(graph: ProjectGraph): Map<string, EntityNode> {
       .filter((node) => node.kind === 'file' && node.source_file)
       .map((node) => [node.source_file!, node]),
   );
-}
-
-function fileSymbols(graph: ProjectGraph, path: string): EntityNode[] {
-  return graph.nodes
-    .filter(
-      (node) =>
-        node.source_file === path &&
-        node.kind !== 'file' &&
-        node.kind !== 'module',
-    )
-    .sort((a, b) => {
-      const lineDelta =
-        (a.source_span?.start_line ?? 0) - (b.source_span?.start_line ?? 0);
-      return lineDelta || a.label.localeCompare(b.label);
-    });
 }
 
 function localImports(
@@ -165,113 +149,6 @@ function briefInlineCodeList(items: string[]): string {
   return remaining > 0
     ? `${visible.join(', ')}, and ${remaining} more`
     : visible.join(', ');
-}
-
-function highlightSummary(
-  path: string,
-  category: 'code' | 'test',
-  symbols: EntityNode[],
-): string {
-  const noun = category === 'test' ? 'Test file' : 'Source file';
-  const purpose =
-    category === 'test'
-      ? 'contains tests and validation symbols'
-      : 'contains source symbols';
-  return clampLeadingParagraph(
-    `${noun} \`${path}\` ${purpose}. Key symbols: ${briefInlineCodeList(
-      symbols.map((symbol) => symbol.label),
-    )}.`,
-  );
-}
-
-function renderFileHighlight(
-  graph: ProjectGraph,
-  path: string,
-  category: 'code' | 'test',
-): string[] {
-  const fileNode = graphFileNodes(graph).get(path);
-  const symbols = fileSymbols(graph, path);
-  const imports = fileNode ? localImports(graph, fileNode, 'outgoing') : [];
-  const importedBy = fileNode ? localImports(graph, fileNode, 'incoming') : [];
-  return [
-    `### ${path}`,
-    '',
-    highlightSummary(path, category, symbols),
-    '',
-    `- Symbols: ${inlineCodeList(
-      symbols.map((symbol) => `${symbol.label} (${symbol.kind})`),
-      SOURCE_SYMBOL_LIMIT,
-    )}`,
-    `- Imports: ${inlineCodeList(imports, SOURCE_IMPORT_LIMIT)}`,
-    `- Imported by: ${inlineCodeList(importedBy, SOURCE_IMPORT_LIMIT)}`,
-    '',
-  ];
-}
-
-function sourceHighlightPaths(
-  discovery: DiscoveryResult,
-  graph: ProjectGraph,
-  category: 'code' | 'test',
-): string[] {
-  const categories = categoryByPath(discovery);
-  const fileNodes = graphFileNodes(graph);
-  const paths = new Set<string>();
-  const include = (path: string | undefined): void => {
-    if (!path || !fileNodes.has(path)) return;
-    if (categories.get(path) !== category) return;
-    paths.add(path);
-  };
-
-  if (category === 'code') {
-    for (const path of discovery.entrypoints) include(path);
-  } else {
-    for (const path of discovery.testPaths) include(path);
-  }
-  for (const node of graph.analysis.god_nodes) include(node.source_file);
-  for (const node of graph.analysis.bridges) include(node.source_file);
-  for (const file of [...discovery.files].sort((a, b) =>
-    a.path.localeCompare(b.path),
-  )) {
-    if (file.category === category) include(file.path);
-  }
-
-  const limit =
-    category === 'test'
-      ? TEST_FILE_HIGHLIGHT_LIMIT
-      : SOURCE_FILE_HIGHLIGHT_LIMIT;
-  return [...paths].slice(0, limit);
-}
-
-function renderSourceHighlights(
-  discovery: DiscoveryResult,
-  graph: ProjectGraph,
-  category: 'code' | 'test',
-): string {
-  const paths = sourceHighlightPaths(discovery, graph, category);
-  const title =
-    category === 'test' ? 'Source Test Highlights' : 'Source File Highlights';
-  const fallback =
-    category === 'test'
-      ? 'No parsed test files were available for source-grounded highlights.'
-      : 'No parsed source files were available for source-grounded highlights.';
-  if (paths.length === 0) {
-    return `## ${title}
-
-No parsed ${category === 'test' ? 'test' : 'source'} files were available for source-grounded highlights during bootstrap.
-
-- ${fallback}
-`;
-  }
-
-  return [
-    `## ${title}`,
-    '',
-    'These generated highlights come from deterministic file, symbol, and import extraction so agents can search source-shaped concepts before opening raw files.',
-    '',
-    ...paths.flatMap((path) => renderFileHighlight(graph, path, category)),
-  ]
-    .join('\n')
-    .trimEnd();
 }
 
 function renderEntryPointFlow(
@@ -349,80 +226,18 @@ No source files had incoming local imports during bootstrap.
   return [
     '## Dependency Hotspots',
     '',
-    'Dependency hotspots list source files with incoming local imports so agents can find shared modules and integration points quickly.',
+    'Dependency hotspots are the source files with the most local importers, the shared modules and integration points; each file card in [[files]] names its importers.',
     '',
-    ...hotspots.flatMap(({ path, importedBy }) => [
-      `### ${path}`,
-      '',
-      clampLeadingParagraph(
-        `Source file \`${path}\` is imported by local files including ${briefInlineCodeList(importedBy)}.`,
-      ),
-      '',
-      `- Imported by: ${inlineCodeList(importedBy, SOURCE_IMPORT_LIMIT)}`,
-      '',
-    ]),
-  ]
-    .join('\n')
-    .trimEnd();
-}
-
-function renderTestCoverageLinks(graph: ProjectGraph): string {
-  const fileNodes = graphFileNodes(graph);
-  const coverage = [...fileNodes.entries()]
-    .map(([path, node]) => ({
-      path,
-      tests: localFileRelations(graph, node, 'tests', 'incoming', false),
-      inferred: localFileRelations(graph, node, 'tests', 'incoming', true),
-    }))
-    .filter((entry) => entry.tests.length + entry.inferred.length > 0)
-    .sort(
-      (a, b) =>
-        b.tests.length - a.tests.length ||
-        b.inferred.length - a.inferred.length ||
-        a.path.localeCompare(b.path),
-    )
-    .slice(0, 25);
-
-  if (coverage.length === 0) {
-    return `## Test Coverage Links
-
-No test-to-source import relationships were detected during bootstrap.
-
-- No inferred test coverage links were detected.
-`;
-  }
-
-  return [
-    '## Test Coverage Links',
-    '',
-    'Test coverage links map inferred test relationships from test imports to source files so agents can find validation paths.',
-    '',
-    ...coverage.flatMap(({ path, tests, inferred }) => [
-      `### ${path}`,
-      '',
-      clampLeadingParagraph(
-        tests.length > 0
-          ? `Source file \`${path}\` is covered by test imports from ${briefInlineCodeList(tests)}.`
-          : `Source file \`${path}\` has no test imports; ${briefInlineCodeList(inferred)} load it by path (inferred).`,
-      ),
-      '',
-      ...(tests.length > 0
-        ? [`- Tests: ${inlineCodeList(tests, SOURCE_IMPORT_LIMIT)}`]
-        : []),
-      ...(inferred.length > 0
-        ? [
-            `- Inferred tests (load it by path, not by import): ${inlineCodeList(inferred, SOURCE_IMPORT_LIMIT)}`,
-          ]
-        : []),
-      '',
-    ]),
-  ]
-    .join('\n')
-    .trimEnd();
+    ...hotspots.map(
+      ({ path, importedBy }) =>
+        `- \`${path}\`: imported by ${importedBy.length} local ${importedBy.length === 1 ? 'file' : 'files'}`,
+    ),
+  ].join('\n');
 }
 
 const GENERATED_ROOT_ENTRIES: Array<[stem: string, summary: string]> = [
   ['architecture', 'Repository structure and entry points.'],
+  ['files', 'One card per source and test file.'],
   ['cross-cutting', 'Shared concerns and likely integration paths.'],
   ['confidence', 'Review queue for uncertain generated knowledge.'],
   ['tests', 'Test layout and validation notes.'],
@@ -553,8 +368,6 @@ ${bulletList(
 )}
 
 ${renderDependencyHotspots(discovery, graph)}
-
-${renderSourceHighlights(discovery, graph, 'code')}
 `;
 }
 
@@ -715,7 +528,6 @@ async function codeRefSpecFiles(root: string): Promise<BootstrapFile[]> {
 
 function testsIndexFile(
   discovery: DiscoveryResult,
-  graph: ProjectGraph,
   specFiles: BootstrapFile[],
 ): BootstrapFile {
   const children = specFiles
@@ -742,13 +554,9 @@ This section records the test layout discovered during bootstrap and indexes gen
 
 ## Test Paths
 
-These paths looked test-related during local discovery.
+These paths looked test-related during local discovery; each test file's card in [[files]] lists its tests and the files they check.
 
 ${bulletList(discovery.testPaths, 'No test paths were detected during skeleton bootstrap.')}
-
-${renderSourceHighlights(discovery, graph, 'test')}
-
-${renderTestCoverageLinks(graph)}
 
 ## Generated Test Specs
 
@@ -964,6 +772,11 @@ export async function createBootstrapPlan(
       committed: true,
     },
     {
+      path: 'lat.md/files.md',
+      content: await filesFile(root, discovery, graph),
+      committed: true,
+    },
+    {
       path: 'lat.md/cross-cutting.md',
       content: crossCuttingFile(graph),
       committed: true,
@@ -973,7 +786,7 @@ export async function createBootstrapPlan(
       content: confidenceFile(),
       committed: true,
     },
-    testsIndexFile(discovery, graph, specFiles),
+    testsIndexFile(discovery, specFiles),
     ...specFiles,
   ];
   const plan = { root, discovery, graph, files };

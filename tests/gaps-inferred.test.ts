@@ -133,7 +133,7 @@ describe('test coverage from path mentions', () => {
     expect(inferred).not.toContain('`src/imported.ts`');
   });
 
-  it('labels inferred tests in context and the generated tests map', async () => {
+  it('labels inferred tests in context and the file cards', async () => {
     const ctx = await project();
     const graph = await extractProjectGraph(ctx.projectRoot);
 
@@ -141,16 +141,20 @@ describe('test coverage from path mentions', () => {
       (await buildContextInfo(ctx, 'src/spawned.ts', graph))!,
     );
     const plan = await createBootstrapPlan(ctx.projectRoot);
-    const testsMap = plan.files.find(
-      (file) => file.path === 'lat.md/tests/tests.md',
+    const cards = plan.files.find(
+      (file) => file.path === 'lat.md/files.md',
     )!.content;
+    const card = (path: string) =>
+      cards.slice(cards.indexOf(`## ${path}\n`)).split(/\n(?=## )/)[0];
 
     expect(context).toContain(
       '- tested by: `tests/spawned.test.ts` (inferred)',
     );
-    expect(testsMap).toContain(
+    expect(card('src/spawned.ts')).toContain(
       '- Inferred tests (load it by path, not by import): `tests/spawned.test.ts`',
     );
-    expect(testsMap).toContain('- Tests: `tests/imported.test.ts`');
+    expect(card('src/imported.ts')).toContain(
+      '- Tested by: `tests/imported.test.ts`',
+    );
   });
 });

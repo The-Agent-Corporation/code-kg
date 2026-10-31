@@ -37,7 +37,7 @@ Open the relevant knowledge section before raw source:
 
 ```bash
 code-kg context apps/api/memory.py
-code-kg section "lat.md/tests/tests#Tests#Test Coverage Links#apps/api/memory.py"
+code-kg section "lat.md/files#Source Files#apps/api/memory.py"
 ```
 
 After code or knowledge changes:

@@ -24,39 +24,29 @@ import { searchSections } from '../src/search/search.js';
  * its committed knowledge base that answer it. Any listed id counts as a hit.
  */
 const A = 'lat.md/architecture#Architecture#';
-const T = 'lat.md/tests/tests#Tests#';
 const C = 'lat.md/concepts#Concepts#';
+const F = 'lat.md/files#Source Files#';
 const QUESTIONS: Array<{ question: string; answers: string[] }> = [
   {
     question:
       'how are human edits preserved when the knowledge base is regenerated',
-    answers: [
-      `${C}Merge-Safe Materialization`,
-      `${A}Source File Highlights#src/codekg/bootstrap.ts`,
-      `${A}Dependency Hotspots#src/codekg/bootstrap.ts`,
-    ],
+    answers: [`${C}Merge-Safe Materialization`, `${F}src/codekg/bootstrap.ts`],
   },
   {
     question: 'what does edit-safe mean for a section',
     answers: [
       `${C}Source Anchor Policies`,
-      `${A}Dependency Hotspots#src/codekg/types.ts`,
-      `${T}Test Coverage Links#src/codekg/backlinks.ts`,
+      `${F}src/codekg/types.ts`,
+      `${F}src/codekg/backlinks.ts`,
     ],
   },
   {
     question: 'when does drift report a warning',
-    answers: [
-      `${C}Drift and Source Review`,
-      `${T}Test Coverage Links#src/codekg/drift.ts`,
-    ],
+    answers: [`${C}Drift and Source Review`, `${F}src/codekg/drift.ts`],
   },
   {
     question: 'how do I acknowledge that a section was reviewed against source',
-    answers: [
-      `${C}Drift and Source Review`,
-      `${T}Test Coverage Links#src/codekg/review-source.ts`,
-    ],
+    answers: [`${C}Drift and Source Review`, `${F}src/codekg/review-source.ts`],
   },
   {
     question: 'how does a curated section become edit-safe',
@@ -66,100 +56,80 @@ const QUESTIONS: Array<{ question: string; answers: string[] }> = [
     question: 'how does apply-backlinks insert @lat comments into source files',
     answers: [
       `${C}Source Anchor Policies`,
-      `${T}Test Coverage Links#src/codekg/backlinks.ts`,
-      `${T}Source Test Highlights#tests/backlinks-safety.test.ts`,
+      `${F}src/codekg/backlinks.ts`,
+      `${F}tests/backlinks-safety.test.ts`,
     ],
   },
   {
     question: 'what happens when no embedding provider is configured',
     answers: [
       `${C}Search Backends`,
-      `${T}Test Coverage Links#src/codekg/search.ts`,
-      `${T}Test Coverage Links#src/config.ts`,
-      `${A}Dependency Hotspots#src/config.ts`,
-      `${T}Source Test Highlights#tests/search-fallback.test.ts`,
+      `${F}src/codekg/search.ts`,
+      `${F}src/config.ts`,
+      `${F}tests/search-fallback.test.ts`,
     ],
   },
   {
     question: 'which search backends can code-kg search use',
     answers: [
       `${C}Search Backends`,
-      `${T}Test Coverage Links#src/codekg/search.ts`,
-      `${T}Source Test Highlights#tests/search-fallback.test.ts`,
+      `${F}src/codekg/search.ts`,
+      `${F}tests/search-fallback.test.ts`,
     ],
   },
   {
     question: 'how are inferred test edges different from extracted imports',
     answers: [
       `${C}Relationship Confidence`,
-      `${A}Source File Highlights#src/codekg/graph.ts`,
-      `${A}Dependency Hotspots#src/codekg/graph.ts`,
-      `${T}Source Test Highlights#tests/gaps-inferred.test.ts`,
+      `${F}src/codekg/graph.ts`,
+      `${F}tests/gaps-inferred.test.ts`,
       'lat.md/confidence#Confidence Review',
     ],
   },
   {
     question: 'what does the pre-commit hook do',
-    answers: [
-      `${C}Agent Guidance and Hooks`,
-      `${T}Source Test Highlights#tests/git-hooks.test.ts`,
-    ],
+    answers: [`${C}Agent Guidance and Hooks`, `${F}tests/git-hooks.test.ts`],
   },
   {
     question: 'how is the AGENTS.md guidance block installed',
     answers: [
       `${C}Agent Guidance and Hooks`,
-      `${A}Source File Highlights#src/codekg/agents.ts`,
-      `${T}Test Coverage Links#src/codekg/agents.ts`,
-      `${T}Source Test Highlights#tests/agents-edge-cases.test.ts`,
+      `${F}src/codekg/agents.ts`,
+      `${F}tests/agents-edge-cases.test.ts`,
     ],
   },
   {
     question: 'where is the MCP server defined',
-    answers: [
-      `${T}Test Coverage Links#src/codekg/mcp.ts`,
-      `${T}Source Test Highlights#tests/mcp.test.ts`,
-    ],
+    answers: [`${F}src/codekg/mcp.ts`, `${F}tests/mcp.test.ts`],
   },
   {
     question: 'how is the structural graph extracted from source code',
     answers: [
       `${C}Structural Extraction`,
       `${A}Structural Graph`,
-      `${A}Source File Highlights#src/codekg/graph.ts`,
-      `${A}Dependency Hotspots#src/codekg/graph.ts`,
-      `${A}Dependency Hotspots#src/codekg/structural.ts`,
+      `${F}src/codekg/graph.ts`,
+      `${F}src/codekg/structural.ts`,
     ],
   },
   {
     question: 'where are the code-kg CLI commands registered',
-    answers: [
-      `${A}Source File Highlights#src/codekg/cli.ts`,
-      `${A}Entry Points`,
-    ],
+    answers: [`${F}src/codekg/cli.ts`, `${A}Entry Points`],
   },
   {
     question: 'how are wiki links between sections validated',
-    answers: [
-      `${A}Source File Highlights#src/cli/check.ts`,
-      `${T}Test Coverage Links#src/cli/check.ts`,
-      'lat.md/tests/check-md#Check Md Tests',
-    ],
+    answers: [`${F}src/cli/check.ts`, 'lat.md/tests/check-md#Check Md Tests'],
   },
   {
     question: 'what is the materialization manifest',
     answers: [
       `${C}Merge-Safe Materialization`,
-      `${A}Dependency Hotspots#src/codekg/types.ts`,
-      `${A}Source File Highlights#src/codekg/bootstrap.ts`,
+      `${F}src/codekg/types.ts`,
+      `${F}src/codekg/bootstrap.ts`,
     ],
   },
   {
     question: 'how does a hook read its payload from stdin',
-    answers: [
-      `${C}Agent Guidance and Hooks`,
-      `${T}Source Test Highlights#tests/hook-stdin.test.ts`,
-    ],
+    answers: [`${C}Agent Guidance and Hooks`, `${F}tests/hook-stdin.test.ts`],
   },
 ];
 
@@ -237,12 +207,12 @@ const HELD_OUT: Array<{ question: string; files: string[] }> = [
  * Measured on the committed knowledge base. Raise these when ranking or
  * curated sections improve; lowering one needs a reason in the commit.
  */
-const LEXICAL_FLOOR = { recallAt5: 0.824, mrr: 0.708 };
-const SEMANTIC_FLOOR = { recallAt5: 0.882, mrr: 0.698 };
-const HELD_OUT_LEXICAL_FLOOR = { recallAt5: 0.267, mrr: 0.119 };
-const HELD_OUT_SEMANTIC_FLOOR = { recallAt5: 0.2, mrr: 0.144 };
+const LEXICAL_FLOOR = { recallAt5: 0.824, mrr: 0.722 };
+const SEMANTIC_FLOOR = { recallAt5: 0.882, mrr: 0.76 };
+const HELD_OUT_LEXICAL_FLOOR = { recallAt5: 0.6, mrr: 0.442 };
+const HELD_OUT_SEMANTIC_FLOOR = { recallAt5: 0.733, mrr: 0.591 };
 const HELD_OUT_ASK_FLOOR = { recallAt5: 0.733, mrr: 0.578 };
-const HELD_OUT_SEMANTIC_ASK_FLOOR = { recallAt5: 0.733, mrr: 0.456 };
+const HELD_OUT_SEMANTIC_ASK_FLOOR = { recallAt5: 0.8, mrr: 0.639 };
 /**
  * Generated per-file sections are top-N lists that reshuffle as the code
  * changes, so a run may fall this far below a floor. One question leaving
