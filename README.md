@@ -190,9 +190,11 @@ code-kg search "conceptual query" --backend auto-semantic
 
 The default local model is `Xenova/bge-small-en-v1.5` with 384-dimensional
 vectors. The first run downloads the model into the Transformers cache; inference
-and vector search then run locally. Override with `LAT_LOCAL_EMBEDDING_MODEL`
-and `LAT_LOCAL_EMBEDDING_DIMENSIONS` if you choose a different local embedding
-model.
+and vector search then run locally. To choose another model, pass `--model`:
+`base` for `Xenova/bge-base-en-v1.5`, or a Hugging Face model id together with
+`--dimensions`. See [Local Semantic Search](docs/USAGE.md#local-semantic-search)
+for the trade-off. `LAT_LOCAL_EMBEDDING_MODEL` and
+`LAT_LOCAL_EMBEDDING_DIMENSIONS` override the saved model for one shell.
 
 `code-kg semantic enable-local` persists the local provider in the lat config
 directory so semantic search, hooks, and MCP tools work without exporting
@@ -203,6 +205,11 @@ environment variables each session:
   "embedding_provider": "local"
 }
 ```
+
+With `--model`, it also saves `local_embedding_model` and
+`local_embedding_dimensions`; without it, a model saved earlier is kept. The
+vector cache records the model it was built with and is rebuilt when the model
+changes.
 
 Remote embeddings are still supported through `LAT_LLM_KEY`:
 
@@ -238,9 +245,11 @@ LAT_TEST_LOCAL_EMBEDDINGS=1 pnpm vitest run tests/search.test.ts --testNamePatte
 ```
 
 `tests/retrieval-eval.test.ts` asks 17 questions about this repository against
-its committed `lat.md/` and reports recall@5 and mean reciprocal rank. The
-lexical half runs in the normal suite and fails if either number drops more
-than 0.03 below its recorded floor, which leaves room for generated sections
-reshuffling after a code change. The semantic half runs with
-`LAT_TEST_LOCAL_EMBEDDINGS=1`. Raise the floors when ranking or curated sections
-improve.
+its committed `lat.md/` and reports recall@5 and mean reciprocal rank. It also
+asks 15 held-out questions, each answered by a source file, and 10 bare
+identifiers, and measures `ask` on both. The lexical half runs in the normal
+suite and fails if either number drops more than 0.03 below its recorded floor,
+which leaves room for generated sections reshuffling after a code change. The
+semantic half runs with `LAT_TEST_LOCAL_EMBEDDINGS=1`, and also fails if
+semantic `ask` scores below `ask` without it. Raise the floors when ranking or
+curated sections improve.

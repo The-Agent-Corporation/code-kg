@@ -585,14 +585,14 @@ Source file `src/codekg/search.ts` defines `CodeKgSearchBackend`, `ResolvedSearc
 
 ## src/codekg/semantic.ts
 
-Source file `src/codekg/semantic.ts` defines `SemanticAction`, `SemanticOptions`, `SemanticSummary`, and 8 more.
+Source file `src/codekg/semantic.ts` defines `SemanticAction`, `SemanticOptions`, `SemanticSummary`, and 9 more.
 
 - Used by `code-kg semantic status`: Show semantic search provider and vector cache status
 - Used by `code-kg semantic enable-local`: Use local embeddings for semantic search
 - Used by `code-kg semantic reindex`: Rebuild the semantic search vector cache
-- Defines: `SemanticAction`, `SemanticOptions`, `SemanticSummary`, `vectorCachePresent`, `semanticSummary`, `providerLabel`, `cacheLabel`, `semanticDoctorStatus`, `formatStatus`, `formatEnableLocal`, `semanticCommand`
+- Defines: `SemanticAction`, `SemanticOptions`, `SemanticSummary`, `vectorCachePresent`, `semanticSummary`, `providerLabel`, `cacheLabel`, `semanticDoctorStatus`, `formatStatus`, `cacheModel`, `formatEnableLocal`, `semanticCommand`
 - Tested by: `tests/codekg.test.ts`, `tests/config-corrupt.test.ts`
-- Imports: `src/cli/search.ts`, `src/config.ts`, `src/context.ts`, `src/search/provider.ts`
+- Imports: `src/cli/search.ts`, `src/config.ts`, `src/context.ts`, `src/search/db.ts`, `src/search/provider.ts`
 - Imported by: `src/codekg/agents.ts`, `src/codekg/doctor.ts`, `tests/codekg.test.ts`, `tests/config-corrupt.test.ts`
 
 ## src/codekg/source-scan.ts
@@ -690,8 +690,9 @@ Source file `src/config.ts` defines `getConfigDir`, `getConfigPath`, `LatConfig`
 - Used by `lat config`: Show configuration file path
 - `jsonErrorLocation` (function): Where JSON.parse failed, without the input excerpt its message may quote.
 - `getEnvLlmKey` (function): Returns the LLM key from (in priority order): 1.
+- `saveLocalEmbeddingConfig` (function): Without `model`, keeps whichever local model the config already names.
 - `embeddingConfigError` (function): Why the embedding configuration cannot be resolved, or null if it can.
-- Also defines: `getConfigDir`, `getConfigPath`, `LatConfig`, `readConfig`, `writeConfig`, `isChatOnlyKey`, `getEmbeddingKey`, `getLlmKey`, `getLocalEmbeddingModelConfig`, `saveLocalEmbeddingConfig`, `saveRemoteEmbeddingKey`, `hasEmbeddingConfig`
+- Also defines: `getConfigDir`, `getConfigPath`, `LatConfig`, `readConfig`, `writeConfig`, `isChatOnlyKey`, `getEmbeddingKey`, `getLlmKey`, `getLocalEmbeddingModelConfig`, `saveRemoteEmbeddingKey`, `hasEmbeddingConfig`
 - Tested by: `tests/config-corrupt.test.ts`, `tests/search.test.ts`
 - Imported by: `scripts/cook-test-rag.ts`, `src/cli/hook.ts`, `src/cli/init.ts`, `src/codekg/enrich.ts`, `src/codekg/query.ts`, `src/codekg/search.ts`, and 5 more
 
@@ -791,11 +792,13 @@ Source file `src/parser.ts` defines `processor`, `parse`, `toMarkdown`.
 
 ## src/search/db.ts
 
-Source file `src/search/db.ts` defines `openDb`, `ensureSchema`, `closeDb`.
+Source file `src/search/db.ts` defines `openDb`, `MODEL_META_KEY`, `indexedModel`, and 2 more.
 
-- Defines: `openDb`, `ensureSchema`, `closeDb`
-- Tested by: `tests/retrieval-eval.test.ts`, `tests/search.test.ts`, `tests/semantic-score.test.ts`
-- Imported by: `src/cli/search.ts`, `tests/retrieval-eval.test.ts`, `tests/search.test.ts`, `tests/semantic-score.test.ts`
+- `indexedModel` (function): The model the index was built with, as passed to ensureSchema.
+- `ensureSchema` (function): Creates the vector tables, first dropping ones built with other dimensions or another `model`.
+- Also defines: `openDb`, `MODEL_META_KEY`, `closeDb`
+- Tested by: `tests/codekg.test.ts`, `tests/retrieval-eval.test.ts`, `tests/search.test.ts`, `tests/semantic-score.test.ts`
+- Imported by: `src/cli/search.ts`, `src/codekg/semantic.ts`, `tests/codekg.test.ts`, `tests/retrieval-eval.test.ts`, `tests/search.test.ts`, `tests/semantic-score.test.ts`
 
 ## src/search/embeddings.ts
 
@@ -819,9 +822,12 @@ Source file `src/search/index.ts` defines `hashContent`, `sectionContent`, `Inde
 
 ## src/search/provider.ts
 
-Source file `src/search/provider.ts` defines `RemoteEmbeddingProvider`, `LocalEmbeddingProvider`, `EmbeddingProvider`, and 6 more.
+Source file `src/search/provider.ts` defines `RemoteEmbeddingProvider`, `LocalEmbeddingProvider`, `EmbeddingProvider`, and 9 more.
 
-- Defines: `RemoteEmbeddingProvider`, `LocalEmbeddingProvider`, `EmbeddingProvider`, `DEFAULT_LOCAL_EMBEDDING_MODEL`, `DEFAULT_LOCAL_EMBEDDING_DIMENSIONS`, `openai`, `vercel`, `localProvider`, `detectProvider`
+- `LOCAL_EMBEDDING_MODELS` (const): Local models `semantic enable-local --model` knows by name.
+- `resolveLocalEmbeddingModel` (function): The model id and dimensions for a known model name or id, or for any other id together with its dimensions.
+- `providerModelId` (function): Identifies the vectors a provider makes; see ensureSchema.
+- Also defines: `RemoteEmbeddingProvider`, `LocalEmbeddingProvider`, `EmbeddingProvider`, `DEFAULT_LOCAL_EMBEDDING_MODEL`, `DEFAULT_LOCAL_EMBEDDING_DIMENSIONS`, `openai`, `vercel`, `localProvider`, `detectProvider`
 - Tested by: `tests/embeddings.test.ts`, `tests/retrieval-eval.test.ts`, `tests/search.test.ts`, `tests/semantic-score.test.ts`
 - Imports: `src/config.ts`
 - Imported by: `src/cli/init.ts`, `src/cli/search.ts`, `src/codekg/semantic.ts`, `src/search/embeddings.ts`, `src/search/index.ts`, `src/search/search.ts`, and 5 more
@@ -1039,7 +1045,7 @@ Test file `tests/codekg-messages.test.ts` checks `src/codekg/bootstrap.ts`, `src
 
 ## tests/codekg.test.ts
 
-Test file `tests/codekg.test.ts` checks `src/codekg/agents.ts`, `src/codekg/anchors.ts`, and 22 more.
+Test file `tests/codekg.test.ts` checks `src/codekg/agents.ts`, `src/codekg/anchors.ts`, and 23 more.
 
 - Test: code-kg bootstrap › previews the skeleton knowledge base without writing files
 - Test: code-kg bootstrap › detects Python project signals, entrypoints, and pytest-style tests
@@ -1061,9 +1067,9 @@ Test file `tests/codekg.test.ts` checks `src/codekg/agents.ts`, `src/codekg/anch
 - Test: code-kg bootstrap › falls back to local lexical search for auto-semantic when no embedding provider is configured
 - Test: code-kg bootstrap › selects semantic search for auto-semantic when local embeddings are configured
 - Test: code-kg bootstrap › routes explicit semantic Code-KG search through the embedding-backed backend
-- and 67 more tests
-- Checks: `src/codekg/agents.ts`, `src/codekg/anchors.ts`, `src/codekg/backlinks.ts`, `src/codekg/bootstrap.ts`, `src/codekg/changed.ts`, `src/codekg/check.ts`, and 18 more
-- Imports: `src/codekg/agents.ts`, `src/codekg/anchors.ts`, `src/codekg/backlinks.ts`, `src/codekg/bootstrap.ts`, `src/codekg/changed.ts`, `src/codekg/check.ts`, and 17 more
+- and 68 more tests
+- Checks: `src/codekg/agents.ts`, `src/codekg/anchors.ts`, `src/codekg/backlinks.ts`, `src/codekg/bootstrap.ts`, `src/codekg/changed.ts`, `src/codekg/check.ts`, and 19 more
+- Imports: `src/codekg/agents.ts`, `src/codekg/anchors.ts`, `src/codekg/backlinks.ts`, `src/codekg/bootstrap.ts`, `src/codekg/changed.ts`, `src/codekg/check.ts`, and 18 more
 
 ## tests/config-corrupt.test.ts
 
@@ -1296,6 +1302,7 @@ Test file `tests/search.test.ts` checks `src/config.ts`, `src/search/db.ts`, and
 - Test: detectProvider › rejects Anthropic key with helpful message
 - Test: detectProvider › rejects unknown key
 - Test: ensureSchema › rebuilds vector tables when embedding dimensions change
+- Test: ensureSchema › rebuilds vector tables when the model changes, and adopts an index that predates model tracking
 - Test: embedding config › keeps persisted local embeddings independent of chat key helpers
 - Test: embedding config › uses persisted local embedding provider when no env key is set
 - Test: embedding config › does not fall back to persisted local provider when remote env provider is explicit

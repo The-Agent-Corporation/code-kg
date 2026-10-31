@@ -47,6 +47,7 @@ import { doctorCommand } from '../src/codekg/doctor.js';
 import { discoverProject } from '../src/codekg/discovery.js';
 import { installGlobalCommand } from '../src/codekg/global-install.js';
 import { semanticCommand } from '../src/codekg/semantic.js';
+import { closeDb, ensureSchema, openDb } from '../src/search/db.js';
 import { contextCommand } from '../src/codekg/context.js';
 import { gapsCommand } from '../src/codekg/gaps.js';
 import { changedCommand } from '../src/codekg/changed.js';
@@ -1497,6 +1498,82 @@ describe('code-kg bootstrap', () => {
         'provider: local (Xenova/bge-small-en-v1.5, 384d)',
       );
       expect(status.output).toContain('vector cache: missing');
+    } finally {
+      for (const [key, value] of Object.entries(originalEnv)) {
+        if (value === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = value;
+        }
+      }
+    }
+  });
+
+  it('chooses the local embedding model by name, or by id with its dimensions', async () => {
+    const root = await makeProject();
+    const configRoot = await mkdtemp(join(tmpdir(), 'codekg-config-'));
+    roots.push(configRoot);
+    await writeBootstrapPlan(await createBootstrapPlan(root));
+    const names = [
+      'XDG_CONFIG_HOME',
+      'LAT_EMBEDDING_PROVIDER',
+      'LAT_LOCAL_EMBEDDING_MODEL',
+      'LAT_LOCAL_EMBEDDING_DIMENSIONS',
+    ];
+    const originalEnv = Object.fromEntries(
+      names.map((name) => [name, process.env[name]]),
+    );
+    for (const name of names) delete process.env[name];
+    process.env.XDG_CONFIG_HOME = configRoot;
+    const enable = (model?: string, dimensions?: number) =>
+      semanticCommand(ctx(root), { action: 'enable-local', model, dimensions });
+    const saved = async () =>
+      JSON.parse(
+        await readFile(join(configRoot, 'lat', 'config.json'), 'utf-8'),
+      ) as Record<string, unknown>;
+    const model = async () => {
+      const config = await saved();
+      return [config.local_embedding_model, config.local_embedding_dimensions];
+    };
+
+    try {
+      const db = openDb(join(root, 'lat.md'));
+      await ensureSchema(db, 384, 'local:Xenova/bge-small-en-v1.5');
+      await closeDb(db);
+
+      const base = await enable('base');
+      expect(base.isError).toBeFalsy();
+      expect(base.output).toContain(
+        'provider: local (Xenova/bge-base-en-v1.5, 768d)',
+      );
+      expect(base.output).toContain(
+        'vector cache: present (built with local:Xenova/bge-small-en-v1.5; rebuilt on the next search',
+      );
+      expect(await model()).toStrictEqual(['Xenova/bge-base-en-v1.5', 768]);
+
+      expect((await enable()).isError).toBeFalsy();
+      expect(await model()).toStrictEqual(['Xenova/bge-base-en-v1.5', 768]);
+
+      const unknown = await enable('acme/embedder');
+      expect(unknown.isError).toBe(true);
+      expect(unknown.output).toContain('pass --dimensions');
+      expect((await enable('base', 512)).output).toBe(
+        'Xenova/bge-base-en-v1.5 has 768 dimensions, not 512.',
+      );
+      expect((await enable('acme/embedder', Number('x'))).output).toBe(
+        '--dimensions must be a positive integer.',
+      );
+      expect(await model()).toStrictEqual(['Xenova/bge-base-en-v1.5', 768]);
+
+      expect((await enable('acme/embedder', 512)).isError).toBeFalsy();
+      expect(await model()).toStrictEqual(['acme/embedder', 512]);
+
+      const small = await enable('small');
+      expect(small.output).toContain(
+        'provider: local (Xenova/bge-small-en-v1.5, 384d)',
+      );
+      expect(small.output).not.toContain('rebuilt');
+      expect((await saved()).embedding_provider).toBe('local');
     } finally {
       for (const [key, value] of Object.entries(originalEnv)) {
         if (value === undefined) {

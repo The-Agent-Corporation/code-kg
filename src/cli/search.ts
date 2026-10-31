@@ -1,6 +1,6 @@
 import type { CmdContext, CmdResult, Styler } from '../context.js';
 import { openDb, ensureSchema, closeDb } from '../search/db.js';
-import { detectProvider } from '../search/provider.js';
+import { detectProvider, providerModelId } from '../search/provider.js';
 import { indexSections, type IndexStats } from '../search/index.js';
 import { noiseFloor, searchSections } from '../search/search.js';
 import {
@@ -42,7 +42,7 @@ async function withDb<T>(
   const db = openDb(latDir);
 
   try {
-    await ensureSchema(db, provider.dimensions);
+    await ensureSchema(db, provider.dimensions, providerModelId(provider));
 
     const countResult = await db.execute('SELECT COUNT(*) as n FROM sections');
     const isEmpty = (countResult.rows[0].n as number) === 0;
