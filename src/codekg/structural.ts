@@ -55,7 +55,7 @@ type FileExtraction = {
   structural: ExtractResult;
 };
 // Bump when changing the adapter, legacy symbol parser, or vendored extraction.
-const EXTRACTOR_VERSION = 'graft-0.17.0-codekg-1';
+const EXTRACTOR_VERSION = 'graft-0.17.0-codekg-2';
 type ExtractionCache = {
   version: 1;
   extractor: string;

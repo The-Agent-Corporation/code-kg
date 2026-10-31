@@ -1,35 +1,35 @@
 # Locate Tests
 
-This file was generated from existing `@lat` test backlinks so bootstrap output can preserve current test specifications.
+This file was generated from `@lat` backlinks in test code; each section names the test that checks it.
 
 ## File stem fuzzy does not over-match
 
-This generated test specification preserves the existing `@lat` backlink target `locate#File stem fuzzy does not over-match`.
+Checked by `tests/cases.test.ts`: short-ref › fuzzy does not over-match when file prefix is shared.
 
 ## Finds sections by exact id
 
-This generated test specification preserves the existing `@lat` backlink target `locate#Finds sections by exact id`.
+Checked by `tests/cases.test.ts`: basic-project › locate finds sections by exact id.
 
 ## Fuzzy matches with typos
 
-This generated test specification preserves the existing `@lat` backlink target `locate#Fuzzy matches with typos`.
+Checked by `tests/cases.test.ts`: basic-project › locate fuzzy matches with typos.
 
 ## Matches subsection by trailing segment
 
-This generated test specification preserves the existing `@lat` backlink target `locate#Matches subsection by trailing segment`.
+Checked by `tests/cases.test.ts`: basic-project › locate matches subsection by trailing segment name.
 
 ## Matches with skipped intermediate sections
 
-This generated test specification preserves the existing `@lat` backlink target `locate#Matches with skipped intermediate sections`.
+Checked by `tests/cases.test.ts`: basic-project › locate matches with skipped intermediate sections.
 
 ## Reports match reasons
 
-This generated test specification preserves the existing `@lat` backlink target `locate#Reports match reasons`.
+Checked by `tests/cases.test.ts`: basic-project › locate reports match reasons.
 
 ## Strips brackets from query
 
-This generated test specification preserves the existing `@lat` backlink target `locate#Strips brackets from query`.
+Checked by `tests/cases.test.ts`: basic-project › locate strips brackets from query.
 
 ## Strips leading hash from query
 
-This generated test specification preserves the existing `@lat` backlink target `locate#Strips leading hash from query`.
+Checked by `tests/cases.test.ts`: basic-project › locate strips leading hash from query.

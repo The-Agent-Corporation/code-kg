@@ -50,7 +50,7 @@ jobs:
           set -o pipefail
           node dist/src/codekg/cli.js drift | tee drift.txt
           if grep -q '^## WARNING' drift.txt; then
-            msg="code-kg drift reports warnings. Run 'code-kg update --no-enrich' (or 'node dist/src/codekg/cli.js update --no-enrich') and commit lat.md/ and .code-kg/materialization-manifest.json."
+            msg="code-kg drift reports warnings. Run 'code-kg update --no-enrich' (or 'node dist/src/codekg/cli.js update --no-enrich') to refresh generated knowledge, reread any curated section a warning names and acknowledge it with 'code-kg review-source <section> --write', then commit lat.md/ and .code-kg/materialization-manifest.json."
             if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
               echo "::error title=Knowledge base is stale::$msg"
               exit 1

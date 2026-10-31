@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { CmdContext, CmdResult } from '../context.js';
+import { anchorChanges, anchorName, sectionNodeIds } from './anchors.js';
 import { extractProjectGraph, hashProjectGraph } from './graph.js';
 import type {
   EntityNode,
@@ -38,7 +39,7 @@ async function readManifest(
 function manifestSourceNodeIds(manifest: MaterializationManifest): Set<string> {
   const ids = new Set<string>();
   for (const section of Object.values(manifest.sections)) {
-    for (const id of section.source_node_ids) ids.add(id);
+    for (const id of sectionNodeIds(section)) ids.add(id);
   }
   return ids;
 }
@@ -58,6 +59,8 @@ function findMissingSourceNodes(
   const graphNodeIds = new Set(graph.nodes.map((node) => node.id));
   const findings: DriftFinding[] = [];
   for (const [stableId, section] of Object.entries(manifest.sections)) {
+    if (section.status === 'suppressed' || section.status === 'orphaned')
+      continue;
     for (const nodeId of section.source_node_ids) {
       if (manifest.suppressed.nodes.includes(nodeId)) continue;
       if (!graphNodeIds.has(nodeId)) {
@@ -69,6 +72,46 @@ function findMissingSourceNodes(
     }
   }
   return findings;
+}
+
+function findChangedAnchors(
+  manifest: MaterializationManifest,
+  graph: ProjectGraph,
+): DriftFinding[] {
+  const nodes = graphNodeById(graph);
+  const findings: DriftFinding[] = [];
+  for (const [stableId, section] of Object.entries(manifest.sections)) {
+    if (section.status === 'suppressed' || section.status === 'orphaned')
+      continue;
+    const { missing, changed } = anchorChanges(section, nodes);
+    for (const anchor of missing) {
+      if (manifest.suppressed.nodes.includes(anchor.node_id)) continue;
+      findings.push({
+        severity: 'WARNING',
+        message: `Manifest section ${stableId} is anchored to ${anchorName(anchor)}, which disappeared from the fresh graph; re-anchor it with code-kg anchor or remove the anchor.`,
+      });
+    }
+    if (changed.length)
+      findings.push({
+        severity: 'WARNING',
+        message: `Anchored source changed: ${changed.map(anchorName).join(', ')}; review knowledge section ${stableId}, then run code-kg review-source ${JSON.stringify(stableId)} --write.`,
+      });
+  }
+  return findings;
+}
+
+function findOrphanedFiles(
+  ctx: CmdContext,
+  manifest: MaterializationManifest,
+): DriftFinding[] {
+  return Object.values(manifest.sections)
+    .filter((section) => section.status === 'orphaned')
+    .map((section) => ({
+      severity: 'INFO' as const,
+      message: existsSync(join(ctx.projectRoot, section.file))
+        ? `Generated file ${section.file} is orphaned: nothing generates it any more, and ask skips it. Delete it if it is no longer needed.`
+        : `Generated file ${section.file} is orphaned: it was deleted, and updates no longer write it. Restore the file to resume updates.`,
+    }));
 }
 
 function findUncoveredFiles(
@@ -142,7 +185,7 @@ function eligibleSectionsForNode(
     .filter(
       (section) =>
         (section.status === 'curated' || section.status === 'edited') &&
-        section.source_node_ids.includes(nodeId),
+        sectionNodeIds(section).includes(nodeId),
     )
     .sort((a, b) => sectionPriority(a) - sectionPriority(b))
     .map((section) => section.stable_id);
@@ -236,6 +279,7 @@ async function applySafeManifestUpdates(
   await writeFile(manifestPath(ctx), JSON.stringify(manifest, null, 2) + '\n');
 }
 
+// @lat: [[lat.md/concepts#Concepts#Drift and Source Review]]
 export async function driftCommand(
   ctx: CmdContext,
   opts: DriftOptions = {},
@@ -258,8 +302,10 @@ export async function driftCommand(
   const graphHash = hashProjectGraph(graph);
   const findings: DriftFinding[] = [];
   findings.push(...findMissingSourceNodes(manifest, graph));
+  findings.push(...findChangedAnchors(manifest, graph));
   findings.push(...findStaleRelationships(manifest, graph));
   findings.push(...findSuggestedRelationships(manifest, graph));
+  findings.push(...findOrphanedFiles(ctx, manifest));
   const changedSources = new Map<string, string[]>();
   for (const section of Object.values(manifest.sections)) {
     if (section.status === 'suppressed' || section.status === 'orphaned')

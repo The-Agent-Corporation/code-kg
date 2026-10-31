@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { join, posix, resolve, relative } from 'node:path';
+import { isAbsolute, join, posix, resolve, relative, sep } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { CmdContext, CmdResult } from '../context.js';
@@ -12,6 +12,8 @@ import { sourceHash } from './structural.js';
 import { currentMeanings } from './meaning.js';
 import { visibleGraph } from './visibility.js';
 import { InputError } from './errors.js';
+import { isIdentifierQuery, STOP_WORDS } from './search.js';
+import { anchorChanges, manifestOwner, sectionNodeIds } from './anchors.js';
 import type {
   EntityNode,
   MaterializationManifest,
@@ -43,17 +45,20 @@ export type QueryResult = {
   warnings: string[];
   backend: string;
 };
-const STOP = new Set(
-  'a an and are at be by can do does for from how i in is it of on or the this to what where which who with'.split(
-    ' ',
-  ),
-);
 export function tokenize(text: string): string[] {
   return text
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
     .toLowerCase()
     .split(/[^a-z0-9]+/)
-    .filter((token) => token.length > 1 && !STOP.has(token));
+    .filter((token) => token.length > 1 && !STOP_WORDS.has(token));
+}
+/** Agent tool payloads name files by absolute path; graph nodes use project-relative ones. */
+export function projectQuery(root: string, query: string): string {
+  if (!isAbsolute(query)) return query;
+  const path = relative(resolve(root), query);
+  return path && !path.startsWith('..') && !isAbsolute(path)
+    ? path.split(sep).join('/')
+    : query;
 }
 export function withinScope(path: string, scope?: string): boolean {
   if (!scope || scope === '.') return true;
@@ -88,6 +93,25 @@ export async function currentSource(
     .split('\n')
     .slice(start - 1, end)
     .join('\n');
+}
+
+/**
+ * Knowledge-score bonus per semantic match: 1 for the closest match, falling
+ * linearly with similarity to 0 at the noise floor. When nothing beats the
+ * floor the query has no semantic match, so no section gets a bonus.
+ */
+// @lat: [[lat.md/concepts#Concepts#Search Backends]]
+export function semanticBonus(
+  matches: { section: { id: string }; score: number }[],
+  floor: number,
+): Map<string, number> {
+  const best = Math.max(...matches.map((match) => match.score));
+  const bonus = new Map<string, number>();
+  if (!(best > floor)) return bonus;
+  for (const match of matches)
+    if (match.score > floor)
+      bonus.set(match.section.id, (match.score - floor) / (best - floor));
+  return bonus;
 }
 
 function graphRank(
@@ -226,8 +250,10 @@ export async function ask(
   const sections = flattenSections(
     await loadAllSections(join(root, 'lat.md')).catch(() => []),
   );
-  const semantic = new Map<string, number>();
-  if (opts.semantic !== false) {
+  let semantic = new Map<string, number>();
+  let semanticRan = false;
+  const identifier = isIdentifierQuery(query);
+  if (opts.semantic !== false && !identifier) {
     try {
       const key = getEmbeddingKey();
       if (key && sections.length) {
@@ -236,10 +262,11 @@ export async function ask(
           query,
           key,
           opts.limit ?? 8,
+          undefined,
+          true,
         );
-        found.matches.forEach((match, i) =>
-          semantic.set(match.section.id, 1 / (1 + i)),
-        );
+        semantic = semanticBonus(found.matches, found.noiseFloor ?? -1);
+        semanticRan = true;
       }
     } catch (error) {
       warnings.push(
@@ -249,6 +276,10 @@ export async function ask(
     }
   }
   const knowledgeFiles = new Map<string, string>();
+  const graphNodes = new Map(graph.nodes.map((node) => [node.id, node]));
+  const graphFiles = new Set(
+    graph.nodes.filter((n) => n.kind === 'file').map((n) => n.source_file),
+  );
   for (const section of sections) {
     let body = knowledgeFiles.get(section.filePath);
     if (body === undefined) {
@@ -259,15 +290,18 @@ export async function ask(
       .split('\n')
       .slice(section.startLine - 1, section.endLine)
       .join('\n');
-    const owner = Object.values(manifest?.sections ?? {}).find(
-      (s) => s.file === section.filePath,
-    );
+    const owner = manifestOwner(manifest, section);
     if (owner?.status === 'suppressed' || owner?.status === 'orphaned')
       continue;
+    // A section headed by a source path, such as a file card, is about that file.
     if (
       opts.in &&
-      !withinScope(section.filePath, opts.in) &&
-      !owner?.source_node_ids.some((id) => nodes.some((n) => n.id === id))
+      !(graphFiles.has(section.heading)
+        ? withinScope(section.heading, opts.in)
+        : withinScope(section.filePath, opts.in) ||
+          (owner ? sectionNodeIds(owner) : []).some((id) =>
+            nodes.some((n) => n.id === id),
+          ))
     )
       continue;
     const words = new Set(tokenize(section.heading + ' ' + text));
@@ -277,9 +311,13 @@ export async function ask(
     if (!value) continue;
     const baseline =
       owner?.source_hashes ?? manifest?.sections.architecture?.source_hashes;
-    const stale = Object.entries(baseline ?? {}).some(
-      ([p, h]) => graph.source_hashes?.[p] !== h,
-    );
+    const anchors = owner && anchorChanges(owner, graphNodes);
+    const stale =
+      Object.entries(baseline ?? {}).some(
+        ([p, h]) => graph.source_hashes?.[p] !== h,
+      ) ||
+      !!anchors?.missing.length ||
+      !!anchors?.changed.length;
     hits.push({
       id: section.id,
       kind: 'knowledge',
@@ -330,7 +368,11 @@ export async function ask(
     warnings,
     backend: semantic.size
       ? 'knowledge + semantic + lexical + graph'
-      : 'knowledge + lexical + graph',
+      : semanticRan
+        ? 'knowledge + lexical + graph (no semantic match closer than off-topic text)'
+        : identifier && opts.semantic !== false
+          ? 'knowledge + lexical + graph (identifier query; semantic skipped)'
+          : 'knowledge + lexical + graph',
   };
 }
 
@@ -367,6 +409,7 @@ export async function trace(
   opts: { direction?: 'in' | 'out'; depth?: number; in?: string } = {},
 ) {
   withinScope('', opts.in);
+  query = projectQuery(root, query);
   const graph = await visibleGraph(root, await freshGraph(root));
   const visible = graph.nodes.filter(
     (n) => n.kind !== 'module' && withinScope(n.source_file ?? '', opts.in),
@@ -548,6 +591,7 @@ export async function skeletonCommand(
     ctx.projectRoot,
     await freshGraph(ctx.projectRoot),
   );
+  path = projectQuery(ctx.projectRoot, path);
   const files = [
     ...new Set(
       graph.nodes.flatMap((n) => (n.source_file ? [n.source_file] : [])),

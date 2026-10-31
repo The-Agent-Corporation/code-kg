@@ -267,10 +267,21 @@ semantic
 semantic
   .command('enable-local')
   .description('Use local embeddings for semantic search')
-  .action(async () => {
+  .option(
+    '--model <model>',
+    'small (bge-small-en-v1.5, the default), base (bge-base-en-v1.5), or a Hugging Face model id',
+  )
+  .option(
+    '--dimensions <n>',
+    'vector size, required for a model id other than small or base',
+    (value) => Number(value),
+  )
+  .action(async (opts: { model?: string; dimensions?: number }) => {
     const ctx = latContext();
     const { semanticCommand } = await import('./semantic.js');
-    handleResult(await semanticCommand(ctx, { action: 'enable-local' }));
+    handleResult(
+      await semanticCommand(ctx, { action: 'enable-local', ...opts }),
+    );
   });
 
 semantic
@@ -669,6 +680,25 @@ program
     const { reviewSourceCommand } = await import('./review-source.js');
     handleResult(
       await reviewSourceCommand(rootOnlyContext(), id, opts.write === true),
+    );
+  });
+
+program
+  .command('anchor')
+  .argument('<section-id>')
+  .argument('[symbol-or-file]', '<file>#<symbol>, a symbol name, or a file')
+  .description(
+    'Anchor a curated section to a symbol or file so apply-backlinks follows it as the source moves',
+  )
+  .option('--remove', 'Remove the anchor instead of adding it')
+  .option('--list', "List the section's anchors and where they are now")
+  .action(async (section, target, opts) => {
+    const { anchorCommand } = await import('./anchor.js');
+    handleResult(
+      await anchorCommand(latContext(), section, {
+        action: opts.list ? 'list' : opts.remove ? 'remove' : 'add',
+        target,
+      }),
     );
   });
 

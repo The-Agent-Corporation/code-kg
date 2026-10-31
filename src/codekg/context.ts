@@ -3,7 +3,9 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { CmdContext, CmdResult } from '../context.js';
 import { flattenSections, loadAllSections, type Section } from '../lattice.js';
+import { sectionNodeIds } from './anchors.js';
 import { freshGraph } from './fresh.js';
+import { projectQuery } from './query.js';
 import type {
   EntityNode,
   MaterializationManifest,
@@ -117,7 +119,7 @@ function manifestSectionIdsForNodes(
   const ids = new Set<string>();
   if (!manifest) return ids;
   for (const section of Object.values(manifest.sections)) {
-    if (section.source_node_ids.some((id) => nodeIds.has(id))) {
+    if (sectionNodeIds(section).some((id) => nodeIds.has(id))) {
       ids.add(section.public_section_id);
     }
     if (section.source_spans.some((span) => files.has(span.file))) {
@@ -159,6 +161,7 @@ export async function buildContextInfo(
   query: string,
   graphArg?: ProjectGraph,
 ): Promise<ContextInfo | null> {
+  query = projectQuery(ctx.projectRoot, query);
   const graph = graphArg ?? (await freshGraph(ctx.projectRoot));
   const nodes = matchedNodes(graph, query);
   if (nodes.length === 0) return null;

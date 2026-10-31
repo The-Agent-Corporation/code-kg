@@ -37,9 +37,10 @@ code-kg doctor                  # readiness report
   `review-source <stable-id> --write` is an explicit acknowledgement, not an
   automatic repair operation.
 
-- **Before broad source search**, query the graph first — MCP `codekg_search`
-  with `backend: "auto-semantic"`, or `code-kg search "<question>" --backend
-  auto-semantic`.
+- **Before broad source search**, query the graph first — MCP `codekg_ask` or
+  `code-kg ask "<question>"`. To list knowledge sections only, use MCP
+  `codekg_search` with `backend: "auto-semantic"`, or `code-kg search
+  "<question>" --backend auto-semantic`.
 - **Before opening raw source**, run `code-kg context <file-or-symbol>` (or MCP
   `codekg_section "<section-id>"`) to read the relevant sections, their
   relationships, and tests.

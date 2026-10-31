@@ -32,7 +32,7 @@ pnpm vitest run tests/search.test.ts --testNamePattern "local embeddings eval"
 The CLI entrypoint after build is `node dist/src/codekg/cli.js <command>` (this is the `code-kg` binary defined in `package.json` `bin`). See `README.md` for the full command list and `docs/USAGE.md` for the tested happy path.
 
 Opt-in tests gated behind env flags (skipped by default):
-- `LAT_TEST_LOCAL_EMBEDDINGS=1` — runs the real local-embedding retrieval eval (downloads a model).
+- `LAT_TEST_LOCAL_EMBEDDINGS=1` — runs the real local-embedding retrieval evals (downloads a model), including the semantic half of `tests/retrieval-eval.test.ts`. Its lexical half always runs and enforces recall@5 / MRR floors over this repo's `lat.md/`.
 
 ## Architecture
 
@@ -45,7 +45,7 @@ Code-KG produces and maintains `lat.md/`, a **reviewable markdown knowledge grap
 
 ### Command pattern
 
-Commands are pure functions taking a `CmdContext` (`{ latDir, projectRoot, styler, mode: 'cli' | 'mcp' }`) and returning a `CmdResult` (`{ output, isError? }`) — see `src/context.ts`. The same command functions back both the CLI and the MCP server; `mode` and `styler` (plain vs. colored) are the only environment differences. Query and review commands (search, section, ask, trace, context, gaps, drift, check, confidence, suppress, apply-backlinks, …) are wired into both `cli.ts` and `mcp.ts`. Setup and knowledge-writing commands are CLI-only: `bootstrap`/`materialize`, `update`, `enrich`, `reconcile`, `review-source`, `semantic`, `agents`, `git-hooks`, `doctor`, and `workspace add/list/remove` (MCP has only `codekg_workspace_ask`). When adding a command, write it as a context-in/result-out function so it can be wired into either or both.
+Commands are pure functions taking a `CmdContext` (`{ latDir, projectRoot, styler, mode: 'cli' | 'mcp' }`) and returning a `CmdResult` (`{ output, isError? }`) — see `src/context.ts`. The same command functions back both the CLI and the MCP server; `mode` and `styler` (plain vs. colored) are the only environment differences. Query and review commands (search, section, ask, trace, context, gaps, drift, check, confidence, suppress, anchor, apply-backlinks, …) are wired into both `cli.ts` and `mcp.ts`; `suppress`, `anchor` and `apply-backlinks --write` write the manifest or source through MCP too. Setup and knowledge-writing commands are CLI-only: `bootstrap`/`materialize`, `update`, `enrich`, `reconcile`, `review-source`, `semantic`, `agents`, `git-hooks`, `doctor`, and `workspace add/list/remove` (MCP has only `codekg_workspace_ask`). When adding a command, write it as a context-in/result-out function so it can be wired into either or both.
 
 User-input errors in Code-KG commands throw `InputError` (`src/codekg/errors.ts`): the CLI prints just the message and exits 1, and MCP returns it as an error result.
 
@@ -54,7 +54,7 @@ User-input errors in Code-KG commands throw `InputError` (`src/codekg/errors.ts`
 `.code-kg/materialization-manifest.json` records, per generated section, what was generated and how it may be edited. Types live in `src/codekg/types.ts`. The critical distinction:
 
 - `source_anchor_policy: "coverage-only"` — section has `source_node_ids` used only for drift/coverage evidence. **Not** safe to auto-edit.
-- `source_anchor_policy: "edit-safe"` — section has `source_spans`; only these sections may receive automated source edits (e.g. `apply-backlinks --write`).
+- `source_anchor_policy: "edit-safe"` — section has `source_spans` or `source_anchors` (graph symbols pinned by `code-kg anchor`); only these sections may receive automated source edits (e.g. `apply-backlinks --write`).
 
 Repeated materialization preserves human-edited and curated sections: when generated content changes for an edited section, the new candidate is written to `.code-kg/cache/merge-proposals/` for manual review rather than overwriting. Respect this merge-safe contract — never blindly overwrite edited sections.
 
@@ -68,4 +68,4 @@ Local-first. Lexical search always works offline; semantic search uses a local e
 
 ## Working in this repo with Code-KG itself
 
-This repo dogfoods Code-KG — `lat.md/` and `.code-kg/` describe this very codebase, and `AGENTS.md` carries managed agent guidance. Per that guidance: prefer `code-kg search "<question>"` / `code-kg context <file>` to orient before broad grep/glob source sweeps, and run `code-kg check` + `code-kg drift` after changing code or knowledge docs. (Requires `pnpm build` first, then `node dist/src/codekg/cli.js <cmd>`.)
+This repo dogfoods Code-KG — `lat.md/` and `.code-kg/` describe this very codebase, and `AGENTS.md` carries managed agent guidance. Per that guidance: prefer `code-kg ask "<question>"` / `code-kg context <file>` to orient before broad grep/glob source sweeps, and run `code-kg check` + `code-kg drift` after changing code or knowledge docs. (Requires `pnpm build` first, then `node dist/src/codekg/cli.js <cmd>`.)

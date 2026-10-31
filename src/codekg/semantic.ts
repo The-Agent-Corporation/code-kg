@@ -7,10 +7,13 @@ import {
   saveLocalEmbeddingConfig,
 } from '../config.js';
 import { runIndex } from '../cli/search.js';
+import { closeDb, indexedModel, openDb } from '../search/db.js';
 import {
   DEFAULT_LOCAL_EMBEDDING_DIMENSIONS,
   DEFAULT_LOCAL_EMBEDDING_MODEL,
   detectProvider,
+  providerModelId,
+  resolveLocalEmbeddingModel,
   type EmbeddingProvider,
 } from '../search/provider.js';
 
@@ -18,6 +21,9 @@ export type SemanticAction = 'status' | 'enable-local' | 'reindex';
 
 export type SemanticOptions = {
   action: SemanticAction;
+  /** For enable-local: small, base, or a Hugging Face model id. */
+  model?: string;
+  dimensions?: number;
 };
 
 type SemanticSummary =
@@ -110,16 +116,31 @@ function formatStatus(ctx: CmdContext): string {
   return lines.join('\n');
 }
 
-function formatEnableLocal(ctx: CmdContext): string {
+async function cacheModel(ctx: CmdContext): Promise<string | undefined> {
+  if (!vectorCachePresent(ctx)) return undefined;
+  const db = openDb(ctx.latDir);
+  try {
+    return await indexedModel(db);
+  } finally {
+    await closeDb(db);
+  }
+}
+
+async function formatEnableLocal(ctx: CmdContext): Promise<string> {
   const provider = detectProvider('local');
   const cachePresent = vectorCachePresent(ctx);
+  const built = await cacheModel(ctx);
   return [
     '# Code-KG Semantic Search',
     '',
     '- local embeddings enabled',
     `- config: ${getConfigPath()}`,
     `- provider: ${providerLabel(provider)}`,
-    `- vector cache: ${cacheLabel(cachePresent)}`,
+    `- vector cache: ${cacheLabel(cachePresent)}${
+      built && built !== providerModelId(provider)
+        ? ` (built with ${built}; rebuilt on the next search or \`code-kg semantic reindex\`)`
+        : ''
+    }`,
     `- default model: ${DEFAULT_LOCAL_EMBEDDING_MODEL} (${DEFAULT_LOCAL_EMBEDDING_DIMENSIONS}d)`,
   ].join('\n');
 }
@@ -133,15 +154,24 @@ export async function semanticCommand(
   }
 
   if (opts.action === 'enable-local') {
+    let model: ReturnType<typeof resolveLocalEmbeddingModel> | undefined;
     try {
-      saveLocalEmbeddingConfig();
+      model =
+        opts.model === undefined
+          ? undefined
+          : resolveLocalEmbeddingModel(opts.model, opts.dimensions);
+    } catch (error) {
+      return { output: (error as Error).message, isError: true };
+    }
+    try {
+      saveLocalEmbeddingConfig(model);
     } catch (error) {
       return {
         output: `${(error as Error).message}\nFix or remove the config file, then run \`code-kg semantic enable-local\` again.`,
         isError: true,
       };
     }
-    return { output: formatEnableLocal(ctx) };
+    return { output: await formatEnableLocal(ctx) };
   }
 
   let key: string | undefined;

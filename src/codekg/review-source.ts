@@ -1,12 +1,13 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { CmdContext, CmdResult } from '../context.js';
-import { sourceAnchorPolicy } from './anchors.js';
+import { anchorChanges, anchorName, sourceAnchorPolicy } from './anchors.js';
 import { readJson, writeJsonAtomic } from './cache.js';
 import { freshGraph } from './fresh.js';
 import type { MaterializationManifest } from './types.js';
 import { sourceHash } from './structural.js';
 
+// @lat: [[lat.md/concepts#Concepts#Drift and Source Review]]
 export async function reviewSourceCommand(
   ctx: CmdContext,
   stableId: string,
@@ -42,14 +43,20 @@ export async function reviewSourceCommand(
               .map((n) => n.source_file!),
           ]),
         ];
-  const missing = files.filter((f) => !graph.source_hashes?.[f]);
+  const anchors = section.source_anchors ?? [];
+  const nodes = new Map(graph.nodes.map((n) => [n.id, n]));
+  const { missing: goneAnchors } = anchorChanges(section, nodes);
+  const missing = [
+    ...files.filter((f) => !graph.source_hashes?.[f]),
+    ...goneAnchors.map(anchorName),
+  ];
   if (missing.length)
     return {
       output:
         'Resolve missing source coverage before review: ' + missing.join(', '),
       isError: true,
     };
-  if (!files.length)
+  if (!files.length && !anchors.length)
     return {
       output: 'Section has no source coverage to review.',
       isError: true,
@@ -65,14 +72,18 @@ export async function reviewSourceCommand(
   const keptSpans = section.source_spans.filter(
     (s) => !staleSpanFiles.includes(s.file),
   );
+  const downgraded =
+    staleSpanFiles.length > 0 &&
+    !keptSpans.length &&
+    !section.source_anchors?.length;
   if (write) {
-    if (staleSpanFiles.length) {
-      section.source_spans = keptSpans;
-      if (!keptSpans.length) section.source_anchor_policy = 'coverage-only';
-    }
+    if (staleSpanFiles.length) section.source_spans = keptSpans;
+    if (downgraded) section.source_anchor_policy = 'coverage-only';
     section.source_hashes = Object.fromEntries(
       files.map((f) => [f, graph.source_hashes![f]]),
     );
+    for (const anchor of anchors)
+      anchor.hash = nodes.get(anchor.node_id)!.body_hash ?? '';
     section.current_hash = sourceHash(content);
     section.status = 'curated';
     await writeJsonAtomic(path, manifest, 2);
@@ -84,20 +95,30 @@ export async function reviewSourceCommand(
       "'s source spans in " +
       staleSpanFiles.join(', ') +
       ': they were recorded against older content.' +
-      (keptSpans.length
+      (!downgraded
         ? ''
         : ' With no spans left, it ' +
           (write ? 'is now' : 'would become') +
-          ' coverage-only. Record fresh spans before marking it edit-safe again.')
+          ' coverage-only. Use `code-kg anchor` to make it edit-safe with anchors that follow the source.')
     : '';
+  const count = (n: number, noun: string) =>
+    `${n} ${noun}${n === 1 ? '' : 's'}`;
+  const coverage = anchors.length
+    ? [
+        files.length && count(files.length, 'file'),
+        count(anchors.length, 'anchor'),
+      ]
+        .filter(Boolean)
+        .join(', ')
+    : count(files.length, 'file');
   return {
     output:
       (write ? 'Acknowledged' : 'Would acknowledge') +
       ' source review for ' +
       stableId +
       ' (' +
-      files.length +
-      ' files).\n' +
+      coverage +
+      ').\n' +
       'Section prose and relationship confidence are unchanged.' +
       downgrade,
   };

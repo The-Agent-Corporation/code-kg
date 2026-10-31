@@ -141,7 +141,8 @@ untouched generated manifest-owned files, skips curated/edited/authored prose, a
 checks for concurrent file changes before writing.
 
 Its 250-character leading paragraph is a search preview. Subsequent paragraphs
-retain detailed knowledge and are included in semantic section indexing. Preview
+retain detailed knowledge and are included in semantic section indexing and
+lexical search scoring. Preview
 enrichment rejects overlong, multi-paragraph, or incomplete responses rather than
 clipping them; the original paragraph and subsequent details are preserved when
 generation fails. A partial failure returns an error even if other previews were
