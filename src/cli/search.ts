@@ -2,7 +2,7 @@ import type { CmdContext, CmdResult, Styler } from '../context.js';
 import { openDb, ensureSchema, closeDb } from '../search/db.js';
 import { detectProvider } from '../search/provider.js';
 import { indexSections, type IndexStats } from '../search/index.js';
-import { searchSections } from '../search/search.js';
+import { noiseFloor, searchSections } from '../search/search.js';
 import {
   loadAllSections,
   flattenSections,
@@ -10,9 +10,16 @@ import {
 } from '../lattice.js';
 import { formatResultList, formatNavHints } from '../format.js';
 
+export type SemanticMatch = SectionMatch & {
+  /** Cosine similarity to the query; see searchSections. */
+  score: number;
+};
+
 export type SearchResult = {
   query: string;
-  matches: SectionMatch[];
+  matches: SemanticMatch[];
+  /** Present when requested; see noiseFloor. */
+  noiseFloor?: number;
 };
 
 export type IndexProgress = {
@@ -52,7 +59,8 @@ async function withDb<T>(
 
 /**
  * Run a semantic search across lat.md sections.
- * Handles indexing (with optional progress callback). Returns matched sections.
+ * Handles indexing (with optional progress callback). Returns matched sections,
+ * and the index's noise floor when `withNoiseFloor` is set.
  */
 export async function runSearch(
   latDir: string,
@@ -60,23 +68,29 @@ export async function runSearch(
   key: string,
   limit: number,
   progress?: IndexProgress,
+  withNoiseFloor = false,
 ): Promise<SearchResult> {
   return withDb(latDir, key, progress, async (db, provider) => {
     const results = await searchSections(db, query, provider, key, limit);
     if (results.length === 0) {
       return { query, matches: [] };
     }
+    const floor = withNoiseFloor
+      ? { noiseFloor: await noiseFloor(db, provider, key) }
+      : {};
 
     const allSections = await loadAllSections(latDir);
     const flat = flattenSections(allSections);
     const byId = new Map(flat.map((s) => [s.id, s]));
 
-    const matches = results
-      .map((r) => byId.get(r.id))
-      .filter((s): s is NonNullable<typeof s> => !!s)
-      .map((s) => ({ section: s, reason: 'semantic match' }));
+    const matches = results.flatMap((r) => {
+      const section = byId.get(r.id);
+      return section
+        ? [{ section, reason: 'semantic match', score: r.score }]
+        : [];
+    });
 
-    return { query, matches };
+    return { query, matches, ...floor };
   });
 }
 

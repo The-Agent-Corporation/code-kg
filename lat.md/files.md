@@ -156,14 +156,14 @@ Source file `src/cli/refs.ts` defines `Scope`, `RefsFound`, `RefsError`, and 6 m
 
 ## src/cli/search.ts
 
-Source file `src/cli/search.ts` defines `SearchResult`, `IndexProgress`, `withDb`, and 7 more.
+Source file `src/cli/search.ts` defines `SemanticMatch`, `SearchResult`, `IndexProgress`, and 8 more.
 
 - Used by `lat search`: Semantic search across lat.md sections
 - Used by `MCP lat_search`: Semantic search across lat.md sections using embeddings
 - `runSearch` (function): Run a semantic search across lat.md sections.
 - `runIndex` (function): Index-only mode (no query).
 - `SearchPresentation` (type): Wording that differs between the lat and code-kg front ends.
-- Also defines: `SearchResult`, `IndexProgress`, `withDb`, `cliProgress`, `cliProgress#beforeIndex`, `cliProgress#afterIndex`, `searchCommand`
+- Also defines: `SemanticMatch`, `SearchResult`, `IndexProgress`, `withDb`, `cliProgress`, `cliProgress#beforeIndex`, `cliProgress#afterIndex`, `searchCommand`
 - Imports: `src/context.ts`, `src/format.ts`, `src/lattice.ts`, `src/search/db.ts`, `src/search/index.ts`, `src/search/provider.ts`, and 1 more
 - Imported by: `src/cli/hook.ts`, `src/codekg/query.ts`, `src/codekg/semantic.ts`, `src/codekg/update.ts`, `src/mcp/server.ts`
 
@@ -529,7 +529,7 @@ Source file `src/codekg/meaning.ts` defines `SourceMeaning`, `MeaningCache`, `ca
 
 ## src/codekg/query.ts
 
-Source file `src/codekg/query.ts` defines `QueryOptions`, `QueryHit`, `QueryResult`, and 14 more.
+Source file `src/codekg/query.ts` defines `QueryOptions`, `QueryHit`, `QueryResult`, and 15 more.
 
 - Used by `code-kg ask`: Search reviewed knowledge and fresh source with lexical, semantic, and graph ranking
 - Used by `code-kg map`: Show a bounded repository map and dependency hotspots
@@ -540,10 +540,11 @@ Source file `src/codekg/query.ts` defines `QueryOptions`, `QueryHit`, `QueryResu
 - Used by `MCP codekg_repo_map`: Read a bounded source map and dependency hotspots
 - Used by `MCP codekg_file_api`: Read signatures and symbol locations in a file
 - `projectQuery` (function): Agent tool payloads name files by absolute path; graph nodes use project-relative ones.
+- `semanticBonus` (function): Knowledge-score bonus per semantic match: 1 for the closest match, falling linearly with similarity to 0 at the noise floor.
 - Also defines: `QueryOptions`, `QueryHit`, `QueryResult`, `tokenize`, `withinScope`, `bounded`, `currentSource`, `graphRank`, `ask`, `formatQuery`, `askCommand`, `trace`, `traceCommand`, `mapCommand`, `skeletonCommand`, `grepCommand`
-- Tested by: `tests/cards.test.ts`, `tests/codekg-intelligence.test.ts`, `tests/codekg.test.ts`, `tests/input-errors.test.ts`, `tests/retrieval-eval.test.ts`, `tests/trace-depth.test.ts`
+- Tested by: `tests/cards.test.ts`, `tests/codekg-intelligence.test.ts`, `tests/codekg.test.ts`, `tests/input-errors.test.ts`, `tests/retrieval-eval.test.ts`, `tests/semantic-score.test.ts`, and 1 more
 - Imports: `src/cli/search.ts`, `src/codekg/anchors.ts`, `src/codekg/cache.ts`, `src/codekg/errors.ts`, `src/codekg/fresh.ts`, `src/codekg/meaning.ts`, and 7 more
-- Imported by: `src/codekg/agent-context.ts`, `src/codekg/context.ts`, `src/codekg/mcp.ts`, `src/codekg/workspace.ts`, `tests/cards.test.ts`, `tests/codekg-intelligence.test.ts`, and 4 more
+- Imported by: `src/codekg/agent-context.ts`, `src/codekg/context.ts`, `src/codekg/mcp.ts`, `src/codekg/workspace.ts`, `tests/cards.test.ts`, `tests/codekg-intelligence.test.ts`, and 5 more
 
 ## src/codekg/reconcile.ts
 
@@ -791,8 +792,8 @@ Source file `src/parser.ts` defines `processor`, `parse`, `toMarkdown`.
 Source file `src/search/db.ts` defines `openDb`, `ensureSchema`, `closeDb`.
 
 - Defines: `openDb`, `ensureSchema`, `closeDb`
-- Tested by: `tests/retrieval-eval.test.ts`, `tests/search.test.ts`
-- Imported by: `src/cli/search.ts`, `tests/retrieval-eval.test.ts`, `tests/search.test.ts`
+- Tested by: `tests/retrieval-eval.test.ts`, `tests/search.test.ts`, `tests/semantic-score.test.ts`
+- Imported by: `src/cli/search.ts`, `tests/retrieval-eval.test.ts`, `tests/search.test.ts`, `tests/semantic-score.test.ts`
 
 ## src/search/embeddings.ts
 
@@ -810,27 +811,29 @@ Source file `src/search/embeddings.ts` defines `MAX_REMOTE_BATCH`, `MAX_LOCAL_BA
 Source file `src/search/index.ts` defines `hashContent`, `sectionContent`, `IndexStats`, and 1 more.
 
 - Defines: `hashContent`, `sectionContent`, `IndexStats`, `indexSections`
-- Tested by: `tests/retrieval-eval.test.ts`, `tests/search.test.ts`
-- Imports: `src/lattice.ts`, `src/search/embeddings.ts`, `src/search/provider.ts`
-- Imported by: `src/cli/search.ts`, `tests/retrieval-eval.test.ts`, `tests/search.test.ts`
+- Tested by: `tests/retrieval-eval.test.ts`, `tests/search.test.ts`, `tests/semantic-score.test.ts`
+- Imports: `src/lattice.ts`, `src/search/embeddings.ts`, `src/search/provider.ts`, `src/search/search.ts`
+- Imported by: `src/cli/search.ts`, `tests/retrieval-eval.test.ts`, `tests/search.test.ts`, `tests/semantic-score.test.ts`
 
 ## src/search/provider.ts
 
 Source file `src/search/provider.ts` defines `RemoteEmbeddingProvider`, `LocalEmbeddingProvider`, `EmbeddingProvider`, and 6 more.
 
 - Defines: `RemoteEmbeddingProvider`, `LocalEmbeddingProvider`, `EmbeddingProvider`, `DEFAULT_LOCAL_EMBEDDING_MODEL`, `DEFAULT_LOCAL_EMBEDDING_DIMENSIONS`, `openai`, `vercel`, `localProvider`, `detectProvider`
-- Tested by: `tests/embeddings.test.ts`, `tests/retrieval-eval.test.ts`, `tests/search.test.ts`
+- Tested by: `tests/embeddings.test.ts`, `tests/retrieval-eval.test.ts`, `tests/search.test.ts`, `tests/semantic-score.test.ts`
 - Imports: `src/config.ts`
-- Imported by: `src/cli/init.ts`, `src/cli/search.ts`, `src/codekg/semantic.ts`, `src/search/embeddings.ts`, `src/search/index.ts`, `src/search/search.ts`, and 4 more
+- Imported by: `src/cli/init.ts`, `src/cli/search.ts`, `src/codekg/semantic.ts`, `src/search/embeddings.ts`, `src/search/index.ts`, `src/search/search.ts`, and 5 more
 
 ## src/search/search.ts
 
-Source file `src/search/search.ts` defines `SearchResult`, `searchSections`.
+Source file `src/search/search.ts` defines `SearchResult`, `OFF_TOPIC_PROBES`, `NOISE_FLOOR_META_KEY`, and 3 more.
 
-- Defines: `SearchResult`, `searchSections`
-- Tested by: `tests/retrieval-eval.test.ts`, `tests/search.test.ts`
+- `OFF_TOPIC_PROBES` (const): Questions no codebase answers; see noiseFloor.
+- `noiseFloor` (function): The highest similarity an off-topic probe question reaches in this index.
+- Also defines: `SearchResult`, `NOISE_FLOOR_META_KEY`, `nearest`, `searchSections`
+- Tested by: `tests/retrieval-eval.test.ts`, `tests/search.test.ts`, `tests/semantic-score.test.ts`
 - Imports: `src/search/embeddings.ts`, `src/search/provider.ts`
-- Imported by: `src/cli/search.ts`, `tests/retrieval-eval.test.ts`, `tests/search.test.ts`
+- Imported by: `src/cli/search.ts`, `src/search/index.ts`, `tests/retrieval-eval.test.ts`, `tests/search.test.ts`, `tests/semantic-score.test.ts`
 
 ## src/source-parser.ts
 
@@ -1258,9 +1261,11 @@ Test file `tests/retrieval-eval.test.ts` checks `src/codekg/query.ts`, `src/code
 - Test: retrieval eval (lexical) › stays at or above the recorded floor
 - Test: retrieval eval (lexical) › stays at or above the recorded floor on held-out questions
 - Test: retrieval eval (lexical) › keeps ask without semantic search at or above the held-out floor
+- Test: retrieval eval (lexical) › keeps ask without semantic search at or above the identifier floor
 - Test: stays at or above the recorded floor
 - Test: stays at or above the recorded floor on held-out questions
-- Test: keeps ask with semantic search at or above the held-out ask floor
+- Test: keeps ask with semantic search on held-out questions at or above its floor and ask without it
+- Test: keeps ask with semantic search on identifiers at or above its floor
 - Checks: `src/codekg/query.ts`, `src/codekg/search.ts`, `src/codekg/types.ts`, `src/lattice.ts`, `src/search/db.ts`, `src/search/index.ts`, and 2 more
 - Imports: `src/codekg/query.ts`, `src/codekg/search.ts`, `src/codekg/types.ts`, `src/lattice.ts`, `src/search/db.ts`, `src/search/index.ts`, and 2 more
 
@@ -1299,6 +1304,16 @@ Test file `tests/search.test.ts` checks `src/config.ts`, `src/search/db.ts`, and
 - Test: finds performance documentation for latency query
 - Checks: `src/config.ts`, `src/search/db.ts`, `src/search/index.ts`, `src/search/provider.ts`, `src/search/search.ts`, `tests/rag-replay-server.ts`
 - Imports: `src/config.ts`, `src/search/db.ts`, `src/search/index.ts`, `src/search/provider.ts`, `src/search/search.ts`, `tests/rag-replay-server.ts`
+
+## tests/semantic-score.test.ts
+
+Test file `tests/semantic-score.test.ts` checks `src/codekg/query.ts`, `src/search/db.ts`, and 3 more.
+
+- Test: semantic scores › returns cosine similarity and caches the noise floor until the sections change
+- Test: semanticBonus › gives the closest match 1 and falls linearly to 0 at the noise floor
+- Test: semanticBonus › gives nothing when no match is closer than the noise floor
+- Checks: `src/codekg/query.ts`, `src/search/db.ts`, `src/search/index.ts`, `src/search/provider.ts`, `src/search/search.ts`
+- Imports: `src/codekg/query.ts`, `src/search/db.ts`, `src/search/index.ts`, `src/search/provider.ts`, `src/search/search.ts`
 
 ## tests/source-scan.test.ts
 

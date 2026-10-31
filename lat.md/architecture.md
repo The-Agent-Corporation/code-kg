@@ -28,7 +28,7 @@ No parsed entrypoint files were available for first-hop dependency flow during b
 The initial inventory groups files by broad category so later extraction can focus on high-value paths.
 
 - Code files: 103
-- Test files: 29
+- Test files: 30
 - Documentation files: 78
 - Config files: 2
 - Asset files: 2
@@ -36,14 +36,14 @@ The initial inventory groups files by broad category so later extraction can foc
 
 ## Structural Graph
 
-Code-KG extracted a deterministic structural graph with 1271 nodes, 3140 edges, 4 communities using the multi-language-directory-fallback analysis path.
+Code-KG extracted a deterministic structural graph with 1290 nodes, 3189 edges, 4 communities using the multi-language-directory-fallback analysis path.
 
 ## Communities
 
 Directory-based communities provide the first subsystem map until graph clustering is available.
 
-- src: 75 files, 840 symbols, cohesion 0.83
-- tests: 51 files, 264 symbols, cohesion 0.48
+- src: 75 files, 846 symbols, cohesion 0.83
+- tests: 52 files, 276 symbols, cohesion 0.48
 - templates: 2 files, 27 symbols, cohesion 1
 - scripts: 4 files, 4 symbols, cohesion 0.86
 
@@ -57,8 +57,8 @@ High-degree nodes may deserve review as important entry points, bridges, or util
 - src (module)
 - src/context.ts (file)
 - src/codekg/agents.ts (file)
-- tests/codekg-intelligence.test.ts (file)
 - tests/retrieval-eval.test.ts (file)
+- tests/codekg-intelligence.test.ts (file)
 - src/lattice.ts (file)
 - src/codekg/graph.ts (file)
 
@@ -73,10 +73,10 @@ Dependency hotspots are the source files with the most local importers, the shar
 - `src/codekg/bootstrap.ts`: imported by 12 local files
 - `src/codekg/structural.ts`: imported by 12 local files
 - `src/codekg/anchors.ts`: imported by 11 local files
+- `src/codekg/query.ts`: imported by 11 local files
 - `src/config.ts`: imported by 11 local files
+- `src/search/provider.ts`: imported by 11 local files
 - `src/codekg/check.ts`: imported by 10 local files
-- `src/codekg/query.ts`: imported by 10 local files
-- `src/search/provider.ts`: imported by 10 local files
 - `src/codekg/fresh.ts`: imported by 9 local files
 - `src/code-refs.ts`: imported by 8 local files
 - `src/codekg/graph.ts`: imported by 8 local files

@@ -95,6 +95,25 @@ export async function currentSource(
     .join('\n');
 }
 
+/**
+ * Knowledge-score bonus per semantic match: 1 for the closest match, falling
+ * linearly with similarity to 0 at the noise floor. When nothing beats the
+ * floor the query has no semantic match, so no section gets a bonus.
+ */
+// @lat: [[lat.md/concepts#Concepts#Search Backends]]
+export function semanticBonus(
+  matches: { section: { id: string }; score: number }[],
+  floor: number,
+): Map<string, number> {
+  const best = Math.max(...matches.map((match) => match.score));
+  const bonus = new Map<string, number>();
+  if (!(best > floor)) return bonus;
+  for (const match of matches)
+    if (match.score > floor)
+      bonus.set(match.section.id, (match.score - floor) / (best - floor));
+  return bonus;
+}
+
 function graphRank(
   graph: ProjectGraph,
   seeds: Map<string, number>,
@@ -231,7 +250,8 @@ export async function ask(
   const sections = flattenSections(
     await loadAllSections(join(root, 'lat.md')).catch(() => []),
   );
-  const semantic = new Map<string, number>();
+  let semantic = new Map<string, number>();
+  let semanticRan = false;
   if (opts.semantic !== false) {
     try {
       const key = getEmbeddingKey();
@@ -241,10 +261,11 @@ export async function ask(
           query,
           key,
           opts.limit ?? 8,
+          undefined,
+          true,
         );
-        found.matches.forEach((match, i) =>
-          semantic.set(match.section.id, 1 / (1 + i)),
-        );
+        semantic = semanticBonus(found.matches, found.noiseFloor ?? -1);
+        semanticRan = true;
       }
     } catch (error) {
       warnings.push(
@@ -346,7 +367,9 @@ export async function ask(
     warnings,
     backend: semantic.size
       ? 'knowledge + semantic + lexical + graph'
-      : 'knowledge + lexical + graph',
+      : semanticRan
+        ? 'knowledge + lexical + graph (no semantic match closer than off-topic text)'
+        : 'knowledge + lexical + graph',
   };
 }
 

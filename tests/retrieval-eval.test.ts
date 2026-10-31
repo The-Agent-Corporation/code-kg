@@ -138,7 +138,9 @@ const QUESTIONS: Array<{ question: string; answers: string[] }> = [
  * answered by a source file. Do not pick what to document or how to rank
  * from these: they only measure whether a change generalises.
  */
-const HELD_OUT: Array<{ question: string; files: string[] }> = [
+type FileQuestion = { question: string; files: string[] };
+
+const HELD_OUT: FileQuestion[] = [
   {
     question:
       'where is the manifest written atomically so a crash cannot leave a partial file',
@@ -204,6 +206,24 @@ const HELD_OUT: Array<{ question: string; files: string[] }> = [
 ];
 
 /**
+ * Names an agent pastes from code, each answered by the file defining it.
+ * Embeddings know little about these, so their semantic matches are mostly
+ * noise that must not push the lexical answer down.
+ */
+const IDENTIFIERS: FileQuestion[] = [
+  { question: 'detectProvider', files: ['src/search/provider.ts'] },
+  { question: 'scanCodeRefs', files: ['src/code-refs.ts'] },
+  { question: 'readSectionBodies', files: ['src/codekg/search.ts'] },
+  { question: 'rankSectionsLexically', files: ['src/codekg/search.ts'] },
+  { question: 'testDeclarations', files: ['src/codekg/cards.ts'] },
+  { question: 'clampLeadingParagraph', files: ['src/codekg/limits.ts'] },
+  { question: 'manifestOwner', files: ['src/codekg/anchors.ts'] },
+  { question: 'anchorChanges', files: ['src/codekg/anchors.ts'] },
+  { question: 'withinScope', files: ['src/codekg/query.ts'] },
+  { question: 'graphRank', files: ['src/codekg/query.ts'] },
+];
+
+/**
  * Measured on the committed knowledge base. Raise these when ranking or
  * curated sections improve; lowering one needs a reason in the commit.
  */
@@ -212,7 +232,9 @@ const SEMANTIC_FLOOR = { recallAt5: 0.941, mrr: 0.729 };
 const HELD_OUT_LEXICAL_FLOOR = { recallAt5: 0.6, mrr: 0.45 };
 const HELD_OUT_SEMANTIC_FLOOR = { recallAt5: 0.733, mrr: 0.63 };
 const HELD_OUT_ASK_FLOOR = { recallAt5: 0.733, mrr: 0.578 };
-const HELD_OUT_SEMANTIC_ASK_FLOOR = { recallAt5: 0.8, mrr: 0.639 };
+const HELD_OUT_SEMANTIC_ASK_FLOOR = { recallAt5: 0.8, mrr: 0.649 };
+const IDENTIFIER_ASK_FLOOR = { recallAt5: 1, mrr: 1 };
+const IDENTIFIER_SEMANTIC_ASK_FLOOR = { recallAt5: 1, mrr: 0.683 };
 /**
  * Generated per-file sections are top-N lists that reshuffle as the code
  * changes, so a run may fall this far below a floor. One question leaving
@@ -250,15 +272,18 @@ function inSampleScore(rankings: string[][]): Score {
 }
 
 /** `rankings[i]` lists, per result, the files that result is about. */
-function heldOutScore(rankings: string[][][]): Score {
+function fileScore(
+  set: readonly FileQuestion[],
+  rankings: string[][][],
+): Score {
   return score(
-    HELD_OUT.map(
+    set.map(
       ({ files }, index) =>
         rankings[index].findIndex((about) =>
           about.some((file) => files.includes(file)),
         ) + 1,
     ),
-    HELD_OUT.map(({ question }) => question),
+    set.map(({ question }) => question),
   );
 }
 
@@ -289,6 +314,23 @@ function sectionFiles(id: string, heading: string): string[] {
 
 function hitFiles(hit: QueryHit): string[] {
   return hit.kind === 'source' ? [hit.path] : sectionFiles(hit.id, hit.title);
+}
+
+async function askScore(
+  set: readonly FileQuestion[],
+  semantic: boolean,
+): Promise<Score> {
+  const rankings: string[][][] = [];
+  for (const { question } of set) {
+    const result = await ask(repoRoot, question, {
+      limit: 10,
+      semantic,
+      source: false,
+    });
+    if (semantic) expect(result.backend).toContain('semantic');
+    rankings.push(result.hits.map(hitFiles));
+  }
+  return fileScore(set, rankings);
 }
 
 beforeAll(async () => {
@@ -333,7 +375,8 @@ describe('retrieval eval (lexical)', () => {
   });
 
   it('stays at or above the recorded floor on held-out questions', () => {
-    const result = heldOutScore(
+    const result = fileScore(
+      HELD_OUT,
       HELD_OUT.map(({ question }) =>
         rankSectionsLexically(sections, question, 10, bodies).map((section) =>
           sectionFiles(section.id, section.heading),
@@ -344,16 +387,19 @@ describe('retrieval eval (lexical)', () => {
   });
 
   it('keeps ask without semantic search at or above the held-out floor', async () => {
-    const rankings: string[][][] = [];
-    for (const { question } of HELD_OUT) {
-      const result = await ask(repoRoot, question, {
-        limit: 10,
-        semantic: false,
-        source: false,
-      });
-      rankings.push(result.hits.map(hitFiles));
-    }
-    expectFloor(heldOutScore(rankings), HELD_OUT_ASK_FLOOR, 'held-out ask');
+    expectFloor(
+      await askScore(HELD_OUT, false),
+      HELD_OUT_ASK_FLOOR,
+      'held-out ask',
+    );
+  }, 120_000);
+
+  it('keeps ask without semantic search at or above the identifier floor', async () => {
+    expectFloor(
+      await askScore(IDENTIFIERS, false),
+      IDENTIFIER_ASK_FLOOR,
+      'identifier ask',
+    );
   }, 120_000);
 });
 
@@ -407,7 +453,8 @@ describe.skipIf(process.env.LAT_TEST_LOCAL_EMBEDDINGS !== '1')(
         HELD_OUT.map(({ question }) => question),
       );
       expectFloor(
-        heldOutScore(
+        fileScore(
+          HELD_OUT,
           rankings.map((results) =>
             results.map((r) => sectionFiles(r.id, r.heading)),
           ),
@@ -417,28 +464,37 @@ describe.skipIf(process.env.LAT_TEST_LOCAL_EMBEDDINGS !== '1')(
       );
     }, 300_000);
 
-    it('keeps ask with semantic search at or above the held-out ask floor', async () => {
+    async function semanticAskScore(set: readonly FileQuestion[]) {
       const previous = process.env.LAT_EMBEDDING_PROVIDER;
       process.env.LAT_EMBEDDING_PROVIDER = 'local';
       try {
-        const rankings: string[][][] = [];
-        for (const { question } of HELD_OUT) {
-          const result = await ask(repoRoot, question, {
-            limit: 10,
-            source: false,
-          });
-          expect(result.backend).toContain('semantic');
-          rankings.push(result.hits.map(hitFiles));
-        }
-        expectFloor(
-          heldOutScore(rankings),
-          HELD_OUT_SEMANTIC_ASK_FLOOR,
-          'held-out semantic ask',
-        );
+        return await askScore(set, true);
       } finally {
         if (previous === undefined) delete process.env.LAT_EMBEDDING_PROVIDER;
         else process.env.LAT_EMBEDDING_PROVIDER = previous;
       }
+    }
+
+    it('keeps ask with semantic search on held-out questions at or above its floor and ask without it', async () => {
+      const lexical = await askScore(HELD_OUT, false);
+      const semantic = await semanticAskScore(HELD_OUT);
+      expectFloor(
+        semantic,
+        HELD_OUT_SEMANTIC_ASK_FLOOR,
+        'held-out semantic ask',
+      );
+      expect(semantic.recallAt5).toBeGreaterThanOrEqual(
+        lexical.recallAt5 - SLACK,
+      );
+      expect(semantic.mrr).toBeGreaterThanOrEqual(lexical.mrr - SLACK);
+    }, 300_000);
+
+    it('keeps ask with semantic search on identifiers at or above its floor', async () => {
+      expectFloor(
+        await semanticAskScore(IDENTIFIERS),
+        IDENTIFIER_SEMANTIC_ASK_FLOOR,
+        'identifier semantic ask',
+      );
     }, 300_000);
   },
 );
