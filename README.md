@@ -59,8 +59,7 @@ tool context plus structured Grep, Glob, Read, LS, read_file, and
 list_directory payloads where the host supports them. It adds a non-blocking
 reminder before broad raw-source search commands such as `rg`, `grep`, `find`,
 or `git grep`; when it can infer the search pattern, it suggests a concrete
-`code-kg search "<query>" --backend auto-semantic` command instead of a generic
-placeholder.
+`code-kg ask "<query>"` command instead of a generic placeholder.
 
 Session, prompt, post-edit, and stop hooks now provide bounded context or refresh
 the structural cache. They make no model requests and never approve knowledge.

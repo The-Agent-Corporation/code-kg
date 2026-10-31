@@ -743,8 +743,12 @@ describe('code-kg bootstrap', () => {
     expect(result.output).toContain('installed AGENTS.md guidance');
     expect(result.output).toContain('installed Codex hook');
     expect(agentsMd).toContain('<!-- code-kg:agents:start -->');
-    expect(agentsMd).toContain('Before broad source reads');
-    expect(agentsMd).toContain('code-kg search "<question>"');
+    expect(agentsMd).toContain(
+      'Before broad source reads, grep/glob searches, or answering codebase-structure questions, use `code-kg ask "<question>"` or MCP `codekg_ask` first',
+    );
+    expect(agentsMd).toContain(
+      'To list knowledge sections only, use `code-kg search "<question>" --backend auto-semantic`',
+    );
     expect(hooks.hooks.PreToolUse).toHaveLength(1);
     expect(hooks.hooks.PreToolUse[0].matcher).toContain('Grep');
     expect(hooks.hooks.PreToolUse[0].matcher).toContain('Read');
@@ -984,10 +988,13 @@ describe('code-kg bootstrap', () => {
     expect(parsed.hookSpecificOutput.hookEventName).toBe('PreToolUse');
     expect(parsed.hookSpecificOutput.additionalContext).toContain('Code-KG');
     expect(parsed.hookSpecificOutput.additionalContext).toContain(
-      'code-kg search "entry points" --backend auto-semantic',
+      'code-kg ask "entry points"',
+    );
+    expect(parsed.hookSpecificOutput.additionalContext).toContain(
+      'MCP `codekg_ask`',
     );
     expect(parsed.hookSpecificOutput.additionalContext).not.toContain(
-      'code-kg search "<question>"',
+      '"<question>"',
     );
     expect(parsed.hookSpecificOutput.additionalContext).toContain(
       'code-kg section "<section-id>"',
@@ -1008,7 +1015,7 @@ describe('code-kg bootstrap', () => {
     };
 
     expect(parsed.hookSpecificOutput.additionalContext).toContain(
-      'code-kg search "user \\"token\\"" --backend auto-semantic',
+      'code-kg ask "user \\"token\\""',
     );
   });
 
@@ -1031,10 +1038,10 @@ describe('code-kg bootstrap', () => {
 
     expect(
       JSON.parse(grepResult.output).hookSpecificOutput.additionalContext,
-    ).toContain('code-kg search "memory coverage" --backend auto-semantic');
+    ).toContain('code-kg ask "memory coverage"');
     expect(
       JSON.parse(globResult.output).hookSpecificOutput.additionalContext,
-    ).toContain('code-kg search "**/*.py" --backend auto-semantic');
+    ).toContain('code-kg ask "**/*.py"');
   });
 
   it('nudges structured raw source read payloads toward sections without inventing a query', async () => {
@@ -1054,7 +1061,7 @@ describe('code-kg bootstrap', () => {
     expect(contextText).toContain('src/index.ts');
     expect(contextText).toContain('code-kg context "src/index.ts"');
     expect(contextText).toContain('code-kg section "<section-id>"');
-    expect(contextText).not.toContain('code-kg search "src/index.ts"');
+    expect(contextText).not.toContain('code-kg ask "src/index.ts"');
   });
 
   it('does not nudge structured reads of Code-KG knowledge files', async () => {
@@ -1095,11 +1102,17 @@ describe('code-kg bootstrap', () => {
         },
       }),
     });
+    const askResult = await hookCheckCommand(ctx(root), {
+      input: JSON.stringify({
+        tool_input: { command: 'code-kg ask "entry points"' },
+      }),
+    });
     const testResult = await hookCheckCommand(ctx(root), {
       input: JSON.stringify({ tool_input: { command: 'pnpm vitest run' } }),
     });
 
     expect(codeKgResult.output).toBe('');
+    expect(askResult.output).toBe('');
     expect(testResult.output).toBe('');
   });
 

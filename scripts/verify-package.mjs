@@ -201,11 +201,7 @@ const hookNudge = execFileSync(bin, ['hook-check'], {
 });
 assertIncludes(hookNudge, 'hookSpecificOutput', 'hook-check nudge');
 const hookContext = JSON.parse(hookNudge).hookSpecificOutput.additionalContext;
-assertIncludes(
-  hookContext,
-  'code-kg search "entry points" --backend auto-semantic',
-  'hook-check nudge',
-);
+assertIncludes(hookContext, 'code-kg ask "entry points"', 'hook-check nudge');
 const structuredGrepNudge = execFileSync(bin, ['hook-check'], {
   cwd: sample,
   encoding: 'utf-8',
@@ -217,7 +213,7 @@ const structuredGrepNudge = execFileSync(bin, ['hook-check'], {
 });
 assertIncludes(
   JSON.parse(structuredGrepNudge).hookSpecificOutput.additionalContext,
-  'code-kg search "test coverage" --backend auto-semantic',
+  'code-kg ask "test coverage"',
   'structured Grep hook-check nudge',
 );
 const structuredReadNudge = execFileSync(bin, ['hook-check'], {

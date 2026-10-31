@@ -79,7 +79,7 @@ Every graph edge carries a confidence. `EXTRACTED` edges come from static syntax
 `code-kg agents install` adds a managed block to `AGENTS.md` and hooks that steer agents to the knowledge base. `code-kg git-hooks install` adds a pre-commit hook that refreshes it.
 
 - The `AGENTS.md` block sits between `code-kg:agents:start` and `code-kg:agents:end` markers. [[src/codekg/agents.ts#agentsCommand]] refuses a file with anything other than one ordered pair.
-- Codex hooks run `hook-check` before tool calls, which nudges searches and file reads toward `code-kg search` and `code-kg context` ([[src/codekg/agents.ts#hookCheckCommand]]). `agent-context session|prompt|edit|stop` supplies bounded local context ([[src/codekg/agent-context.ts#agentContextCommand]]). The Claude Code plugin registers the same events.
+- Codex hooks run `hook-check` before tool calls, which nudges searches toward `code-kg ask` and file reads toward `code-kg context` ([[src/codekg/agents.ts#hookCheckCommand]]). `agent-context session|prompt|edit|stop` supplies bounded local context ([[src/codekg/agent-context.ts#agentContextCommand]]). The Claude Code plugin registers the same events.
 - Hook commands read their JSON payload from stdin without waiting for the pipe to close. [[src/codekg/stdin.ts#readHookInput]] waits up to 5s for the first byte and 1.5s between chunks, and the CLI prints one stderr line when the payload is missing or truncated.
 - The pre-commit hook runs `code-kg update` with enrichment off and stages the refreshed `lat.md/` and manifest, unless they already had unstaged changes ([[src/codekg/git-hooks.ts#installGitHook]]).
 

@@ -27,11 +27,14 @@ Expected status should show:
 
 ## Daily Agent Workflow
 
-Use semantic search before broad source search:
+Ask Code-KG before broad source search:
 
 ```bash
-code-kg search "how is memory coverage tested" --backend auto-semantic
+code-kg ask "how is memory coverage tested"
 ```
+
+To list only knowledge sections, use
+`code-kg search "how is memory coverage tested" --backend auto-semantic`.
 
 Open the relevant knowledge section before raw source:
 
@@ -94,8 +97,11 @@ printf '%s' '{"tool_name":"Grep","tool_input":{"pattern":"memory coverage","path
 The hook suggests:
 
 ```text
-code-kg search "memory coverage" --backend auto-semantic
+code-kg ask "memory coverage"
 ```
+
+`ask` returns matching knowledge sections and fresh source together, so it
+also finds code that no section describes yet.
 
 Reads of `lat.md/` and `.code-kg/` stay silent so agents can inspect the
 knowledge base without loops.
