@@ -12,7 +12,7 @@ import { sourceHash } from './structural.js';
 import { currentMeanings } from './meaning.js';
 import { visibleGraph } from './visibility.js';
 import { InputError } from './errors.js';
-import { STOP_WORDS } from './search.js';
+import { isIdentifierQuery, STOP_WORDS } from './search.js';
 import { anchorChanges, manifestOwner, sectionNodeIds } from './anchors.js';
 import type {
   EntityNode,
@@ -93,6 +93,25 @@ export async function currentSource(
     .split('\n')
     .slice(start - 1, end)
     .join('\n');
+}
+
+/**
+ * Knowledge-score bonus per semantic match: 1 for the closest match, falling
+ * linearly with similarity to 0 at the noise floor. When nothing beats the
+ * floor the query has no semantic match, so no section gets a bonus.
+ */
+// @lat: [[lat.md/concepts#Concepts#Search Backends]]
+export function semanticBonus(
+  matches: { section: { id: string }; score: number }[],
+  floor: number,
+): Map<string, number> {
+  const best = Math.max(...matches.map((match) => match.score));
+  const bonus = new Map<string, number>();
+  if (!(best > floor)) return bonus;
+  for (const match of matches)
+    if (match.score > floor)
+      bonus.set(match.section.id, (match.score - floor) / (best - floor));
+  return bonus;
 }
 
 function graphRank(
@@ -231,8 +250,10 @@ export async function ask(
   const sections = flattenSections(
     await loadAllSections(join(root, 'lat.md')).catch(() => []),
   );
-  const semantic = new Map<string, number>();
-  if (opts.semantic !== false) {
+  let semantic = new Map<string, number>();
+  let semanticRan = false;
+  const identifier = isIdentifierQuery(query);
+  if (opts.semantic !== false && !identifier) {
     try {
       const key = getEmbeddingKey();
       if (key && sections.length) {
@@ -241,10 +262,11 @@ export async function ask(
           query,
           key,
           opts.limit ?? 8,
+          undefined,
+          true,
         );
-        found.matches.forEach((match, i) =>
-          semantic.set(match.section.id, 1 / (1 + i)),
-        );
+        semantic = semanticBonus(found.matches, found.noiseFloor ?? -1);
+        semanticRan = true;
       }
     } catch (error) {
       warnings.push(
@@ -255,6 +277,9 @@ export async function ask(
   }
   const knowledgeFiles = new Map<string, string>();
   const graphNodes = new Map(graph.nodes.map((node) => [node.id, node]));
+  const graphFiles = new Set(
+    graph.nodes.filter((n) => n.kind === 'file').map((n) => n.source_file),
+  );
   for (const section of sections) {
     let body = knowledgeFiles.get(section.filePath);
     if (body === undefined) {
@@ -268,12 +293,15 @@ export async function ask(
     const owner = manifestOwner(manifest, section);
     if (owner?.status === 'suppressed' || owner?.status === 'orphaned')
       continue;
+    // A section headed by a source path, such as a file card, is about that file.
     if (
       opts.in &&
-      !withinScope(section.filePath, opts.in) &&
-      !(owner ? sectionNodeIds(owner) : []).some((id) =>
-        nodes.some((n) => n.id === id),
-      )
+      !(graphFiles.has(section.heading)
+        ? withinScope(section.heading, opts.in)
+        : withinScope(section.filePath, opts.in) ||
+          (owner ? sectionNodeIds(owner) : []).some((id) =>
+            nodes.some((n) => n.id === id),
+          ))
     )
       continue;
     const words = new Set(tokenize(section.heading + ' ' + text));
@@ -340,7 +368,11 @@ export async function ask(
     warnings,
     backend: semantic.size
       ? 'knowledge + semantic + lexical + graph'
-      : 'knowledge + lexical + graph',
+      : semanticRan
+        ? 'knowledge + lexical + graph (no semantic match closer than off-topic text)'
+        : identifier && opts.semantic !== false
+          ? 'knowledge + lexical + graph (identifier query; semantic skipped)'
+          : 'knowledge + lexical + graph',
   };
 }
 

@@ -134,6 +134,7 @@ async function clearSuppression(
   };
 }
 
+// @lat: [[lat.md/concepts#Concepts#Suppression Tombstones]]
 export async function suppressCommand(
   ctx: CmdContext,
   opts: SuppressOptions,

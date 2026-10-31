@@ -10,7 +10,8 @@
 # `code-kg update` yourself, or commit with CODEKG_SKIP_ENRICH=0, to include it.
 # A remote embedding provider, if configured, is still called for the reindex.
 #
-# Bypass for a single commit with:  git commit --no-verify
+# Installed by `code-kg git-hooks install`. Re-running install updates it in
+# place. Bypass for a single commit with:  git commit --no-verify
 
 # Nothing to do if the code-kg CLI isn't on PATH.
 if ! command -v code-kg >/dev/null 2>&1; then

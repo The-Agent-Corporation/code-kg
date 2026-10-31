@@ -267,10 +267,21 @@ semantic
 semantic
   .command('enable-local')
   .description('Use local embeddings for semantic search')
-  .action(async () => {
+  .option(
+    '--model <model>',
+    'small (bge-small-en-v1.5, the default), base (bge-base-en-v1.5), or a Hugging Face model id',
+  )
+  .option(
+    '--dimensions <n>',
+    'vector size, required for a model id other than small or base',
+    (value) => Number(value),
+  )
+  .action(async (opts: { model?: string; dimensions?: number }) => {
     const ctx = latContext();
     const { semanticCommand } = await import('./semantic.js');
-    handleResult(await semanticCommand(ctx, { action: 'enable-local' }));
+    handleResult(
+      await semanticCommand(ctx, { action: 'enable-local', ...opts }),
+    );
   });
 
 semantic

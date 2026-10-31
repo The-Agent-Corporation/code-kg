@@ -47,6 +47,7 @@ function formatOutput(changes: ReconcileChange[], write: boolean): string {
   ].join('\n');
 }
 
+// @lat: [[lat.md/concepts#Concepts#Reconcile]]
 export async function reconcileCommand(
   ctx: CmdContext,
   opts: ReconcileOptions,

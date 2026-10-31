@@ -23,6 +23,49 @@ export type EmbeddingProvider =
 export const DEFAULT_LOCAL_EMBEDDING_MODEL = 'Xenova/bge-small-en-v1.5';
 export const DEFAULT_LOCAL_EMBEDDING_DIMENSIONS = 384;
 
+/** Local models `semantic enable-local --model` knows by name. */
+export const LOCAL_EMBEDDING_MODELS: Record<
+  string,
+  { model: string; dimensions: number }
+> = {
+  small: {
+    model: DEFAULT_LOCAL_EMBEDDING_MODEL,
+    dimensions: DEFAULT_LOCAL_EMBEDDING_DIMENSIONS,
+  },
+  base: { model: 'Xenova/bge-base-en-v1.5', dimensions: 768 },
+};
+
+/**
+ * The model id and dimensions for a known model name or id, or for any other
+ * id together with its dimensions.
+ */
+// @lat: [[lat.md/concepts#Concepts#Search Backends]]
+export function resolveLocalEmbeddingModel(
+  name: string,
+  dimensions?: number,
+): { model: string; dimensions: number } {
+  const known =
+    LOCAL_EMBEDDING_MODELS[name] ??
+    Object.values(LOCAL_EMBEDDING_MODELS).find((m) => m.model === name);
+  if (
+    dimensions !== undefined &&
+    (!Number.isInteger(dimensions) || dimensions <= 0)
+  )
+    throw new Error('--dimensions must be a positive integer.');
+  if (known) {
+    if (dimensions !== undefined && dimensions !== known.dimensions)
+      throw new Error(
+        `${known.model} has ${known.dimensions} dimensions, not ${dimensions}.`,
+      );
+    return known;
+  }
+  if (dimensions === undefined)
+    throw new Error(
+      `Unknown local model ${name}: pass --dimensions with its vector size, or use ${Object.keys(LOCAL_EMBEDDING_MODELS).join(' or ')}.`,
+    );
+  return { model: name, dimensions };
+}
+
 const openai: RemoteEmbeddingProvider = {
   kind: 'remote',
   name: 'openai',
@@ -66,6 +109,11 @@ function localProvider(): LocalEmbeddingProvider {
       : (config.model ?? DEFAULT_LOCAL_EMBEDDING_MODEL),
     dimensions,
   };
+}
+
+/** Identifies the vectors a provider makes; see ensureSchema. */
+export function providerModelId(provider: EmbeddingProvider): string {
+  return `${provider.name}:${provider.model}`;
 }
 
 export function detectProvider(key: string): EmbeddingProvider {

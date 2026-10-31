@@ -1,19 +1,19 @@
 # Refs E2e Tests
 
-This file was generated from existing `@lat` test backlinks so bootstrap output can preserve current test specifications.
+This file was generated from `@lat` backlinks in test code; each section names the test that checks it.
 
 ## File-level query finds all refs to that file
 
-This generated test specification preserves the existing `@lat` backlink target `tests/refs-e2e#File-level query finds all refs to that file`.
+Checked by `tests/cases.test.ts`: source-file-refs › findRefs with file-level query finds all refs to that file.
 
 ## Finds referring sections via wiki links
 
-This generated test specification preserves the existing `@lat` backlink target `refs-e2e#Finds referring sections via wiki links`.
+Checked by `tests/cases.test.ts`: basic-project › refs finds sections referencing a target.
 
 ## Source query returns no-match for nonexistent file
 
-This generated test specification preserves the existing `@lat` backlink target `tests/refs-e2e#Source query returns no-match for nonexistent file`.
+Checked by `tests/cases.test.ts`: source-file-refs › findRefs with source query returns no-match for nonexistent file.
 
 ## Source symbol query finds md sections
 
-This generated test specification preserves the existing `@lat` backlink target `tests/refs-e2e#Source symbol query finds md sections`.
+Checked by `tests/cases.test.ts`: source-file-refs › findRefs with source symbol query finds md sections.

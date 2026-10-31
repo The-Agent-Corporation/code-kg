@@ -23,8 +23,7 @@ const SECTION_END = '<!-- code-kg:agents:end -->';
 const CODEX_HOOK_COMMAND = 'code-kg hook-check';
 const CODEX_HOOK_MATCHER =
   'Bash|Grep|Glob|Read|LS|List|read_file|list_directory';
-const GENERIC_SEARCH_COMMAND =
-  'code-kg search "<question>" --backend auto-semantic';
+const GENERIC_SEARCH_COMMAND = 'code-kg ask "<question>"';
 
 type HookCommandSelection = {
   hookCommand: string;
@@ -145,11 +144,10 @@ function managedAgentsSection(fallbackInvocation?: string): string {
   }
   lines.push(
     'Rules:',
-    '- Before broad source reads, grep/glob searches, or answering codebase-structure questions, use `code-kg search "<question>"` or MCP `codekg_search` first.',
-    '- Prefer `code-kg ask "<question>"` or MCP `codekg_ask` for combined knowledge and fresh source context. Use `--in <directory>` to scope a monorepo query.',
+    '- Before broad source reads, grep/glob searches, or answering codebase-structure questions, use `code-kg ask "<question>"` or MCP `codekg_ask` first; it returns knowledge sections and fresh source together. Use `--in <directory>` to scope a monorepo query.',
     '- Before changing a symbol or file, inspect `code-kg impact <symbol-or-file>`; use `callers`, `callees`, `skeleton`, and `map` for targeted exploration.',
     '- Source descriptions are inferred, not accepted knowledge. Verify source evidence and stale-section warnings; refreshing the index never approves or rewrites curated knowledge.',
-    '- For conceptual queries, prefer `code-kg search "<question>" --backend auto-semantic` or `codekg_search` with `backend: "auto-semantic"` so semantic search is used when configured and lexical search is used as a fallback.',
+    '- To list knowledge sections only, use `code-kg search "<question>" --backend auto-semantic` or `codekg_search` with `backend: "auto-semantic"`: semantic search when configured, lexical search for code names and paths or as a fallback.',
     '- Use `code-kg section "<section-id>"` or MCP `codekg_section` to read full sections with outgoing and incoming relationships before opening raw source.',
     '- Treat `lat.md/` as the primary map and raw source as the implementation detail to inspect after the relevant knowledge sections are known.',
     '- After modifying code or knowledge docs, run `code-kg check` and use `code-kg drift` to compare source and the knowledge base.',
@@ -775,7 +773,7 @@ function queryFromSearchCommand(command: string): string | undefined {
 
 function suggestedSearchCommand(query: string | undefined): string {
   if (!query?.trim()) return GENERIC_SEARCH_COMMAND;
-  return `code-kg search "${escapeSearchQuery(query.trim())}" --backend auto-semantic`;
+  return `code-kg ask "${escapeSearchQuery(query.trim())}"`;
 }
 
 function hookAdditionalContext(action: HookAction): string {
@@ -788,7 +786,7 @@ function hookAdditionalContext(action: HookAction): string {
   }
 
   const searchCommand = suggestedSearchCommand(action.query);
-  return `Code-KG: this repo has a reviewable knowledge graph. Before broad raw-source search, run \`${searchCommand}\` or MCP \`codekg_search\` with backend \`auto-semantic\`, then use \`code-kg section "<section-id>"\` before opening raw files.`;
+  return `Code-KG: this repo has a reviewable knowledge graph. Before broad raw-source search, run \`${searchCommand}\` or MCP \`codekg_ask\` for matching knowledge sections and fresh source together, then use \`code-kg section "<section-id>"\` to read a full section.`;
 }
 
 function hookNudgeOutput(action: HookAction): string {

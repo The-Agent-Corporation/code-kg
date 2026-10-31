@@ -12,11 +12,11 @@ Use this section for auth, persistence, configuration, background work, observab
 - src/codekg/cli.ts (file)
 - src/context.ts (file)
 - src/codekg/agents.ts (file)
+- tests/retrieval-eval.test.ts (file)
 - tests/codekg-intelligence.test.ts (file)
 - src/lattice.ts (file)
 - src/codekg/graph.ts (file)
 - src/codekg/types.ts (file)
-- src/cli/init.ts (file)
 
 ## Cross-Community Imports
 
