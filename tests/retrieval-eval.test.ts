@@ -229,7 +229,7 @@ const IDENTIFIERS: FileQuestion[] = [
  */
 const LEXICAL_FLOOR = { recallAt5: 0.824, mrr: 0.722 };
 const SEMANTIC_FLOOR = { recallAt5: 0.941, mrr: 0.729 };
-const HELD_OUT_LEXICAL_FLOOR = { recallAt5: 0.6, mrr: 0.45 };
+const HELD_OUT_LEXICAL_FLOOR = { recallAt5: 0.667, mrr: 0.515 };
 const HELD_OUT_SEMANTIC_FLOOR = { recallAt5: 0.733, mrr: 0.563 };
 const HELD_OUT_ASK_FLOOR = { recallAt5: 0.733, mrr: 0.578 };
 const HELD_OUT_SEMANTIC_ASK_FLOOR = { recallAt5: 0.8, mrr: 0.649 };

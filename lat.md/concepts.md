@@ -17,6 +17,15 @@ Each generated file in `lat.md/` has an entry in `.code-kg/materialization-manif
 
 Hand-written files such as this one have no manifest entry and are never written; the generated root index lists them. When nothing else changed, the manifest keeps its `generated_at`, so a no-op update leaves it untouched. The implementation map is [[files#Source Files#src/codekg/bootstrap.ts]].
 
+## Reconcile
+
+`code-kg reconcile` brings manifest statuses in line with `lat.md/` without regenerating anything. It finds generated files someone edited or deleted; it previews by default, and `--write` records them.
+
+- [[src/codekg/reconcile.ts#reconcileCommand]] checks each `generated` entry. A missing file becomes `orphaned`, and a file whose sha256 differs from `generated_hash` becomes `edited`, with the new hash in `current_hash`. Entries with other statuses are left alone.
+- It writes only `.code-kg/materialization-manifest.json`. `update` makes the same changes when it next runs, and also writes merge proposals and drops the generated links to deleted files; see [[concepts#Concepts#Merge-Safe Materialization]].
+- The status decides how other commands treat a file. `ask` skips `orphaned` and `suppressed` sections and ranks `edited` and `curated` ones a little higher; drift, `apply-backlinks` and `review-source` skip `orphaned` and `suppressed` sections.
+- `code-kg confidence reconcile` is a different command: it finds confidence annotations removed from markdown; see [[confidence#Confidence Review]].
+
 ## File Cards
 
 `lat.md/files.md` has a generated card for every parsed source and test file, so a file can be found by what it does and not only by its name. [[src/codekg/cards.ts#filesFile]] builds it on `bootstrap` and `update`.
@@ -63,6 +72,15 @@ Every graph edge carries a confidence. `EXTRACTED` edges come from static syntax
 - `code-kg gaps` lists files covered only by inferred test edges apart from untested files, and `context`, `changed` and the tests map mark such tests "(inferred)".
 - [[confidence#Confidence Review]] is the queue for uncertain generated relationships.
 
+## Suppression Tombstones
+
+A suppression tombstone hides a graph node or relationship that Code-KG should not report, such as a vendored file or a false edge. Tombstones live in the manifest and survive every update.
+
+- `code-kg suppress node <node-id>`, `suppress relationship <relationship-id>`, `suppress list` and `suppress clear <id>`, or MCP `codekg_suppress`, edit the sorted id lists `suppressed.nodes` and `suppressed.relationships` ([[src/codekg/suppress.ts#suppressCommand]]). Drift prints relationship ids with its suggestions. Materialization copies the lists forward unchanged.
+- [[src/codekg/visibility.ts#visibleGraph]] removes suppressed nodes, every node in a suppressed file, suppressed relationships, and manifest relationships marked `rejected` or `suppressed`. `ask`, `callers`, `callees`, `impact`, `map`, `skeleton`, `grep` and `anchor` read the graph through it.
+- Drift does not warn when a suppressed node disappears, even an anchored one, does not list a suppressed file as uncovered, and does not suggest relationships that are suppressed or touch a suppressed node. `doctor` counts the tombstones.
+- Generated files are built from the full graph, so a suppressed file keeps its card in [[files]].
+
 ## Search Backends
 
 `code-kg search` is lexical by default and works offline. `--backend semantic` uses embeddings, `auto-semantic` uses them when a provider is configured and falls back to lexical otherwise, and `hybrid` runs `ask`.
@@ -74,6 +92,15 @@ Every graph edge carries a confidence. `EXTRACTED` edges come from static syntax
 - `ask` adds a semantic bonus by cosine similarity: 1 for the closest match, falling linearly to 0 at the index's noise floor ([[src/codekg/query.ts#semanticBonus]]). The floor is the closest any of a fixed set of off-topic questions gets ([[src/search/search.ts#noiseFloor]]), measured because similarity scales differ by model. When nothing beats it, no section gets a bonus and the `Backend:` line says so.
 - Queries made only of code names or paths, such as `writeJsonAtomic` or `src/codekg/cache.ts`, are identifier queries ([[src/codekg/search.ts#isIdentifierQuery]]). Embeddings rarely place the defining file near them, so `auto-semantic` searches them lexically and `ask` skips its semantic bonus, and both say so in the `Backend:` line.
 - `tests/retrieval-eval.test.ts` measures ranking changes with recall@5 and mean reciprocal rank over this repository's questions. A held-out set, each answered by a source file, covers features the knowledge base was not written against; it measures `ask` too, and is never used to choose what to document or how to rank. A set of bare identifiers checks that identifier queries keep their lexical answer.
+
+## Workspaces
+
+A workspace lets one `ask` search several local repositories, each with its own Code-KG knowledge base. Repositories are registered explicitly in `.code-kg/workspace.json`; nothing is discovered automatically.
+
+- `code-kg workspace add <directories...>`, `workspace list` and `workspace remove <names...>` manage the registrations ([[src/codekg/workspace.ts#workspaceCommand]]). A repository is named after its directory, with characters other than letters, digits, `_` and `-` replaced by `-`, and stored by its path relative to the project root. Adding a different directory under a name already in use is refused.
+- `code-kg ask --workspace "<question>"` or MCP `codekg_workspace_ask` runs `ask` in each repository and merges the hits by rank, because scores from different repositories are not comparable ([[src/codekg/workspace.ts#askWorkspace]]). Hit ids, paths and titles carry the repository's name. `--in <name>` or `--in <name>/<path>` limits the search to one repository or a path inside it.
+- A repository that fails, for example because its directory is gone, becomes a warning; the command fails only when none succeeds.
+- Each repository keeps its own `lat.md/` and manifest, and `update`, `check` and drift work on one repository at a time; the workspace file is not part of any manifest. The MCP server also starts in a directory that has a workspace file but no `lat.md/`.
 
 ## Agent Guidance and Hooks
 
