@@ -3,10 +3,10 @@ import { existsSync } from 'node:fs';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { extname } from 'node:path';
-import { scanCodeRefs } from '../code-refs.js';
+import { scanCodeRefs, type CodeRef } from '../code-refs.js';
 import { walkEntries } from '../walk.js';
 import { isSectionEntry } from './anchors.js';
-import { filesFile } from './cards.js';
+import { filesFile, testDeclarations, type TestDeclaration } from './cards.js';
 import { discoverProject } from './discovery.js';
 import {
   extractProjectGraph,
@@ -416,7 +416,8 @@ Skeleton bootstrap does not create inferred relationships, so there are no confi
 }
 
 type SpecTree = {
-  targets: string[];
+  /** The tests whose `@lat` comments point at this heading. */
+  checks: string[];
   children: Map<string, SpecTree>;
 };
 
@@ -449,21 +450,25 @@ function specStemForTarget(target: string, sourceFile: string): string | null {
   return sourceFile.startsWith('tests/') ? `tests/${filePart}` : filePart;
 }
 
-function addSpecTarget(
-  root: SpecTree,
-  headings: string[],
-  target: string,
-): void {
-  let current = root;
+function specNode(tree: SpecTree, headings: string[]): SpecTree {
+  let current = tree;
   for (const heading of headings) {
     let child = current.children.get(heading);
     if (!child) {
-      child = { targets: [], children: new Map() };
+      child = { checks: [], children: new Map() };
       current.children.set(heading, child);
     }
     current = child;
   }
-  current.targets.push(target);
+  return current;
+}
+
+/** The test a `@lat` comment sits on or directly above, as `file`: suite › name. */
+function specCheck(ref: CodeRef, tests: TestDeclaration[]): string {
+  const test = tests.find((t) => t.line >= ref.line && t.line <= ref.line + 3);
+  return test
+    ? `\`${ref.file}\`: ${[...test.suites, test.name].join(' › ')}`
+    : `\`${ref.file}\``;
 }
 
 function renderSpecTree(tree: SpecTree, depth: number): string[] {
@@ -473,15 +478,20 @@ function renderSpecTree(tree: SpecTree, depth: number): string[] {
   )) {
     const marker = '#'.repeat(depth);
     lines.push(`${marker} ${heading}`, '');
-    if (child.targets.length > 0) {
-      const target = child.targets.sort()[0];
-      lines.push(
-        `This generated test specification preserves the existing \`@lat\` backlink target \`${target}\`.`,
-        '',
-      );
+    const [first, ...rest] = [...new Set(child.checks)].sort();
+    if (first) {
+      lines.push(clampLeadingParagraph(`Checked by ${first}.`), '');
+      if (rest.length)
+        lines.push(...rest.map((check) => `- Also checked by ${check}`), '');
     } else {
       lines.push(
-        `This generated test group preserves nested \`@lat\` backlink targets under ${heading}.`,
+        clampLeadingParagraph(
+          `Groups ${child.children.size} test ${child.children.size === 1 ? 'specification' : 'specifications'}: ${[
+            ...child.children.keys(),
+          ]
+            .sort()
+            .join('; ')}.`,
+        ),
         '',
       );
     }
@@ -493,6 +503,7 @@ function renderSpecTree(tree: SpecTree, depth: number): string[] {
 async function codeRefSpecFiles(root: string): Promise<BootstrapFile[]> {
   const scan = await scanCodeRefs(root);
   const byStem = new Map<string, SpecTree>();
+  const sources = new Map<string, TestDeclaration[]>();
 
   for (const ref of scan.refs) {
     const stem = specStemForTarget(ref.target, ref.file);
@@ -501,10 +512,18 @@ async function codeRefSpecFiles(root: string): Promise<BootstrapFile[]> {
     if (headingParts.length === 0) continue;
     let tree = byStem.get(stem);
     if (!tree) {
-      tree = { targets: [], children: new Map() };
+      tree = { checks: [], children: new Map() };
       byStem.set(stem, tree);
     }
-    addSpecTarget(tree, headingParts, ref.target);
+    let tests = sources.get(ref.file);
+    if (!tests) {
+      tests = testDeclarations(
+        ref.file,
+        await readFile(join(root, ref.file), 'utf-8').catch(() => ''),
+      );
+      sources.set(ref.file, tests);
+    }
+    specNode(tree, headingParts).checks.push(specCheck(ref, tests));
   }
 
   return [...byStem.entries()]
@@ -514,7 +533,7 @@ async function codeRefSpecFiles(root: string): Promise<BootstrapFile[]> {
       const content = [
         `# ${title}`,
         '',
-        'This file was generated from existing `@lat` test backlinks so bootstrap output can preserve current test specifications.',
+        'This file was generated from `@lat` backlinks in test code; each section names the test that checks it.',
         '',
         ...renderSpecTree(tree, 2),
       ].join('\n');

@@ -209,8 +209,8 @@ const HELD_OUT: Array<{ question: string; files: string[] }> = [
  */
 const LEXICAL_FLOOR = { recallAt5: 0.824, mrr: 0.722 };
 const SEMANTIC_FLOOR = { recallAt5: 0.882, mrr: 0.76 };
-const HELD_OUT_LEXICAL_FLOOR = { recallAt5: 0.6, mrr: 0.442 };
-const HELD_OUT_SEMANTIC_FLOOR = { recallAt5: 0.733, mrr: 0.591 };
+const HELD_OUT_LEXICAL_FLOOR = { recallAt5: 0.6, mrr: 0.45 };
+const HELD_OUT_SEMANTIC_FLOOR = { recallAt5: 0.733, mrr: 0.596 };
 const HELD_OUT_ASK_FLOOR = { recallAt5: 0.733, mrr: 0.578 };
 const HELD_OUT_SEMANTIC_ASK_FLOOR = { recallAt5: 0.8, mrr: 0.639 };
 /**

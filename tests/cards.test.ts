@@ -195,6 +195,8 @@ describe('testDeclarations', () => {
         ].join('\n'),
       ),
     ).toStrictEqual([
+      { line: 1, name: 'outer', suites: [], suite: true },
+      { line: 2, name: 'inner', suites: ['outer'], suite: true },
       { line: 3, name: 'handles %s', suites: ['outer', 'inner'] },
       { line: 5, name: 'after inner', suites: ['outer'] },
     ]);

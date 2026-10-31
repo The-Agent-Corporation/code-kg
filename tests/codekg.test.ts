@@ -393,6 +393,13 @@ describe('code-kg bootstrap', () => {
         '// @lat: [[search#RAG Replay Tests#Indexes all sections]]',
         'export const indexesAllSections = true;',
         '',
+        "describe('tokens', () => {",
+        '  // @lat: [[auth-flow#Refreshes token]]',
+        "  it('refreshes before expiry', () => {});",
+        '});',
+        '// @lat: [[auth-flow#Session]]',
+        "describe('session', () => {});",
+        '',
       ].join('\n'),
     );
 
@@ -413,9 +420,20 @@ describe('code-kg bootstrap', () => {
 
     expect(changes).toContain('created lat.md/tests/auth-flow.md');
     expect(result.isError).toBeFalsy();
-    expect(authSpecs).toContain('## Rejects expired token');
+    expect(authSpecs).toContain(
+      '## Rejects expired token\n\nChecked by `tests/auth.test.ts`.',
+    );
+    expect(authSpecs).toContain(
+      '## Refreshes token\n\nChecked by `tests/auth.test.ts`: tokens › refreshes before expiry.',
+    );
+    expect(authSpecs).toContain(
+      '## Session\n\nChecked by `tests/auth.test.ts`: session.',
+    );
+    expect(authSpecs).not.toContain('preserves the existing');
     expect(mcpSpecs).toContain('## Lists all tools');
-    expect(searchSpecs).toContain('## RAG Replay Tests');
+    expect(searchSpecs).toContain(
+      '## RAG Replay Tests\n\nGroups 1 test specification: Indexes all sections.',
+    );
     expect(searchSpecs).toContain('### Indexes all sections');
   });
 

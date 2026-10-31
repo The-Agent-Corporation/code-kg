@@ -36,13 +36,13 @@ The initial inventory groups files by broad category so later extraction can foc
 
 ## Structural Graph
 
-Code-KG extracted a deterministic structural graph with 1265 nodes, 3125 edges, 4 communities using the multi-language-directory-fallback analysis path.
+Code-KG extracted a deterministic structural graph with 1266 nodes, 3129 edges, 4 communities using the multi-language-directory-fallback analysis path.
 
 ## Communities
 
 Directory-based communities provide the first subsystem map until graph clustering is available.
 
-- src: 75 files, 837 symbols, cohesion 0.83
+- src: 75 files, 838 symbols, cohesion 0.83
 - tests: 50 files, 262 symbols, cohesion 0.48
 - templates: 2 files, 27 symbols, cohesion 1
 - scripts: 4 files, 4 symbols, cohesion 0.86

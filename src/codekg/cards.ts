@@ -61,6 +61,8 @@ export type TestDeclaration = {
   name: string;
   /** Enclosing `describe` names, outermost first. */
   suites: string[];
+  /** A `describe` block rather than a test. */
+  suite?: true;
 };
 
 function isHashCommented(path: string): boolean {
@@ -315,17 +317,15 @@ export function testDeclarations(
     while (suites.length && suites[suites.length - 1].indent >= indent)
       if (js || py || go || rust || line.trim()) suites.pop();
       else break;
-    if (js?.[1] === 'describe') {
-      suites.push({ indent, name: js[3] });
-      return;
-    }
     const name = js?.[3] ?? py?.[1] ?? go?.[1] ?? rust?.[1];
     if (name)
       declarations.push({
         line: index + 1,
         name: prose(name),
         suites: suites.map((suite) => prose(suite.name)),
+        ...(js?.[1] === 'describe' ? { suite: true } : {}),
       });
+    if (js?.[1] === 'describe') suites.push({ indent, name: js[3] });
   });
   return declarations;
 }
@@ -576,7 +576,9 @@ export async function filesFile(
       symbols: isTest ? [] : symbols,
       uses: uses.get(path) ?? [],
       registers: commands.filter((command) => command.file === path),
-      tests: isTest ? testDeclarations(path, content) : [],
+      tests: isTest
+        ? testDeclarations(path, content).filter((test) => !test.suite)
+        : [],
       covers: isTest ? related('tests', 'outgoing') : [],
       testedBy: isTest ? [] : related('tests', 'incoming', false),
       inferredTests: isTest ? [] : related('tests', 'incoming', true),

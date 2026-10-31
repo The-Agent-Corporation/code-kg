@@ -285,11 +285,12 @@ Source file `src/codekg/backlinks.ts` defines `ApplyBacklinksOptions`, `Backlink
 
 ## src/codekg/bootstrap.ts
 
-Source file `src/codekg/bootstrap.ts` defines `MergeProposal`, `SECTION_HEADINGS`, `DEFAULT_GITIGNORE_LINES`, and 45 more.
+Source file `src/codekg/bootstrap.ts` defines `MergeProposal`, `SECTION_HEADINGS`, `DEFAULT_GITIGNORE_LINES`, and 46 more.
 
 - Used by `code-kg init`: Create the initial Code-KG knowledge base
 - `curatedRootEntries` (function): Hand-written files and directories at the top of `lat.md/`.
-- Also defines: `MergeProposal`, `SECTION_HEADINGS`, `DEFAULT_GITIGNORE_LINES`, `SOURCE_IMPORT_LIMIT`, `hash`, `firstHeadingPath`, `bulletList`, `fileCategoryLine`, `graphCountLine`, `categoryByPath`, `graphFileNodes`, `localImports`, `localFileRelations`, `inlineCodeList`, `briefInlineCodeList`, `renderEntryPointFlow`, `renderDependencyHotspots`, `GENERATED_ROOT_ENTRIES`, `RootEntry`, `leadingSentence`, `rootIndex`, `architectureFile`, `crossCuttingFile`, `confidenceFile`, `SpecTree`, `titleCase`, `fileTitle`, `isSectionSpecTarget`, `specStemForTarget`, `addSpecTarget`, and 17 more
+- `specCheck` (function): The test a `@lat` comment sits on or directly above, as `file`: suite › name.
+- Also defines: `MergeProposal`, `SECTION_HEADINGS`, `DEFAULT_GITIGNORE_LINES`, `SOURCE_IMPORT_LIMIT`, `hash`, `firstHeadingPath`, `bulletList`, `fileCategoryLine`, `graphCountLine`, `categoryByPath`, `graphFileNodes`, `localImports`, `localFileRelations`, `inlineCodeList`, `briefInlineCodeList`, `renderEntryPointFlow`, `renderDependencyHotspots`, `GENERATED_ROOT_ENTRIES`, `RootEntry`, `leadingSentence`, `rootIndex`, `architectureFile`, `crossCuttingFile`, `confidenceFile`, `SpecTree`, `titleCase`, `fileTitle`, `isSectionSpecTarget`, `specStemForTarget`, `specNode`, and 17 more
 - Tested by: `tests/anchor.test.ts`, `tests/backlinks-safety.test.ts`, `tests/cards.test.ts`, `tests/codekg-intelligence.test.ts`, `tests/codekg-messages.test.ts`, `tests/codekg.test.ts`, and 4 more
 - Imports: `src/code-refs.ts`, `src/codekg/anchors.ts`, `src/codekg/cards.ts`, `src/codekg/discovery.ts`, `src/codekg/graph.ts`, `src/codekg/limits.ts`, and 2 more
 - Imported by: `src/codekg/cli.ts`, `src/codekg/update.ts`, `tests/anchor.test.ts`, `tests/backlinks-safety.test.ts`, `tests/cards.test.ts`, `tests/codekg-intelligence.test.ts`, and 6 more
