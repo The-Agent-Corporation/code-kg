@@ -162,10 +162,18 @@ export function getLocalEmbeddingModelConfig(): {
   };
 }
 
-export function saveLocalEmbeddingConfig(): void {
+/** Without `model`, keeps whichever local model the config already names. */
+export function saveLocalEmbeddingConfig(model?: {
+  model: string;
+  dimensions: number;
+}): void {
   writeConfig({
     ...readConfig(),
     embedding_provider: 'local',
+    ...(model && {
+      local_embedding_model: model.model,
+      local_embedding_dimensions: model.dimensions,
+    }),
   });
 }
 

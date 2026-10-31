@@ -68,4 +68,4 @@ Local-first. Lexical search always works offline; semantic search uses a local e
 
 ## Working in this repo with Code-KG itself
 
-This repo dogfoods Code-KG — `lat.md/` and `.code-kg/` describe this very codebase, and `AGENTS.md` carries managed agent guidance. Per that guidance: prefer `code-kg search "<question>"` / `code-kg context <file>` to orient before broad grep/glob source sweeps, and run `code-kg check` + `code-kg drift` after changing code or knowledge docs. (Requires `pnpm build` first, then `node dist/src/codekg/cli.js <cmd>`.)
+This repo dogfoods Code-KG — `lat.md/` and `.code-kg/` describe this very codebase, and `AGENTS.md` carries managed agent guidance. Per that guidance: prefer `code-kg ask "<question>"` / `code-kg context <file>` to orient before broad grep/glob source sweeps, and run `code-kg check` + `code-kg drift` after changing code or knowledge docs. (Requires `pnpm build` first, then `node dist/src/codekg/cli.js <cmd>`.)

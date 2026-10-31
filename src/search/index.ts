@@ -5,6 +5,7 @@ import type { Client } from '@libsql/client';
 import { loadAllSections, flattenSections, type Section } from '../lattice.js';
 import { embed } from './embeddings.js';
 import type { EmbeddingProvider } from './provider.js';
+import { NOISE_FLOOR_META_KEY } from './search.js';
 
 function hashContent(text: string): string {
   return createHash('sha256').update(text).digest('hex');
@@ -92,6 +93,12 @@ export async function indexSections(
   for (const id of toDelete) {
     await db.execute({ sql: 'DELETE FROM sections WHERE id = ?', args: [id] });
   }
+
+  if (toEmbed.length || toDelete.length)
+    await db.execute({
+      sql: 'DELETE FROM meta WHERE key = ?',
+      args: [NOISE_FLOOR_META_KEY],
+    });
 
   const added = toEmbed.filter((e) => !existing.has(e.id)).length;
   const updated = toEmbed.filter((e) => existing.has(e.id)).length;

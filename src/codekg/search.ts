@@ -61,6 +61,20 @@ export const STOP_WORDS = new Set(
   ),
 );
 
+/** A camelCase, PascalCase or snake_case name, or a dotted or slashed path. */
+const IDENTIFIER =
+  /^[\w$#.:/-]*([a-z][A-Z]|[A-Za-z0-9]_[A-Za-z0-9]|\w[./#]\w)[\w$#.:/-]*$/;
+
+/**
+ * True for queries made only of code names or paths, such as `writeJsonAtomic`
+ * or `src/codekg/cache.ts`. Embeddings know little about these, so semantic
+ * matches for them are mostly noise.
+ */
+export function isIdentifierQuery(query: string): boolean {
+  const tokens = query.trim().split(/\s+/).filter(Boolean);
+  return tokens.length > 0 && tokens.every((token) => IDENTIFIER.test(token));
+}
+
 function scoreSection(section: Section, query: string, body = ''): number {
   const q = query.toLowerCase();
   const id = section.id.toLowerCase();
@@ -167,11 +181,18 @@ function fallbackLabel(reason: string | null): string {
 
 export function selectCodeKgSearchBackend(
   opts: CodeKgSearchOptions = {},
+  query = '',
 ): SearchBackendSelection {
   if (opts.semantic || opts.backend === 'semantic') {
     return { backend: 'semantic', label: 'semantic' };
   }
   if (opts.backend === 'auto-semantic') {
+    if (isIdentifierQuery(query)) {
+      return {
+        backend: 'local',
+        label: 'local lexical (auto-semantic; identifier query)',
+      };
+    }
     if (hasEmbeddingConfig()) {
       return { backend: 'semantic', label: 'semantic (auto-semantic)' };
     }
@@ -214,7 +235,7 @@ export async function codeKgSearchCommand(
     const { askCommand } = await import('./query.js');
     return askCommand(ctx, query ?? '', { limit: opts.limit });
   }
-  const selected = selectCodeKgSearchBackend(opts);
+  const selected = selectCodeKgSearchBackend(opts, query);
   const limit = opts.limit ?? 5;
 
   if (selected.backend === 'semantic') {

@@ -2,6 +2,12 @@ import type { EmbeddingProvider } from './provider.js';
 
 const MAX_REMOTE_BATCH = 2048;
 const MAX_LOCAL_BATCH = 32;
+/** English bge v1.5 models were trained to embed search queries behind this instruction. */
+const BGE_QUERY_INSTRUCTION =
+  'Represent this sentence for searching relevant passages: ';
+
+/** Queries and the passages they search can be embedded differently. */
+export type EmbedMode = 'query' | 'document';
 
 type FeatureExtractionPipeline = (
   input: string | string[],
@@ -48,6 +54,7 @@ function normalizeLocalVectors(value: unknown): number[][] {
 async function embedLocal(
   texts: string[],
   provider: EmbeddingProvider,
+  mode: EmbedMode,
 ): Promise<number[][]> {
   if (provider.kind !== 'local') {
     throw new Error('embedLocal requires a local embedding provider.');
@@ -55,9 +62,13 @@ async function embedLocal(
 
   const extractor = await getLocalPipeline(provider.model);
   const results: number[][] = [];
+  const inputs =
+    mode === 'query' && /bge-(small|base|large)-en/i.test(provider.model)
+      ? texts.map((text) => BGE_QUERY_INSTRUCTION + text)
+      : texts;
 
-  for (let i = 0; i < texts.length; i += MAX_LOCAL_BATCH) {
-    const batch = texts.slice(i, i + MAX_LOCAL_BATCH);
+  for (let i = 0; i < inputs.length; i += MAX_LOCAL_BATCH) {
+    const batch = inputs.slice(i, i + MAX_LOCAL_BATCH);
     const tensor = await extractor(batch, { pooling: 'mean', normalize: true });
     const vectors = normalizeLocalVectors(tensor.tolist());
 
@@ -84,9 +95,10 @@ export async function embed(
   texts: string[],
   provider: EmbeddingProvider,
   key: string,
+  mode: EmbedMode = 'document',
 ): Promise<number[][]> {
   if (provider.kind === 'local') {
-    return embedLocal(texts, provider);
+    return embedLocal(texts, provider, mode);
   }
 
   const results: number[][] = [];

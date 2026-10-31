@@ -199,14 +199,24 @@ export async function codeKgCheckCommand(ctx: CmdContext): Promise<CmdResult> {
           );
           continue;
         }
-        if (!ids.has(section.public_section_id)) {
+        if (
+          !ids.has(section.public_section_id) &&
+          section.status !== 'orphaned'
+        ) {
           const anchors = isSectionEntry(section)
             ? (section.source_anchors ?? [])
             : [];
+          const deleted =
+            section.status === 'generated' &&
+            !isSectionEntry(section) &&
+            !existsSync(join(ctx.projectRoot, section.file));
           errors.push(
             `Manifest section ${stableId} points to missing section ${section.public_section_id}.` +
               (anchors.length
                 ? ` Restore the heading, or drop the entry by removing its anchors: ${anchors.map((a) => `code-kg anchor ${JSON.stringify(stableId)} --remove ${JSON.stringify(a.node_id)}`).join('; ')}.`
+                : '') +
+              (deleted
+                ? ` ${section.file} was deleted; code-kg update marks it orphaned and stops generating it.`
                 : ''),
           );
         }

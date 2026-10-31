@@ -27,17 +27,20 @@ Expected status should show:
 
 ## Daily Agent Workflow
 
-Use semantic search before broad source search:
+Ask Code-KG before broad source search:
 
 ```bash
-code-kg search "how is memory coverage tested" --backend auto-semantic
+code-kg ask "how is memory coverage tested"
 ```
+
+To list only knowledge sections, use
+`code-kg search "how is memory coverage tested" --backend auto-semantic`.
 
 Open the relevant knowledge section before raw source:
 
 ```bash
 code-kg context apps/api/memory.py
-code-kg section "lat.md/tests/tests#Tests#Test Coverage Links#apps/api/memory.py"
+code-kg section "lat.md/files#Source Files#apps/api/memory.py"
 ```
 
 After code or knowledge changes:
@@ -94,8 +97,11 @@ printf '%s' '{"tool_name":"Grep","tool_input":{"pattern":"memory coverage","path
 The hook suggests:
 
 ```text
-code-kg search "memory coverage" --backend auto-semantic
+code-kg ask "memory coverage"
 ```
+
+`ask` returns matching knowledge sections and fresh source together, so it
+also finds code that no section describes yet.
 
 Reads of `lat.md/` and `.code-kg/` stay silent so agents can inspect the
 knowledge base without loops.
@@ -131,6 +137,28 @@ sections and tests.
 The default local embedding provider is `Xenova/bge-small-en-v1.5` with 384
 dimensions. The first semantic index run may download model files into the
 Transformers cache. After that, search and indexing are local.
+
+To choose a different model:
+
+```bash
+code-kg semantic enable-local --model base
+code-kg semantic enable-local --model Xenova/all-MiniLM-L6-v2 --dimensions 384
+code-kg semantic enable-local --model small
+```
+
+`small` and `base` are known names; any other Hugging Face model id needs
+`--dimensions`. The vector cache records its model, so the next search or
+`code-kg semantic reindex` rebuilds it after a change.
+
+| Model | Download | Dimensions | Index this repo | Held-out recall@5 / MRR |
+| --- | --- | --- | --- | --- |
+| `small` (`Xenova/bge-small-en-v1.5`) | about 130 MB | 384 | 15 s | 0.73 / 0.63 |
+| `base` (`Xenova/bge-base-en-v1.5`) | about 440 MB | 768 | 32 s | 0.53 / 0.43 |
+
+The last two columns come from this repository's knowledge base and
+`tests/retrieval-eval.test.ts`. A larger model was not better here, so measure
+on your own questions before switching: the eval runs with any model via
+`LAT_LOCAL_EMBEDDING_MODEL` and `LAT_LOCAL_EMBEDDING_DIMENSIONS`.
 
 To force a rebuild:
 
