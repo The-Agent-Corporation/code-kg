@@ -18,6 +18,7 @@ These paths looked test-related during local discovery; each test file's card in
 - tests/codekg.test.ts
 - tests/config-corrupt.test.ts
 - tests/curated-files.test.ts
+- tests/embeddings.test.ts
 - tests/enrich.test.ts
 - tests/gaps-inferred.test.ts
 - tests/git-hooks.test.ts
@@ -26,7 +27,6 @@ These paths looked test-related during local discovery; each test file's card in
 - tests/init-version.test.ts
 - tests/input-errors.test.ts
 - tests/lattice.test.ts
-- tests/limits.test.ts
 
 ## Generated Test Specs
 

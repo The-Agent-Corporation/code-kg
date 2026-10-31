@@ -796,11 +796,14 @@ Source file `src/search/db.ts` defines `openDb`, `ensureSchema`, `closeDb`.
 
 ## src/search/embeddings.ts
 
-Source file `src/search/embeddings.ts` defines `MAX_REMOTE_BATCH`, `MAX_LOCAL_BATCH`, `FeatureExtractionPipeline`, and 7 more.
+Source file `src/search/embeddings.ts` defines `MAX_REMOTE_BATCH`, `MAX_LOCAL_BATCH`, `BGE_QUERY_INSTRUCTION`, and 9 more.
 
-- Defines: `MAX_REMOTE_BATCH`, `MAX_LOCAL_BATCH`, `FeatureExtractionPipeline`, `localPipelines`, `getLocalPipeline`, `isNumberArray`, `isNumberMatrix`, `normalizeLocalVectors`, `embedLocal`, `embed`
+- `BGE_QUERY_INSTRUCTION` (const): English bge v1.5 models were trained to embed search queries behind this instruction.
+- `EmbedMode` (type): Queries and the passages they search can be embedded differently.
+- Also defines: `MAX_REMOTE_BATCH`, `MAX_LOCAL_BATCH`, `FeatureExtractionPipeline`, `localPipelines`, `getLocalPipeline`, `isNumberArray`, `isNumberMatrix`, `normalizeLocalVectors`, `embedLocal`, `embed`
+- Tested by: `tests/embeddings.test.ts`
 - Imports: `src/search/provider.ts`
-- Imported by: `src/search/index.ts`, `src/search/search.ts`
+- Imported by: `src/search/index.ts`, `src/search/search.ts`, `tests/embeddings.test.ts`
 
 ## src/search/index.ts
 
@@ -816,9 +819,9 @@ Source file `src/search/index.ts` defines `hashContent`, `sectionContent`, `Inde
 Source file `src/search/provider.ts` defines `RemoteEmbeddingProvider`, `LocalEmbeddingProvider`, `EmbeddingProvider`, and 6 more.
 
 - Defines: `RemoteEmbeddingProvider`, `LocalEmbeddingProvider`, `EmbeddingProvider`, `DEFAULT_LOCAL_EMBEDDING_MODEL`, `DEFAULT_LOCAL_EMBEDDING_DIMENSIONS`, `openai`, `vercel`, `localProvider`, `detectProvider`
-- Tested by: `tests/retrieval-eval.test.ts`, `tests/search.test.ts`
+- Tested by: `tests/embeddings.test.ts`, `tests/retrieval-eval.test.ts`, `tests/search.test.ts`
 - Imports: `src/config.ts`
-- Imported by: `src/cli/init.ts`, `src/cli/search.ts`, `src/codekg/semantic.ts`, `src/search/embeddings.ts`, `src/search/index.ts`, `src/search/search.ts`, and 3 more
+- Imported by: `src/cli/init.ts`, `src/cli/search.ts`, `src/codekg/semantic.ts`, `src/search/embeddings.ts`, `src/search/index.ts`, `src/search/search.ts`, and 4 more
 
 ## src/search/search.ts
 
@@ -1076,6 +1079,14 @@ Test file `tests/curated-files.test.ts` checks `src/codekg/bootstrap.ts`, `src/c
 - Test: hand-written knowledge files › leave ignored files and directories without an index out of the root index
 - Checks: `src/codekg/bootstrap.ts`, `src/codekg/check.ts`, `src/codekg/types.ts`, `src/context.ts`
 - Imports: `src/codekg/bootstrap.ts`, `src/codekg/check.ts`, `src/codekg/types.ts`, `src/context.ts`
+
+## tests/embeddings.test.ts
+
+Test file `tests/embeddings.test.ts` checks `src/search/embeddings.ts`, `src/search/provider.ts`.
+
+- Test: local embeddings › prefix English bge queries with the retrieval instruction, and nothing else
+- Checks: `src/search/embeddings.ts`, `src/search/provider.ts`
+- Imports: `src/search/embeddings.ts`, `src/search/provider.ts`
 
 ## tests/enrich.test.ts
 

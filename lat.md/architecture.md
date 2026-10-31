@@ -28,7 +28,7 @@ No parsed entrypoint files were available for first-hop dependency flow during b
 The initial inventory groups files by broad category so later extraction can focus on high-value paths.
 
 - Code files: 103
-- Test files: 28
+- Test files: 29
 - Documentation files: 78
 - Config files: 2
 - Asset files: 2
@@ -36,14 +36,14 @@ The initial inventory groups files by broad category so later extraction can foc
 
 ## Structural Graph
 
-Code-KG extracted a deterministic structural graph with 1266 nodes, 3129 edges, 4 communities using the multi-language-directory-fallback analysis path.
+Code-KG extracted a deterministic structural graph with 1271 nodes, 3140 edges, 4 communities using the multi-language-directory-fallback analysis path.
 
 ## Communities
 
 Directory-based communities provide the first subsystem map until graph clustering is available.
 
-- src: 75 files, 838 symbols, cohesion 0.83
-- tests: 50 files, 262 symbols, cohesion 0.48
+- src: 75 files, 840 symbols, cohesion 0.83
+- tests: 51 files, 264 symbols, cohesion 0.48
 - templates: 2 files, 27 symbols, cohesion 1
 - scripts: 4 files, 4 symbols, cohesion 0.86
 
@@ -76,8 +76,8 @@ Dependency hotspots are the source files with the most local importers, the shar
 - `src/config.ts`: imported by 11 local files
 - `src/codekg/check.ts`: imported by 10 local files
 - `src/codekg/query.ts`: imported by 10 local files
+- `src/search/provider.ts`: imported by 10 local files
 - `src/codekg/fresh.ts`: imported by 9 local files
-- `src/search/provider.ts`: imported by 9 local files
 - `src/code-refs.ts`: imported by 8 local files
 - `src/codekg/graph.ts`: imported by 8 local files
 - `src/codekg/search.ts`: imported by 7 local files
