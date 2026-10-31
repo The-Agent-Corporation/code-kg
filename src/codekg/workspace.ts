@@ -52,6 +52,7 @@ async function readWorkspace(root: string): Promise<Workspace | null> {
     throw new InputError('Workspace repository names must be unique.');
   return data;
 }
+// @lat: [[lat.md/concepts#Concepts#Workspaces]]
 export async function workspaceCommand(
   ctx: CmdContext,
   action: 'add' | 'list' | 'remove',

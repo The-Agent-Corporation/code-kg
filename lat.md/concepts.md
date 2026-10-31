@@ -11,16 +11,37 @@ Each generated file in `lat.md/` has an entry in `.code-kg/materialization-manif
 - Unchanged since it was generated: overwritten with the new content.
 - Changed by hand: the entry becomes `edited`, the file is left alone, and the new content goes to `.code-kg/cache/merge-proposals/<stable-id>.md`.
 - Already `edited`, `curated` or `suppressed`: kept, with a merge proposal when the generated candidate changed.
-- No longer produced: a `generated` entry becomes `orphaned`.
+- Deleted by hand: the entry becomes `orphaned`, later updates do not recreate the file, and generated indexes stop linking to it. Restoring the file resumes updates, as `edited` if it differs from what was generated. The two index files are always recreated, because `check` requires them.
+- No longer produced, such as a test spec whose last backlink was removed: the entry becomes `orphaned` and the file is kept, still indexed, until someone deletes it.
+- A file that no longer needs its merge proposal, because it is `generated` again or matches the candidate, has the old proposal removed.
 
-Hand-written files such as this one have no manifest entry and are never written; the generated root index lists them. When nothing else changed, the manifest keeps its `generated_at`, so a no-op update leaves it untouched. The implementation map is [[architecture#Architecture#Source File Highlights#src/codekg/bootstrap.ts]].
+Hand-written files such as this one have no manifest entry and are never written; the generated root index lists them. When nothing else changed, the manifest keeps its `generated_at`, so a no-op update leaves it untouched. The implementation map is [[files#Source Files#src/codekg/bootstrap.ts]].
+
+## Reconcile
+
+`code-kg reconcile` brings manifest statuses in line with `lat.md/` without regenerating anything. It finds generated files someone edited or deleted; it previews by default, and `--write` records them.
+
+- [[src/codekg/reconcile.ts#reconcileCommand]] checks each `generated` entry. A missing file becomes `orphaned`, and a file whose sha256 differs from `generated_hash` becomes `edited`, with the new hash in `current_hash`. Entries with other statuses are left alone.
+- It writes only `.code-kg/materialization-manifest.json`. `update` makes the same changes when it next runs, and also writes merge proposals and drops the generated links to deleted files; see [[concepts#Concepts#Merge-Safe Materialization]].
+- The status decides how other commands treat a file. `ask` skips `orphaned` and `suppressed` sections and ranks `edited` and `curated` ones a little higher; drift, `apply-backlinks` and `review-source` skip `orphaned` and `suppressed` sections.
+- `code-kg confidence reconcile` is a different command: it finds confidence annotations removed from markdown; see [[confidence#Confidence Review]].
+
+## File Cards
+
+`lat.md/files.md` has a generated card for every parsed source and test file, so a file can be found by what it does and not only by its name. [[src/codekg/cards.ts#filesFile]] builds it on `bootstrap` and `update`.
+
+- A card opens with the file's leading comment, or a sentence naming its first symbols. It lists the symbols with the first sentence of each doc comment, the CLI and MCP commands whose handlers call into the file, its tests, and its imports and importers. A test file's card lists its test names and the files they check.
+- Commands come from Commander `.command()` chains and MCP `.tool()` and `.registerTool()` calls. A function that more than five commands call is a shared helper and attributes none of them.
+- Cards name symbols instead of giving line numbers, so a card changes only when the file's symbols, docs or relations do.
+- Files under a test directory that nothing imports are fixtures and get no card.
+- `files.md` is merge-safe like the other generated files: a hand edit stops its refresh. Put notes about a file in a hand-written section that links to its card.
 
 ## Drift and Source Review
 
 `code-kg drift` compares the committed manifest with a fresh structural graph. Changed source under a reviewed section, vanished source nodes and stale accepted relationships are warnings.
 
 - Sections can record `source_hashes`, one content hash per covered file. When a file's current hash differs, [[src/codekg/drift.ts#driftCommand]] reports "Source content changed" and names the sections to review.
-- A missing manifest is the only error. Uncovered files and a changed graph are informational, and new relationships between documented files are suggestions.
+- A missing manifest is the only error. Uncovered files, orphaned generated files and a changed graph are informational, and new relationships between documented files are suggestions.
 - `code-kg review-source <stable-id> --write` ([[src/codekg/review-source.ts#reviewSourceCommand]]) is the explicit acknowledgement after reading the source. It records the current hashes and marks the section `curated`, without changing prose or relationship confidence. If an `edit-safe` section's span files changed, it drops those spans, and a section left with no spans or anchors becomes `coverage-only`; see [[concepts#Concepts#Source Anchor Policies]].
 - CI fails a pull request when drift prints any warning. `code-kg update --no-enrich` refreshes the generated knowledge; a curated section that drift names needs a reread and `review-source --write`.
 
@@ -51,21 +72,42 @@ Every graph edge carries a confidence. `EXTRACTED` edges come from static syntax
 - `code-kg gaps` lists files covered only by inferred test edges apart from untested files, and `context`, `changed` and the tests map mark such tests "(inferred)".
 - [[confidence#Confidence Review]] is the queue for uncertain generated relationships.
 
+## Suppression Tombstones
+
+A suppression tombstone hides a graph node or relationship that Code-KG should not report, such as a vendored file or a false edge. Tombstones live in the manifest and survive every update.
+
+- `code-kg suppress node <node-id>`, `suppress relationship <relationship-id>`, `suppress list` and `suppress clear <id>`, or MCP `codekg_suppress`, edit the sorted id lists `suppressed.nodes` and `suppressed.relationships` ([[src/codekg/suppress.ts#suppressCommand]]). Drift prints relationship ids with its suggestions. Materialization copies the lists forward unchanged.
+- [[src/codekg/visibility.ts#visibleGraph]] removes suppressed nodes, every node in a suppressed file, suppressed relationships, and manifest relationships marked `rejected` or `suppressed`. `ask`, `callers`, `callees`, `impact`, `map`, `skeleton`, `grep` and `anchor` read the graph through it.
+- Drift does not warn when a suppressed node disappears, even an anchored one, does not list a suppressed file as uncovered, and does not suggest relationships that are suppressed or touch a suppressed node. `doctor` counts the tombstones.
+- Generated files are built from the full graph, so a suppressed file keeps its card in [[files]].
+
 ## Search Backends
 
 `code-kg search` is lexical by default and works offline. `--backend semantic` uses embeddings, `auto-semantic` uses them when a provider is configured and falls back to lexical otherwise, and `hybrid` runs `ask`.
 
 - Lexical ranking scores each section's id, heading, leading paragraph and the rest of its body, and drops question words such as "how" and "the"; see [[src/codekg/search.ts#rankSectionsLexically]].
-- Semantic search embeds sections with a local model (`Xenova/bge-small-en-v1.5`, enabled by `code-kg semantic enable-local`) or a remote provider keyed by `LAT_LLM_KEY` (OpenAI `sk-…`, Vercel `vck_…`). The vector index is `lat.md/.cache/vectors.db`.
+- Semantic search embeds sections with a local model (`Xenova/bge-small-en-v1.5`, enabled by `code-kg semantic enable-local`) or a remote provider keyed by `LAT_LLM_KEY` (OpenAI `sk-…`, Vercel `vck_…`). The vector index is `lat.md/.cache/vectors.db`; it records the model it was built with and is rebuilt when the model or its dimensions change.
+- `enable-local --model` takes `small`, `base` or a Hugging Face model id with `--dimensions` ([[src/search/provider.ts#resolveLocalEmbeddingModel]]). English bge models embed queries behind their retrieval instruction, and sections without it.
 - With no provider, explicit semantic search returns an error naming the setup command. `auto-semantic` falls back instead, also when semantic search throws, and its `Backend:` line says why; see [[src/codekg/search.ts#codeKgSearchCommand]].
-- `tests/retrieval-eval.test.ts` measures ranking changes with recall@5 and mean reciprocal rank over this repository's questions.
+- `ask` adds a semantic bonus by cosine similarity: 1 for the closest match, falling linearly to 0 at the index's noise floor ([[src/codekg/query.ts#semanticBonus]]). The floor is the closest any of a fixed set of off-topic questions gets ([[src/search/search.ts#noiseFloor]]), measured because similarity scales differ by model. When nothing beats it, no section gets a bonus and the `Backend:` line says so.
+- Queries made only of code names or paths, such as `writeJsonAtomic` or `src/codekg/cache.ts`, are identifier queries ([[src/codekg/search.ts#isIdentifierQuery]]). Embeddings rarely place the defining file near them, so `auto-semantic` searches them lexically and `ask` skips its semantic bonus, and both say so in the `Backend:` line.
+- `tests/retrieval-eval.test.ts` measures ranking changes with recall@5 and mean reciprocal rank over this repository's questions. A held-out set, each answered by a source file, covers features the knowledge base was not written against; it measures `ask` too, and is never used to choose what to document or how to rank. A set of bare identifiers checks that identifier queries keep their lexical answer.
+
+## Workspaces
+
+A workspace lets one `ask` search several local repositories, each with its own Code-KG knowledge base. Repositories are registered explicitly in `.code-kg/workspace.json`; nothing is discovered automatically.
+
+- `code-kg workspace add <directories...>`, `workspace list` and `workspace remove <names...>` manage the registrations ([[src/codekg/workspace.ts#workspaceCommand]]). A repository is named after its directory, with characters other than letters, digits, `_` and `-` replaced by `-`, and stored by its path relative to the project root. Adding a different directory under a name already in use is refused.
+- `code-kg ask --workspace "<question>"` or MCP `codekg_workspace_ask` runs `ask` in each repository and merges the hits by rank, because scores from different repositories are not comparable ([[src/codekg/workspace.ts#askWorkspace]]). Hit ids, paths and titles carry the repository's name. `--in <name>` or `--in <name>/<path>` limits the search to one repository or a path inside it.
+- A repository that fails, for example because its directory is gone, becomes a warning; the command fails only when none succeeds.
+- Each repository keeps its own `lat.md/` and manifest, and `update`, `check` and drift work on one repository at a time; the workspace file is not part of any manifest. The MCP server also starts in a directory that has a workspace file but no `lat.md/`.
 
 ## Agent Guidance and Hooks
 
 `code-kg agents install` adds a managed block to `AGENTS.md` and hooks that steer agents to the knowledge base. `code-kg git-hooks install` adds a pre-commit hook that refreshes it.
 
 - The `AGENTS.md` block sits between `code-kg:agents:start` and `code-kg:agents:end` markers. [[src/codekg/agents.ts#agentsCommand]] refuses a file with anything other than one ordered pair.
-- Codex hooks run `hook-check` before tool calls, which nudges searches and file reads toward `code-kg search` and `code-kg context` ([[src/codekg/agents.ts#hookCheckCommand]]). `agent-context session|prompt|edit|stop` supplies bounded local context ([[src/codekg/agent-context.ts#agentContextCommand]]). The Claude Code plugin registers the same events.
+- Codex hooks run `hook-check` before tool calls, which nudges searches toward `code-kg ask` and file reads toward `code-kg context` ([[src/codekg/agents.ts#hookCheckCommand]]). `agent-context session|prompt|edit|stop` supplies bounded local context ([[src/codekg/agent-context.ts#agentContextCommand]]). The Claude Code plugin registers the same events.
 - Hook commands read their JSON payload from stdin without waiting for the pipe to close. [[src/codekg/stdin.ts#readHookInput]] waits up to 5s for the first byte and 1.5s between chunks, and the CLI prints one stderr line when the payload is missing or truncated.
 - The pre-commit hook runs `code-kg update` with enrichment off and stages the refreshed `lat.md/` and manifest, unless they already had unstaged changes ([[src/codekg/git-hooks.ts#installGitHook]]).
 

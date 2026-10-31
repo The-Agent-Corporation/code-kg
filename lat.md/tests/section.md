@@ -1,43 +1,43 @@
 # Section Tests
 
-This file was generated from existing `@lat` test backlinks so bootstrap output can preserve current test specifications.
+This file was generated from `@lat` backlinks in test code; each section names the test that checks it.
 
 ## formatSectionOutput includes all parts
 
-This generated test specification preserves the existing `@lat` backlink target `tests/section#formatSectionOutput includes all parts`.
+Checked by `tests/cases.test.ts`: getSection › formatSectionOutput includes content and refs.
 
 ## formatSectionOutput renders source ref line ranges
 
-This generated test specification preserves the existing `@lat` backlink target `tests/section#formatSectionOutput renders source ref line ranges`.
+Checked by `tests/cases.test.ts`: getSection › formatSectionOutput renders source ref line ranges.
 
 ## Full id resolves to section
 
-This generated test specification preserves the existing `@lat` backlink target `tests/section#Full id resolves to section`.
+Checked by `tests/cases.test.ts`: getSection › finds section by full id.
 
 ## Nonexistent section returns no-match
 
-This generated test specification preserves the existing `@lat` backlink target `tests/section#Nonexistent section returns no-match`.
+Checked by `tests/cases.test.ts`: getSection › returns no-match for nonexistent section.
 
 ## Section with both outgoing and incoming refs
 
-This generated test specification preserves the existing `@lat` backlink target `tests/section#Section with both outgoing and incoming refs`.
+Checked by `tests/cases.test.ts`: getSection › returns both outgoing and incoming refs.
 
 ## Section with incoming refs only
 
-This generated test specification preserves the existing `@lat` backlink target `tests/section#Section with incoming refs only`.
+Checked by `tests/cases.test.ts`: getSection › returns incoming refs for section referenced by others.
 
 ## Section with no refs or links
 
-This generated test specification preserves the existing `@lat` backlink target `tests/section#Section with no refs or links`.
+Checked by `tests/cases.test.ts`: getSection › returns empty refs for section with no refs or links.
 
 ## Section with outgoing refs only
 
-This generated test specification preserves the existing `@lat` backlink target `tests/section#Section with outgoing refs only`.
+Checked by `tests/cases.test.ts`: getSection › returns outgoing refs for section that links to others.
 
 ## Short id resolves to section
 
-This generated test specification preserves the existing `@lat` backlink target `tests/section#Short id resolves to section`.
+Checked by `tests/cases.test.ts`: getSection › finds section by short id.
 
 ## Source refs include line range
 
-This generated test specification preserves the existing `@lat` backlink target `tests/section#Source refs include line range`.
+Checked by `tests/cases.test.ts`: getSection › TS: outgoingSourceRefs include endLine for function, class, type, interface.
