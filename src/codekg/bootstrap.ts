@@ -42,6 +42,9 @@ const SECTION_HEADINGS: Record<string, string[]> = {
   'tests.tests': ['Tests'],
 };
 
+const ROOT_INDEX = 'lat.md/lat.md';
+const TESTS_INDEX = 'lat.md/tests/tests.md';
+
 const DEFAULT_GITIGNORE_LINES = [
   '.code-kg/cache/',
   '.code-kg/tmp/',
@@ -195,9 +198,15 @@ No parsed entrypoint files were available for first-hop dependency flow during b
     .trimEnd();
 }
 
+/** A closing clause about the file cards, dropped once `files.md` is deleted. */
+function cardsClause(deleted: Set<string>, clause: string): string {
+  return deleted.has('lat.md/files.md') ? '.' : `; ${clause}.`;
+}
+
 function renderDependencyHotspots(
   discovery: DiscoveryResult,
   graph: ProjectGraph,
+  deleted: Set<string>,
 ): string {
   const categories = categoryByPath(discovery);
   const hotspots = [...graphFileNodes(graph).entries()]
@@ -226,7 +235,8 @@ No source files had incoming local imports during bootstrap.
   return [
     '## Dependency Hotspots',
     '',
-    'Dependency hotspots are the source files with the most local importers, the shared modules and integration points; each file card in [[files]] names its importers.',
+    'Dependency hotspots are the source files with the most local importers, the shared modules and integration points' +
+      cardsClause(deleted, 'each file card in [[files]] names its importers'),
     '',
     ...hotspots.map(
       ({ path, importedBy }) =>
@@ -287,9 +297,15 @@ async function curatedRootEntries(root: string): Promise<RootEntry[]> {
   return entries.sort((a, b) => a.stem.localeCompare(b.stem));
 }
 
-function rootIndex(discovery: DiscoveryResult, curated: RootEntry[]): string {
+function rootIndex(
+  discovery: DiscoveryResult,
+  curated: RootEntry[],
+  deleted: Set<string>,
+): string {
   const links = [
-    ...GENERATED_ROOT_ENTRIES.map(([stem, summary]) => ({ stem, summary })),
+    ...GENERATED_ROOT_ENTRIES.filter(
+      ([stem]) => !deleted.has(`lat.md/${stem}.md`),
+    ).map(([stem, summary]) => ({ stem, summary })),
     ...curated,
   ].map(({ stem, summary }) => `- [[${stem}]] - ${summary}`);
   return `# Code-KG Knowledge Base
@@ -307,6 +323,7 @@ The first bootstrap found ${fileCategoryLine(discovery)} files. Treat this as a 
 function architectureFile(
   discovery: DiscoveryResult,
   graph: ProjectGraph,
+  deleted: Set<string>,
 ): string {
   return `# Architecture
 <!-- code-kg:id architecture.overview -->
@@ -367,7 +384,7 @@ ${bulletList(
   'No high-degree nodes were detected during bootstrap.',
 )}
 
-${renderDependencyHotspots(discovery, graph)}
+${renderDependencyHotspots(discovery, graph, deleted)}
 `;
 }
 
@@ -545,16 +562,31 @@ async function codeRefSpecFiles(root: string): Promise<BootstrapFile[]> {
     });
 }
 
-function testsIndexFile(
+/**
+ * Indexes the spec files that will be in `lat.md/tests/`: generated ones the
+ * user has not deleted, and files already there, which `check` requires it to
+ * list, such as orphaned specs.
+ */
+async function testsIndexFile(
+  root: string,
   discovery: DiscoveryResult,
   specFiles: BootstrapFile[],
-): BootstrapFile {
-  const children = specFiles
-    .map((file) => file.path)
-    .filter(
-      (path) =>
-        path.startsWith('lat.md/tests/') && path !== 'lat.md/tests/tests.md',
-    )
+  deleted: Set<string>,
+): Promise<BootstrapFile> {
+  const present = existsSync(join(root, 'lat.md/tests'))
+    ? (await walkEntries(join(root, 'lat.md/tests')))
+        .filter((path) => !path.includes('/') && path.endsWith('.md'))
+        .map((path) => `lat.md/tests/${path}`)
+    : [];
+  const children = [
+    ...new Set([
+      ...specFiles
+        .map((file) => file.path)
+        .filter((path) => !deleted.has(path)),
+      ...present,
+    ]),
+  ]
+    .filter((path) => path.startsWith('lat.md/tests/') && path !== TESTS_INDEX)
     .map((path) => path.replace(/^lat\.md\/tests\//, '').replace(/\.md$/, ''))
     .sort();
   const listing =
@@ -565,7 +597,7 @@ function testsIndexFile(
           .join('\n');
 
   return {
-    path: 'lat.md/tests/tests.md',
+    path: TESTS_INDEX,
     content: `# Tests
 <!-- code-kg:id tests.tests -->
 
@@ -573,7 +605,7 @@ This section records the test layout discovered during bootstrap and indexes gen
 
 ## Test Paths
 
-These paths looked test-related during local discovery; each test file's card in [[files]] lists its tests and the files they check.
+These paths looked test-related during local discovery${cardsClause(deleted, "each test file's card in [[files]] lists its tests and the files they check")}
 
 ${bulletList(discovery.testPaths, 'No test paths were detected during skeleton bootstrap.')}
 
@@ -646,6 +678,38 @@ async function existingManifest(
   const path = join(root, '.code-kg', 'materialization-manifest.json');
   if (!existsSync(path)) return null;
   return JSON.parse(await readFile(path, 'utf-8')) as MaterializationManifest;
+}
+
+/**
+ * Generated files the user deleted. Updates leave them deleted, marked
+ * `orphaned`, and drop the generated links to them. The two indexes are
+ * recreated instead, because `check` requires them.
+ */
+function deletedGeneratedFiles(
+  root: string,
+  manifest: MaterializationManifest | null,
+): Set<string> {
+  return new Set(
+    Object.values(manifest?.sections ?? {})
+      .filter(
+        (section) =>
+          (section.status === 'generated' || section.status === 'orphaned') &&
+          !isSectionEntry(section) &&
+          section.file !== ROOT_INDEX &&
+          section.file !== TESTS_INDEX &&
+          !existsSync(join(root, section.file)),
+      )
+      .map((section) => section.file),
+  );
+}
+
+/** A restored orphaned file is treated as the generated file it was. */
+function restored(
+  section: ManifestSection | undefined,
+): ManifestSection | undefined {
+  return section?.status === 'orphaned'
+    ? { ...section, status: 'generated' }
+    : section;
 }
 
 function stableIdForMarkdownPath(path: string): string {
@@ -755,7 +819,7 @@ async function collectMergeProposals(
     if (!existsSync(target)) continue;
 
     const stableId = stableIdForMarkdownPath(file.path);
-    const currentSection = currentManifest.sections[stableId];
+    const currentSection = restored(currentManifest.sections[stableId]);
     const nextSection = nextManifest.sections[stableId];
     if (!currentSection || !nextSection) continue;
 
@@ -779,15 +843,16 @@ export async function createBootstrapPlan(
   const discovery = await discoverProject(root);
   const graph = await extractProjectGraph(root, discovery);
   const specFiles = await codeRefSpecFiles(root);
+  const deleted = deletedGeneratedFiles(root, await existingManifest(root));
   const files: BootstrapFile[] = [
     {
-      path: 'lat.md/lat.md',
-      content: rootIndex(discovery, await curatedRootEntries(root)),
+      path: ROOT_INDEX,
+      content: rootIndex(discovery, await curatedRootEntries(root), deleted),
       committed: true,
     },
     {
       path: 'lat.md/architecture.md',
-      content: architectureFile(discovery, graph),
+      content: architectureFile(discovery, graph, deleted),
       committed: true,
     },
     {
@@ -805,7 +870,7 @@ export async function createBootstrapPlan(
       content: confidenceFile(),
       committed: true,
     },
-    testsIndexFile(discovery, specFiles),
+    await testsIndexFile(root, discovery, specFiles, deleted),
     ...specFiles,
   ];
   const plan = { root, discovery, graph, files };
@@ -876,17 +941,29 @@ export async function writeBootstrapPlan(
 ): Promise<string[]> {
   const currentManifest = await existingManifest(plan.root);
   const nextManifest = planManifest(plan);
-  if (currentManifest) {
-    nextManifest.relationships = currentManifest.relationships;
-    nextManifest.suppressed = currentManifest.suppressed;
-    for (const [id, section] of Object.entries(currentManifest.sections))
-      if (isSectionEntry(section)) nextManifest.sections[id] ??= section;
-  }
-
+  const deleted = deletedGeneratedFiles(plan.root, currentManifest);
   const written: string[] = [];
   const updated: string[] = [];
   const skipped: string[] = [];
   const mergeProposals: string[] = [];
+  if (currentManifest) {
+    nextManifest.relationships = currentManifest.relationships;
+    nextManifest.suppressed = currentManifest.suppressed;
+    for (const [id, section] of Object.entries(currentManifest.sections)) {
+      if (nextManifest.sections[id]) continue;
+      if (isSectionEntry(section)) nextManifest.sections[id] = section;
+      else if (
+        (section.status === 'generated' || section.status === 'orphaned') &&
+        existsSync(join(plan.root, section.file))
+      ) {
+        // Nothing generates this file any more; it stays until the user deletes it.
+        nextManifest.sections[id] = { ...section, status: 'orphaned' };
+        if (section.status === 'generated')
+          skipped.push(`marked orphaned ${section.file}`);
+      }
+    }
+  }
+
   for (const file of plan.files) {
     if (file.path === '.code-kg/materialization-manifest.json') continue;
     const target = join(plan.root, file.path);
@@ -897,7 +974,7 @@ export async function writeBootstrapPlan(
       }
 
       const stableId = stableIdForMarkdownPath(file.path);
-      const currentSection = currentManifest?.sections[stableId];
+      const currentSection = restored(currentManifest?.sections[stableId]);
       const nextSection = nextManifest.sections[stableId];
       const currentContent = await readFile(target, 'utf-8');
       const currentHash = hash(currentContent);
@@ -961,17 +1038,17 @@ export async function writeBootstrapPlan(
       continue;
     }
 
-    if (file.path.endsWith('.md') && currentManifest) {
-      const stableId = stableIdForMarkdownPath(file.path);
-      const currentSection = currentManifest.sections[stableId];
-      if (currentSection?.status === 'generated') {
-        nextManifest.sections[stableId] = {
-          ...currentSection,
-          status: 'orphaned',
-        };
-        skipped.push(`marked orphaned ${file.path}`);
-        continue;
-      }
+    const stableId = stableIdForMarkdownPath(file.path);
+    const currentSection = currentManifest?.sections[stableId];
+    if (currentSection && deleted.has(file.path)) {
+      nextManifest.sections[stableId] = {
+        ...currentSection,
+        status: 'orphaned',
+      };
+      skipped.push(
+        `${currentSection.status === 'generated' ? 'marked' : 'kept'} orphaned ${file.path}`,
+      );
+      continue;
     }
 
     await mkdir(dirname(target), { recursive: true });

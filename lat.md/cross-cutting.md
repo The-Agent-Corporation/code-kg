@@ -8,8 +8,8 @@ Cross-cutting concerns are seeded from deterministic import relationships and sh
 Use this section for auth, persistence, configuration, background work, observability, and other flows that cross module boundaries.
 
 - tests/codekg.test.ts (file)
-- src/codekg/cli.ts (file)
 - src/codekg/bootstrap.ts (file)
+- src/codekg/cli.ts (file)
 - src/context.ts (file)
 - src/codekg/agents.ts (file)
 - tests/retrieval-eval.test.ts (file)

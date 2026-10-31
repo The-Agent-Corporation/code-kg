@@ -285,12 +285,16 @@ Source file `src/codekg/backlinks.ts` defines `ApplyBacklinksOptions`, `Backlink
 
 ## src/codekg/bootstrap.ts
 
-Source file `src/codekg/bootstrap.ts` defines `MergeProposal`, `SECTION_HEADINGS`, `DEFAULT_GITIGNORE_LINES`, and 46 more.
+Source file `src/codekg/bootstrap.ts` defines `MergeProposal`, `SECTION_HEADINGS`, `ROOT_INDEX`, and 51 more.
 
 - Used by `code-kg init`: Create the initial Code-KG knowledge base
+- `cardsClause` (function): A closing clause about the file cards, dropped once `files.md` is deleted.
 - `curatedRootEntries` (function): Hand-written files and directories at the top of `lat.md/`.
 - `specCheck` (function): The test a `@lat` comment sits on or directly above, as `file`: suite › name.
-- Also defines: `MergeProposal`, `SECTION_HEADINGS`, `DEFAULT_GITIGNORE_LINES`, `SOURCE_IMPORT_LIMIT`, `hash`, `firstHeadingPath`, `bulletList`, `fileCategoryLine`, `graphCountLine`, `categoryByPath`, `graphFileNodes`, `localImports`, `localFileRelations`, `inlineCodeList`, `briefInlineCodeList`, `renderEntryPointFlow`, `renderDependencyHotspots`, `GENERATED_ROOT_ENTRIES`, `RootEntry`, `leadingSentence`, `rootIndex`, `architectureFile`, `crossCuttingFile`, `confidenceFile`, `SpecTree`, `titleCase`, `fileTitle`, `isSectionSpecTarget`, `specStemForTarget`, `specNode`, and 17 more
+- `testsIndexFile` (function): Indexes the spec files that will be in `lat.md/tests/`: generated ones the user has not deleted, and files already there, which `check` requires it to list,…
+- `deletedGeneratedFiles` (function): Generated files the user deleted.
+- `restored` (function): A restored orphaned file is treated as the generated file it was.
+- Also defines: `MergeProposal`, `SECTION_HEADINGS`, `ROOT_INDEX`, `TESTS_INDEX`, `DEFAULT_GITIGNORE_LINES`, `SOURCE_IMPORT_LIMIT`, `hash`, `firstHeadingPath`, `bulletList`, `fileCategoryLine`, `graphCountLine`, `categoryByPath`, `graphFileNodes`, `localImports`, `localFileRelations`, `inlineCodeList`, `briefInlineCodeList`, `renderEntryPointFlow`, `renderDependencyHotspots`, `GENERATED_ROOT_ENTRIES`, `RootEntry`, `leadingSentence`, `rootIndex`, `architectureFile`, `crossCuttingFile`, `confidenceFile`, `SpecTree`, `titleCase`, `fileTitle`, `isSectionSpecTarget`, and 18 more
 - Tested by: `tests/anchor.test.ts`, `tests/backlinks-safety.test.ts`, `tests/cards.test.ts`, `tests/codekg-intelligence.test.ts`, `tests/codekg-messages.test.ts`, `tests/codekg.test.ts`, and 4 more
 - Imports: `src/code-refs.ts`, `src/codekg/anchors.ts`, `src/codekg/cards.ts`, `src/codekg/discovery.ts`, `src/codekg/graph.ts`, `src/codekg/limits.ts`, and 2 more
 - Imported by: `src/codekg/cli.ts`, `src/codekg/update.ts`, `tests/anchor.test.ts`, `tests/backlinks-safety.test.ts`, `tests/cards.test.ts`, `tests/codekg-intelligence.test.ts`, and 6 more
@@ -403,11 +407,11 @@ Source file `src/codekg/doctor.ts` defines `AGENTS_MARKER`, `CODEX_HOOK_COMMAND`
 
 ## src/codekg/drift.ts
 
-Source file `src/codekg/drift.ts` defines `DriftSeverity`, `DriftFinding`, `DriftOptions`, and 19 more.
+Source file `src/codekg/drift.ts` defines `DriftSeverity`, `DriftFinding`, `DriftOptions`, and 20 more.
 
 - Used by `code-kg drift`: Report drift between code and knowledge base
 - Used by `MCP codekg_drift`: Report drift between source code, lat.md sections, and Code-KG manifest state
-- Defines: `DriftSeverity`, `DriftFinding`, `DriftOptions`, `manifestPath`, `readManifest`, `manifestSourceNodeIds`, `manifestGraphHashes`, `findMissingSourceNodes`, `findChangedAnchors`, `findUncoveredFiles`, `relationshipMatchesEdge`, `observedRelationship`, `findStaleRelationships`, `sectionPriority`, `eligibleSectionsForNode`, `graphNodeById`, `isCrossFileRelationship`, `relationshipAlreadyReviewed`, `findSuggestedRelationships`, `formatFindings`, `applySafeManifestUpdates`, `driftCommand`
+- Defines: `DriftSeverity`, `DriftFinding`, `DriftOptions`, `manifestPath`, `readManifest`, `manifestSourceNodeIds`, `manifestGraphHashes`, `findMissingSourceNodes`, `findChangedAnchors`, `findOrphanedFiles`, `findUncoveredFiles`, `relationshipMatchesEdge`, `observedRelationship`, `findStaleRelationships`, `sectionPriority`, `eligibleSectionsForNode`, `graphNodeById`, `isCrossFileRelationship`, `relationshipAlreadyReviewed`, `findSuggestedRelationships`, `formatFindings`, `applySafeManifestUpdates`, `driftCommand`
 - Tested by: `tests/anchor.test.ts`, `tests/backlinks-safety.test.ts`, `tests/codekg-intelligence.test.ts`, `tests/codekg.test.ts`
 - Imports: `src/codekg/anchors.ts`, `src/codekg/graph.ts`, `src/codekg/types.ts`, `src/context.ts`
 - Imported by: `src/codekg/mcp.ts`, `src/codekg/update.ts`, `tests/anchor.test.ts`, `tests/backlinks-safety.test.ts`, `tests/codekg-intelligence.test.ts`, `tests/codekg.test.ts`
@@ -1067,7 +1071,7 @@ Test file `tests/codekg.test.ts` checks `src/codekg/agents.ts`, `src/codekg/anch
 - Test: code-kg bootstrap › falls back to local lexical search for auto-semantic when no embedding provider is configured
 - Test: code-kg bootstrap › selects semantic search for auto-semantic when local embeddings are configured
 - Test: code-kg bootstrap › routes explicit semantic Code-KG search through the embedding-backed backend
-- and 68 more tests
+- and 70 more tests
 - Checks: `src/codekg/agents.ts`, `src/codekg/anchors.ts`, `src/codekg/backlinks.ts`, `src/codekg/bootstrap.ts`, `src/codekg/changed.ts`, `src/codekg/check.ts`, and 19 more
 - Imports: `src/codekg/agents.ts`, `src/codekg/anchors.ts`, `src/codekg/backlinks.ts`, `src/codekg/bootstrap.ts`, `src/codekg/changed.ts`, `src/codekg/check.ts`, and 18 more
 

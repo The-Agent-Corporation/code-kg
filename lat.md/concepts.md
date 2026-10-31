@@ -11,7 +11,8 @@ Each generated file in `lat.md/` has an entry in `.code-kg/materialization-manif
 - Unchanged since it was generated: overwritten with the new content.
 - Changed by hand: the entry becomes `edited`, the file is left alone, and the new content goes to `.code-kg/cache/merge-proposals/<stable-id>.md`.
 - Already `edited`, `curated` or `suppressed`: kept, with a merge proposal when the generated candidate changed.
-- No longer produced: a `generated` entry becomes `orphaned`.
+- Deleted by hand: the entry becomes `orphaned`, later updates do not recreate the file, and generated indexes stop linking to it. Restoring the file resumes updates, as `edited` if it differs from what was generated. The two index files are always recreated, because `check` requires them.
+- No longer produced, such as a test spec whose last backlink was removed: the entry becomes `orphaned` and the file is kept, still indexed, until someone deletes it.
 - A file that no longer needs its merge proposal, because it is `generated` again or matches the candidate, has the old proposal removed.
 
 Hand-written files such as this one have no manifest entry and are never written; the generated root index lists them. When nothing else changed, the manifest keeps its `generated_at`, so a no-op update leaves it untouched. The implementation map is [[files#Source Files#src/codekg/bootstrap.ts]].
@@ -31,7 +32,7 @@ Hand-written files such as this one have no manifest entry and are never written
 `code-kg drift` compares the committed manifest with a fresh structural graph. Changed source under a reviewed section, vanished source nodes and stale accepted relationships are warnings.
 
 - Sections can record `source_hashes`, one content hash per covered file. When a file's current hash differs, [[src/codekg/drift.ts#driftCommand]] reports "Source content changed" and names the sections to review.
-- A missing manifest is the only error. Uncovered files and a changed graph are informational, and new relationships between documented files are suggestions.
+- A missing manifest is the only error. Uncovered files, orphaned generated files and a changed graph are informational, and new relationships between documented files are suggestions.
 - `code-kg review-source <stable-id> --write` ([[src/codekg/review-source.ts#reviewSourceCommand]]) is the explicit acknowledgement after reading the source. It records the current hashes and marks the section `curated`, without changing prose or relationship confidence. If an `edit-safe` section's span files changed, it drops those spans, and a section left with no spans or anchors becomes `coverage-only`; see [[concepts#Concepts#Source Anchor Policies]].
 - CI fails a pull request when drift prints any warning. `code-kg update --no-enrich` refreshes the generated knowledge; a curated section that drift names needs a reread and `review-source --write`.
 

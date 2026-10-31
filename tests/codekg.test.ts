@@ -2287,6 +2287,81 @@ describe('code-kg bootstrap', () => {
     ).toBe(false);
   });
 
+  it('keeps a deleted generated file deleted until it is restored', async () => {
+    const root = await makeProject();
+    await writeBootstrapPlan(await createBootstrapPlan(root));
+    const files = join(root, 'lat.md', 'files.md');
+    const original = await readFile(files, 'utf-8');
+    await unlink(files);
+    expect((await codeKgCheckCommand(ctx(root))).output).toContain(
+      'lat.md/files.md was deleted; code-kg update marks it orphaned',
+    );
+
+    const first = await writeBootstrapPlan(await createBootstrapPlan(root));
+    const second = await writeBootstrapPlan(await createBootstrapPlan(root));
+
+    expect(first).toContain('marked orphaned lat.md/files.md');
+    expect(second).toContain('kept orphaned lat.md/files.md');
+    expect(existsSync(files)).toBe(false);
+    expect((await readManifest(root)).sections.files.status).toBe('orphaned');
+    for (const index of ['lat.md', 'architecture.md', 'tests/tests.md'])
+      expect(
+        await readFile(join(root, 'lat.md', index), 'utf-8'),
+      ).not.toContain('[[files]]');
+    expect((await codeKgCheckCommand(ctx(root))).isError).toBeFalsy();
+    expect((await driftCommand(ctx(root))).output).toContain(
+      'Generated file lat.md/files.md is orphaned: it was deleted',
+    );
+
+    await writeFile(files, original);
+    await writeBootstrapPlan(await createBootstrapPlan(root));
+    expect((await readManifest(root)).sections.files.status).toBe('generated');
+    expect(await readFile(join(root, 'lat.md', 'lat.md'), 'utf-8')).toContain(
+      '[[files]]',
+    );
+
+    await unlink(files);
+    await writeBootstrapPlan(await createBootstrapPlan(root));
+    await writeFile(files, '# Source Files\n\nMy own notes.\n');
+    const edited = await writeBootstrapPlan(await createBootstrapPlan(root));
+    expect(edited).toContain('kept edited lat.md/files.md');
+    expect(edited).toContain(
+      'merge proposal .code-kg/cache/merge-proposals/files.md for files',
+    );
+  });
+
+  it('marks a generated spec file orphaned when nothing generates it any more', async () => {
+    const root = await makeProject();
+    const test = join(root, 'tests', 'auth.test.ts');
+    await writeFile(
+      test,
+      "// @lat: [[auth-flow#Session]]\ndescribe('session', () => {});\n",
+    );
+    await writeBootstrapPlan(await createBootstrapPlan(root));
+    await writeFile(test, "describe('session', () => {});\n");
+
+    const changes = await writeBootstrapPlan(await createBootstrapPlan(root));
+
+    expect(changes).toContain('marked orphaned lat.md/tests/auth-flow.md');
+    expect(existsSync(join(root, 'lat.md', 'tests', 'auth-flow.md'))).toBe(
+      true,
+    );
+    expect((await readManifest(root)).sections['tests.auth-flow'].status).toBe(
+      'orphaned',
+    );
+    expect((await codeKgCheckCommand(ctx(root))).isError).toBeFalsy();
+    expect((await driftCommand(ctx(root))).output).toContain(
+      'Generated file lat.md/tests/auth-flow.md is orphaned: nothing generates it any more',
+    );
+
+    await unlink(join(root, 'lat.md', 'tests', 'auth-flow.md'));
+    await writeBootstrapPlan(await createBootstrapPlan(root));
+    expect(
+      (await readManifest(root)).sections['tests.auth-flow'],
+    ).toBeUndefined();
+    expect((await codeKgCheckCommand(ctx(root))).isError).toBeFalsy();
+  });
+
   it('lists inferred relationships in the confidence review queue', async () => {
     const root = await makeProject();
     await writeBootstrapPlan(await createBootstrapPlan(root));

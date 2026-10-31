@@ -59,6 +59,8 @@ function findMissingSourceNodes(
   const graphNodeIds = new Set(graph.nodes.map((node) => node.id));
   const findings: DriftFinding[] = [];
   for (const [stableId, section] of Object.entries(manifest.sections)) {
+    if (section.status === 'suppressed' || section.status === 'orphaned')
+      continue;
     for (const nodeId of section.source_node_ids) {
       if (manifest.suppressed.nodes.includes(nodeId)) continue;
       if (!graphNodeIds.has(nodeId)) {
@@ -96,6 +98,20 @@ function findChangedAnchors(
       });
   }
   return findings;
+}
+
+function findOrphanedFiles(
+  ctx: CmdContext,
+  manifest: MaterializationManifest,
+): DriftFinding[] {
+  return Object.values(manifest.sections)
+    .filter((section) => section.status === 'orphaned')
+    .map((section) => ({
+      severity: 'INFO' as const,
+      message: existsSync(join(ctx.projectRoot, section.file))
+        ? `Generated file ${section.file} is orphaned: nothing generates it any more, and ask skips it. Delete it if it is no longer needed.`
+        : `Generated file ${section.file} is orphaned: it was deleted, and updates no longer write it. Restore the file to resume updates.`,
+    }));
 }
 
 function findUncoveredFiles(
@@ -289,6 +305,7 @@ export async function driftCommand(
   findings.push(...findChangedAnchors(manifest, graph));
   findings.push(...findStaleRelationships(manifest, graph));
   findings.push(...findSuggestedRelationships(manifest, graph));
+  findings.push(...findOrphanedFiles(ctx, manifest));
   const changedSources = new Map<string, string[]>();
   for (const section of Object.values(manifest.sections)) {
     if (section.status === 'suppressed' || section.status === 'orphaned')
