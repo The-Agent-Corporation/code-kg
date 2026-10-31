@@ -1,9 +1,12 @@
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { extname } from 'node:path';
-import { scanCodeRefs } from '../code-refs.js';
+import { scanCodeRefs, type CodeRef } from '../code-refs.js';
+import { walkEntries } from '../walk.js';
+import { isSectionEntry } from './anchors.js';
+import { filesFile, testDeclarations, type TestDeclaration } from './cards.js';
 import { discoverProject } from './discovery.js';
 import {
   extractProjectGraph,
@@ -33,20 +36,20 @@ type MergeProposal = {
 const SECTION_HEADINGS: Record<string, string[]> = {
   lat: ['Code-KG Knowledge Base'],
   architecture: ['Architecture'],
+  files: ['Source Files'],
   'cross-cutting': ['Cross-Cutting Concerns'],
   confidence: ['Confidence Review'],
   'tests.tests': ['Tests'],
 };
 
+const ROOT_INDEX = 'lat.md/lat.md';
+const TESTS_INDEX = 'lat.md/tests/tests.md';
+
 const DEFAULT_GITIGNORE_LINES = [
   '.code-kg/cache/',
-  '.code-kg/search.sqlite',
   '.code-kg/tmp/',
   'lat.md/.cache/',
 ];
-const SOURCE_FILE_HIGHLIGHT_LIMIT = 15;
-const TEST_FILE_HIGHLIGHT_LIMIT = 25;
-const SOURCE_SYMBOL_LIMIT = 8;
 const SOURCE_IMPORT_LIMIT = 6;
 
 function hash(content: string): string {
@@ -96,21 +99,6 @@ function graphFileNodes(graph: ProjectGraph): Map<string, EntityNode> {
   );
 }
 
-function fileSymbols(graph: ProjectGraph, path: string): EntityNode[] {
-  return graph.nodes
-    .filter(
-      (node) =>
-        node.source_file === path &&
-        node.kind !== 'file' &&
-        node.kind !== 'module',
-    )
-    .sort((a, b) => {
-      const lineDelta =
-        (a.source_span?.start_line ?? 0) - (b.source_span?.start_line ?? 0);
-      return lineDelta || a.label.localeCompare(b.label);
-    });
-}
-
 function localImports(
   graph: ProjectGraph,
   fileNode: EntityNode,
@@ -124,10 +112,17 @@ function localFileRelations(
   fileNode: EntityNode,
   relation: 'imports' | 'tests',
   direction: 'outgoing' | 'incoming',
+  inferred?: boolean,
 ): string[] {
   const nodes = new Map(graph.nodes.map((node) => [node.id, node]));
   const relationships = graph.edges.filter((edge) => {
     if (edge.relation !== relation) return false;
+    if (
+      inferred !== undefined &&
+      (edge.confidence === 'INFERRED') !== inferred
+    ) {
+      return false;
+    }
     return direction === 'outgoing'
       ? edge.source === fileNode.id
       : edge.target === fileNode.id;
@@ -157,113 +152,6 @@ function briefInlineCodeList(items: string[]): string {
   return remaining > 0
     ? `${visible.join(', ')}, and ${remaining} more`
     : visible.join(', ');
-}
-
-function highlightSummary(
-  path: string,
-  category: 'code' | 'test',
-  symbols: EntityNode[],
-): string {
-  const noun = category === 'test' ? 'Test file' : 'Source file';
-  const purpose =
-    category === 'test'
-      ? 'contains tests and validation symbols'
-      : 'contains source symbols';
-  return clampLeadingParagraph(
-    `${noun} \`${path}\` ${purpose}. Key symbols: ${briefInlineCodeList(
-      symbols.map((symbol) => symbol.label),
-    )}.`,
-  );
-}
-
-function renderFileHighlight(
-  graph: ProjectGraph,
-  path: string,
-  category: 'code' | 'test',
-): string[] {
-  const fileNode = graphFileNodes(graph).get(path);
-  const symbols = fileSymbols(graph, path);
-  const imports = fileNode ? localImports(graph, fileNode, 'outgoing') : [];
-  const importedBy = fileNode ? localImports(graph, fileNode, 'incoming') : [];
-  return [
-    `### ${path}`,
-    '',
-    highlightSummary(path, category, symbols),
-    '',
-    `- Symbols: ${inlineCodeList(
-      symbols.map((symbol) => `${symbol.label} (${symbol.kind})`),
-      SOURCE_SYMBOL_LIMIT,
-    )}`,
-    `- Imports: ${inlineCodeList(imports, SOURCE_IMPORT_LIMIT)}`,
-    `- Imported by: ${inlineCodeList(importedBy, SOURCE_IMPORT_LIMIT)}`,
-    '',
-  ];
-}
-
-function sourceHighlightPaths(
-  discovery: DiscoveryResult,
-  graph: ProjectGraph,
-  category: 'code' | 'test',
-): string[] {
-  const categories = categoryByPath(discovery);
-  const fileNodes = graphFileNodes(graph);
-  const paths = new Set<string>();
-  const include = (path: string | undefined): void => {
-    if (!path || !fileNodes.has(path)) return;
-    if (categories.get(path) !== category) return;
-    paths.add(path);
-  };
-
-  if (category === 'code') {
-    for (const path of discovery.entrypoints) include(path);
-  } else {
-    for (const path of discovery.testPaths) include(path);
-  }
-  for (const node of graph.analysis.god_nodes) include(node.source_file);
-  for (const node of graph.analysis.bridges) include(node.source_file);
-  for (const file of [...discovery.files].sort((a, b) =>
-    a.path.localeCompare(b.path),
-  )) {
-    if (file.category === category) include(file.path);
-  }
-
-  const limit =
-    category === 'test'
-      ? TEST_FILE_HIGHLIGHT_LIMIT
-      : SOURCE_FILE_HIGHLIGHT_LIMIT;
-  return [...paths].slice(0, limit);
-}
-
-function renderSourceHighlights(
-  discovery: DiscoveryResult,
-  graph: ProjectGraph,
-  category: 'code' | 'test',
-): string {
-  const paths = sourceHighlightPaths(discovery, graph, category);
-  const title =
-    category === 'test' ? 'Source Test Highlights' : 'Source File Highlights';
-  const fallback =
-    category === 'test'
-      ? 'No parsed test files were available for source-grounded highlights.'
-      : 'No parsed source files were available for source-grounded highlights.';
-  if (paths.length === 0) {
-    return `## ${title}
-
-No parsed ${category === 'test' ? 'test' : 'source'} files were available for source-grounded highlights during bootstrap.
-
-- ${fallback}
-`;
-  }
-
-  return [
-    `## ${title}`,
-    '',
-    'These generated highlights come from deterministic file, symbol, and import extraction so agents can search source-shaped concepts before opening raw files.',
-    '',
-    ...paths.flatMap((path) => renderFileHighlight(graph, path, category)),
-  ]
-    .join('\n')
-    .trimEnd();
 }
 
 function renderEntryPointFlow(
@@ -310,9 +198,15 @@ No parsed entrypoint files were available for first-hop dependency flow during b
     .trimEnd();
 }
 
+/** A closing clause about the file cards, dropped once `files.md` is deleted. */
+function cardsClause(deleted: Set<string>, clause: string): string {
+  return deleted.has('lat.md/files.md') ? '.' : `; ${clause}.`;
+}
+
 function renderDependencyHotspots(
   discovery: DiscoveryResult,
   graph: ProjectGraph,
+  deleted: Set<string>,
 ): string {
   const categories = categoryByPath(discovery);
   const hotspots = [...graphFileNodes(graph).entries()]
@@ -341,74 +235,84 @@ No source files had incoming local imports during bootstrap.
   return [
     '## Dependency Hotspots',
     '',
-    'Dependency hotspots list source files with incoming local imports so agents can find shared modules and integration points quickly.',
+    'Dependency hotspots are the source files with the most local importers, the shared modules and integration points' +
+      cardsClause(deleted, 'each file card in [[files]] names its importers'),
     '',
-    ...hotspots.flatMap(({ path, importedBy }) => [
-      `### ${path}`,
-      '',
-      clampLeadingParagraph(
-        `Source file \`${path}\` is imported by local files including ${briefInlineCodeList(importedBy)}.`,
-      ),
-      '',
-      `- Imported by: ${inlineCodeList(importedBy, SOURCE_IMPORT_LIMIT)}`,
-      '',
-    ]),
-  ]
-    .join('\n')
-    .trimEnd();
+    ...hotspots.map(
+      ({ path, importedBy }) =>
+        `- \`${path}\`: imported by ${importedBy.length} local ${importedBy.length === 1 ? 'file' : 'files'}`,
+    ),
+  ].join('\n');
 }
 
-function renderTestCoverageLinks(graph: ProjectGraph): string {
-  const fileNodes = graphFileNodes(graph);
-  const coverage = [...fileNodes.entries()]
-    .map(([path, node]) => ({
-      path,
-      tests: localFileRelations(graph, node, 'tests', 'incoming'),
-    }))
-    .filter((entry) => entry.tests.length > 0)
-    .sort(
-      (a, b) => b.tests.length - a.tests.length || a.path.localeCompare(b.path),
+const GENERATED_ROOT_ENTRIES: Array<[stem: string, summary: string]> = [
+  ['architecture', 'Repository structure and entry points.'],
+  ['files', 'One card per source and test file.'],
+  ['cross-cutting', 'Shared concerns and likely integration paths.'],
+  ['confidence', 'Review queue for uncertain generated knowledge.'],
+  ['tests', 'Test layout and validation notes.'],
+];
+
+type RootEntry = { stem: string; summary: string };
+
+function leadingSentence(markdown: string): string {
+  const paragraph = markdown
+    .split(/\n\s*\n/)
+    .map((block) =>
+      block
+        .split('\n')
+        .filter((line) => !/^\s*(#|<!--)/.test(line))
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim(),
     )
-    .slice(0, 25);
-
-  if (coverage.length === 0) {
-    return `## Test Coverage Links
-
-No test-to-source import relationships were detected during bootstrap.
-
-- No inferred test coverage links were detected.
-`;
-  }
-
-  return [
-    '## Test Coverage Links',
-    '',
-    'Test coverage links map inferred test relationships from test imports to source files so agents can find validation paths.',
-    '',
-    ...coverage.flatMap(({ path, tests }) => [
-      `### ${path}`,
-      '',
-      clampLeadingParagraph(
-        `Source file \`${path}\` is covered by test imports from ${briefInlineCodeList(tests)}.`,
-      ),
-      '',
-      `- Tests: ${inlineCodeList(tests, SOURCE_IMPORT_LIMIT)}`,
-      '',
-    ]),
-  ]
-    .join('\n')
-    .trimEnd();
+    .find(Boolean);
+  if (!paragraph) return 'Curated knowledge.';
+  return /^.*?[.!?](?=\s|$)/.exec(paragraph)?.[0] ?? paragraph;
 }
 
-function rootIndex(discovery: DiscoveryResult): string {
+/**
+ * Hand-written files and directories at the top of `lat.md/`. The root index
+ * must list them, and listing them here keeps the root generated, so its
+ * snapshot keeps refreshing instead of turning into merge proposals.
+ */
+async function curatedRootEntries(root: string): Promise<RootEntry[]> {
+  const latDir = join(root, 'lat.md');
+  if (!existsSync(latDir)) return [];
+  const generated = new Set(['lat', ...GENERATED_ROOT_ENTRIES.map(([s]) => s)]);
+  // `check` sees lat.md/ through the same walk, so ignored files stay out.
+  const indexes = new Map<string, string>();
+  for (const path of await walkEntries(latDir)) {
+    const [top, child, ...deeper] = path.split('/');
+    if (child === undefined && top.endsWith('.md'))
+      indexes.set(top.slice(0, -3), path);
+    else if (child === `${top}.md` && !deeper.length) indexes.set(top, path);
+  }
+  const entries: RootEntry[] = [];
+  for (const [stem, index] of indexes) {
+    if (generated.has(stem)) continue;
+    const content = await readFile(join(latDir, index), 'utf-8');
+    entries.push({ stem, summary: leadingSentence(content) });
+  }
+  return entries.sort((a, b) => a.stem.localeCompare(b.stem));
+}
+
+function rootIndex(
+  discovery: DiscoveryResult,
+  curated: RootEntry[],
+  deleted: Set<string>,
+): string {
+  const links = [
+    ...GENERATED_ROOT_ENTRIES.filter(
+      ([stem]) => !deleted.has(`lat.md/${stem}.md`),
+    ).map(([stem, summary]) => ({ stem, summary })),
+    ...curated,
+  ].map(({ stem, summary }) => `- [[${stem}]] - ${summary}`);
   return `# Code-KG Knowledge Base
 
 This knowledge base was bootstrapped from local repository discovery and should be curated as the code changes.
 
-- [[architecture]] - Repository structure and entry points.
-- [[cross-cutting]] - Shared concerns and likely integration paths.
-- [[confidence]] - Review queue for uncertain generated knowledge.
-- [[tests]] - Test layout and validation notes.
+${links.join('\n')}
 
 ## Repository Snapshot
 
@@ -419,6 +323,7 @@ The first bootstrap found ${fileCategoryLine(discovery)} files. Treat this as a 
 function architectureFile(
   discovery: DiscoveryResult,
   graph: ProjectGraph,
+  deleted: Set<string>,
 ): string {
   return `# Architecture
 <!-- code-kg:id architecture.overview -->
@@ -479,9 +384,7 @@ ${bulletList(
   'No high-degree nodes were detected during bootstrap.',
 )}
 
-${renderDependencyHotspots(discovery, graph)}
-
-${renderSourceHighlights(discovery, graph, 'code')}
+${renderDependencyHotspots(discovery, graph, deleted)}
 `;
 }
 
@@ -530,7 +433,8 @@ Skeleton bootstrap does not create inferred relationships, so there are no confi
 }
 
 type SpecTree = {
-  targets: string[];
+  /** The tests whose `@lat` comments point at this heading. */
+  checks: string[];
   children: Map<string, SpecTree>;
 };
 
@@ -563,21 +467,25 @@ function specStemForTarget(target: string, sourceFile: string): string | null {
   return sourceFile.startsWith('tests/') ? `tests/${filePart}` : filePart;
 }
 
-function addSpecTarget(
-  root: SpecTree,
-  headings: string[],
-  target: string,
-): void {
-  let current = root;
+function specNode(tree: SpecTree, headings: string[]): SpecTree {
+  let current = tree;
   for (const heading of headings) {
     let child = current.children.get(heading);
     if (!child) {
-      child = { targets: [], children: new Map() };
+      child = { checks: [], children: new Map() };
       current.children.set(heading, child);
     }
     current = child;
   }
-  current.targets.push(target);
+  return current;
+}
+
+/** The test a `@lat` comment sits on or directly above, as `file`: suite › name. */
+function specCheck(ref: CodeRef, tests: TestDeclaration[]): string {
+  const test = tests.find((t) => t.line >= ref.line && t.line <= ref.line + 3);
+  return test
+    ? `\`${ref.file}\`: ${[...test.suites, test.name].join(' › ')}`
+    : `\`${ref.file}\``;
 }
 
 function renderSpecTree(tree: SpecTree, depth: number): string[] {
@@ -587,15 +495,20 @@ function renderSpecTree(tree: SpecTree, depth: number): string[] {
   )) {
     const marker = '#'.repeat(depth);
     lines.push(`${marker} ${heading}`, '');
-    if (child.targets.length > 0) {
-      const target = child.targets.sort()[0];
-      lines.push(
-        `This generated test specification preserves the existing \`@lat\` backlink target \`${target}\`.`,
-        '',
-      );
+    const [first, ...rest] = [...new Set(child.checks)].sort();
+    if (first) {
+      lines.push(clampLeadingParagraph(`Checked by ${first}.`), '');
+      if (rest.length)
+        lines.push(...rest.map((check) => `- Also checked by ${check}`), '');
     } else {
       lines.push(
-        `This generated test group preserves nested \`@lat\` backlink targets under ${heading}.`,
+        clampLeadingParagraph(
+          `Groups ${child.children.size} test ${child.children.size === 1 ? 'specification' : 'specifications'}: ${[
+            ...child.children.keys(),
+          ]
+            .sort()
+            .join('; ')}.`,
+        ),
         '',
       );
     }
@@ -607,6 +520,7 @@ function renderSpecTree(tree: SpecTree, depth: number): string[] {
 async function codeRefSpecFiles(root: string): Promise<BootstrapFile[]> {
   const scan = await scanCodeRefs(root);
   const byStem = new Map<string, SpecTree>();
+  const sources = new Map<string, TestDeclaration[]>();
 
   for (const ref of scan.refs) {
     const stem = specStemForTarget(ref.target, ref.file);
@@ -615,10 +529,18 @@ async function codeRefSpecFiles(root: string): Promise<BootstrapFile[]> {
     if (headingParts.length === 0) continue;
     let tree = byStem.get(stem);
     if (!tree) {
-      tree = { targets: [], children: new Map() };
+      tree = { checks: [], children: new Map() };
       byStem.set(stem, tree);
     }
-    addSpecTarget(tree, headingParts, ref.target);
+    let tests = sources.get(ref.file);
+    if (!tests) {
+      tests = testDeclarations(
+        ref.file,
+        await readFile(join(root, ref.file), 'utf-8').catch(() => ''),
+      );
+      sources.set(ref.file, tests);
+    }
+    specNode(tree, headingParts).checks.push(specCheck(ref, tests));
   }
 
   return [...byStem.entries()]
@@ -628,7 +550,7 @@ async function codeRefSpecFiles(root: string): Promise<BootstrapFile[]> {
       const content = [
         `# ${title}`,
         '',
-        'This file was generated from existing `@lat` test backlinks so bootstrap output can preserve current test specifications.',
+        'This file was generated from `@lat` backlinks in test code; each section names the test that checks it.',
         '',
         ...renderSpecTree(tree, 2),
       ].join('\n');
@@ -640,17 +562,31 @@ async function codeRefSpecFiles(root: string): Promise<BootstrapFile[]> {
     });
 }
 
-function testsIndexFile(
+/**
+ * Indexes the spec files that will be in `lat.md/tests/`: generated ones the
+ * user has not deleted, and files already there, which `check` requires it to
+ * list, such as orphaned specs.
+ */
+async function testsIndexFile(
+  root: string,
   discovery: DiscoveryResult,
-  graph: ProjectGraph,
   specFiles: BootstrapFile[],
-): BootstrapFile {
-  const children = specFiles
-    .map((file) => file.path)
-    .filter(
-      (path) =>
-        path.startsWith('lat.md/tests/') && path !== 'lat.md/tests/tests.md',
-    )
+  deleted: Set<string>,
+): Promise<BootstrapFile> {
+  const present = existsSync(join(root, 'lat.md/tests'))
+    ? (await walkEntries(join(root, 'lat.md/tests')))
+        .filter((path) => !path.includes('/') && path.endsWith('.md'))
+        .map((path) => `lat.md/tests/${path}`)
+    : [];
+  const children = [
+    ...new Set([
+      ...specFiles
+        .map((file) => file.path)
+        .filter((path) => !deleted.has(path)),
+      ...present,
+    ]),
+  ]
+    .filter((path) => path.startsWith('lat.md/tests/') && path !== TESTS_INDEX)
     .map((path) => path.replace(/^lat\.md\/tests\//, '').replace(/\.md$/, ''))
     .sort();
   const listing =
@@ -661,7 +597,7 @@ function testsIndexFile(
           .join('\n');
 
   return {
-    path: 'lat.md/tests/tests.md',
+    path: TESTS_INDEX,
     content: `# Tests
 <!-- code-kg:id tests.tests -->
 
@@ -669,13 +605,9 @@ This section records the test layout discovered during bootstrap and indexes gen
 
 ## Test Paths
 
-These paths looked test-related during local discovery.
+These paths looked test-related during local discovery${cardsClause(deleted, "each test file's card in [[files]] lists its tests and the files they check")}
 
 ${bulletList(discovery.testPaths, 'No test paths were detected during skeleton bootstrap.')}
-
-${renderSourceHighlights(discovery, graph, 'test')}
-
-${renderTestCoverageLinks(graph)}
 
 ## Generated Test Specs
 
@@ -748,6 +680,38 @@ async function existingManifest(
   return JSON.parse(await readFile(path, 'utf-8')) as MaterializationManifest;
 }
 
+/**
+ * Generated files the user deleted. Updates leave them deleted, marked
+ * `orphaned`, and drop the generated links to them. The two indexes are
+ * recreated instead, because `check` requires them.
+ */
+function deletedGeneratedFiles(
+  root: string,
+  manifest: MaterializationManifest | null,
+): Set<string> {
+  return new Set(
+    Object.values(manifest?.sections ?? {})
+      .filter(
+        (section) =>
+          (section.status === 'generated' || section.status === 'orphaned') &&
+          !isSectionEntry(section) &&
+          section.file !== ROOT_INDEX &&
+          section.file !== TESTS_INDEX &&
+          !existsSync(join(root, section.file)),
+      )
+      .map((section) => section.file),
+  );
+}
+
+/** A restored orphaned file is treated as the generated file it was. */
+function restored(
+  section: ManifestSection | undefined,
+): ManifestSection | undefined {
+  return section?.status === 'orphaned'
+    ? { ...section, status: 'generated' }
+    : section;
+}
+
 function stableIdForMarkdownPath(path: string): string {
   return path
     .replace(/^lat\.md\//, '')
@@ -769,6 +733,16 @@ async function writeMergeProposal(
   await mkdir(dirname(target), { recursive: true });
   await writeFile(target, content, 'utf-8');
   return path;
+}
+
+async function clearMergeProposal(
+  root: string,
+  stableId: string,
+): Promise<string[]> {
+  const path = mergeProposalPath(stableId);
+  if (!existsSync(join(root, path))) return [];
+  await rm(join(root, path));
+  return [`removed stale merge proposal ${path} for ${stableId}`];
 }
 
 async function ensureDefaultGitignore(root: string): Promise<boolean> {
@@ -845,7 +819,7 @@ async function collectMergeProposals(
     if (!existsSync(target)) continue;
 
     const stableId = stableIdForMarkdownPath(file.path);
-    const currentSection = currentManifest.sections[stableId];
+    const currentSection = restored(currentManifest.sections[stableId]);
     const nextSection = nextManifest.sections[stableId];
     if (!currentSection || !nextSection) continue;
 
@@ -869,15 +843,21 @@ export async function createBootstrapPlan(
   const discovery = await discoverProject(root);
   const graph = await extractProjectGraph(root, discovery);
   const specFiles = await codeRefSpecFiles(root);
+  const deleted = deletedGeneratedFiles(root, await existingManifest(root));
   const files: BootstrapFile[] = [
     {
-      path: 'lat.md/lat.md',
-      content: rootIndex(discovery),
+      path: ROOT_INDEX,
+      content: rootIndex(discovery, await curatedRootEntries(root), deleted),
       committed: true,
     },
     {
       path: 'lat.md/architecture.md',
-      content: architectureFile(discovery, graph),
+      content: architectureFile(discovery, graph, deleted),
+      committed: true,
+    },
+    {
+      path: 'lat.md/files.md',
+      content: await filesFile(root, discovery, graph),
       committed: true,
     },
     {
@@ -890,7 +870,7 @@ export async function createBootstrapPlan(
       content: confidenceFile(),
       committed: true,
     },
-    testsIndexFile(discovery, graph, specFiles),
+    await testsIndexFile(root, discovery, specFiles, deleted),
     ...specFiles,
   ];
   const plan = { root, discovery, graph, files };
@@ -955,20 +935,35 @@ export async function formatMaterializationPreview(
   return lines.join('\n');
 }
 
+// @lat: [[lat.md/concepts#Concepts#Merge-Safe Materialization]]
 export async function writeBootstrapPlan(
   plan: BootstrapPlan,
 ): Promise<string[]> {
   const currentManifest = await existingManifest(plan.root);
   const nextManifest = planManifest(plan);
-  if (currentManifest) {
-    nextManifest.relationships = currentManifest.relationships;
-    nextManifest.suppressed = currentManifest.suppressed;
-  }
-
+  const deleted = deletedGeneratedFiles(plan.root, currentManifest);
   const written: string[] = [];
   const updated: string[] = [];
   const skipped: string[] = [];
   const mergeProposals: string[] = [];
+  if (currentManifest) {
+    nextManifest.relationships = currentManifest.relationships;
+    nextManifest.suppressed = currentManifest.suppressed;
+    for (const [id, section] of Object.entries(currentManifest.sections)) {
+      if (nextManifest.sections[id]) continue;
+      if (isSectionEntry(section)) nextManifest.sections[id] = section;
+      else if (
+        (section.status === 'generated' || section.status === 'orphaned') &&
+        existsSync(join(plan.root, section.file))
+      ) {
+        // Nothing generates this file any more; it stays until the user deletes it.
+        nextManifest.sections[id] = { ...section, status: 'orphaned' };
+        if (section.status === 'generated')
+          skipped.push(`marked orphaned ${section.file}`);
+      }
+    }
+  }
+
   for (const file of plan.files) {
     if (file.path === '.code-kg/materialization-manifest.json') continue;
     const target = join(plan.root, file.path);
@@ -979,7 +974,7 @@ export async function writeBootstrapPlan(
       }
 
       const stableId = stableIdForMarkdownPath(file.path);
-      const currentSection = currentManifest?.sections[stableId];
+      const currentSection = restored(currentManifest?.sections[stableId]);
       const nextSection = nextManifest.sections[stableId];
       const currentContent = await readFile(target, 'utf-8');
       const currentHash = hash(currentContent);
@@ -1004,6 +999,10 @@ export async function writeBootstrapPlan(
             file.content,
           );
           mergeProposals.push(`merge proposal ${proposalPath} for ${stableId}`);
+        } else {
+          mergeProposals.push(
+            ...(await clearMergeProposal(plan.root, stableId)),
+          );
         }
         nextManifest.sections[stableId] = {
           ...currentSection,
@@ -1029,6 +1028,7 @@ export async function writeBootstrapPlan(
         continue;
       }
 
+      mergeProposals.push(...(await clearMergeProposal(plan.root, stableId)));
       if (currentHash !== nextSection.generated_hash) {
         await writeFile(target, file.content, 'utf-8');
         updated.push(file.path);
@@ -1038,17 +1038,17 @@ export async function writeBootstrapPlan(
       continue;
     }
 
-    if (file.path.endsWith('.md') && currentManifest) {
-      const stableId = stableIdForMarkdownPath(file.path);
-      const currentSection = currentManifest.sections[stableId];
-      if (currentSection?.status === 'generated') {
-        nextManifest.sections[stableId] = {
-          ...currentSection,
-          status: 'orphaned',
-        };
-        skipped.push(`marked orphaned ${file.path}`);
-        continue;
-      }
+    const stableId = stableIdForMarkdownPath(file.path);
+    const currentSection = currentManifest?.sections[stableId];
+    if (currentSection && deleted.has(file.path)) {
+      nextManifest.sections[stableId] = {
+        ...currentSection,
+        status: 'orphaned',
+      };
+      skipped.push(
+        `${currentSection.status === 'generated' ? 'marked' : 'kept'} orphaned ${file.path}`,
+      );
+      continue;
     }
 
     await mkdir(dirname(target), { recursive: true });
@@ -1061,16 +1061,31 @@ export async function writeBootstrapPlan(
     '.code-kg',
     'materialization-manifest.json',
   );
-  await mkdir(dirname(manifestTarget), { recursive: true });
-  await writeFile(
-    manifestTarget,
-    JSON.stringify(nextManifest, null, 2) + '\n',
-    'utf-8',
-  );
-  if (currentManifest) {
-    updated.push('.code-kg/materialization-manifest.json');
+  // Keep the timestamp when nothing else changed, so a no-op update leaves
+  // the committed manifest untouched.
+  const unchanged =
+    currentManifest &&
+    (await readFile(manifestTarget, 'utf-8')) ===
+      JSON.stringify(
+        { ...nextManifest, generated_at: currentManifest.generated_at },
+        null,
+        2,
+      ) +
+        '\n';
+  if (unchanged) {
+    skipped.push('.code-kg/materialization-manifest.json');
   } else {
-    written.push('.code-kg/materialization-manifest.json');
+    await mkdir(dirname(manifestTarget), { recursive: true });
+    await writeFile(
+      manifestTarget,
+      JSON.stringify(nextManifest, null, 2) + '\n',
+      'utf-8',
+    );
+    if (currentManifest) {
+      updated.push('.code-kg/materialization-manifest.json');
+    } else {
+      written.push('.code-kg/materialization-manifest.json');
+    }
   }
 
   if (await ensureDefaultGitignore(plan.root)) {

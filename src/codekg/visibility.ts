@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import { readJson } from './cache.js';
 import type { MaterializationManifest, ProjectGraph } from './types.js';
 
+// @lat: [[lat.md/concepts#Concepts#Suppression Tombstones]]
 export async function visibleGraph(
   root: string,
   graph: ProjectGraph,

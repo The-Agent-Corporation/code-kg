@@ -13,8 +13,9 @@ import { applyBacklinksCommand } from './backlinks.js';
 import { codeKgCheckCommand } from './check.js';
 import { confidenceCommand } from './confidence.js';
 import { driftCommand } from './drift.js';
-import { codeKgSearchCommand } from './search.js';
+import { codeKgSearchCommand, withCodeKgNavHints } from './search.js';
 import { suppressCommand } from './suppress.js';
+import { anchorCommand } from './anchor.js';
 import {
   askCommand,
   mapCommand,
@@ -96,7 +97,9 @@ export function createCodeKgMcpServer(ctx: CmdContext): McpServer {
         .describe('Approximate maximum tokens to return'),
     },
     async ({ query, max_tokens }) =>
-      toMcp(await sectionCommand(ctx, query), { maxTokens: max_tokens }),
+      toMcp(withCodeKgNavHints(ctx, await sectionCommand(ctx, query)), {
+        maxTokens: max_tokens,
+      }),
   );
 
   server.tool(
@@ -226,6 +229,21 @@ export function createCodeKgMcpServer(ctx: CmdContext): McpServer {
       toMcp(await applyBacklinksCommand(ctx, { write: write === true })),
   );
 
+  server.tool(
+    'codekg_anchor',
+    'Add, remove, or list the symbols and files a curated section is anchored to; apply-backlinks inserts backlinks at their current location',
+    {
+      section: z.string().min(1).describe('Section id, e.g. concepts#Search'),
+      action: z.enum(['add', 'remove', 'list']).optional().default('add'),
+      target: z
+        .string()
+        .optional()
+        .describe('<file>#<symbol>, a symbol name, a file path, or a node id'),
+    },
+    async ({ section, action, target }) =>
+      toMcp(await anchorCommand(ctx, section, { action, target })),
+  );
+
   const budget = z.number().int().min(64).max(32000).optional();
   server.tool(
     'codekg_workspace_ask',
@@ -262,13 +280,14 @@ export function createCodeKgMcpServer(ctx: CmdContext): McpServer {
   );
   server.tool(
     'codekg_trace_calls',
-    'Trace callers, callees, references, and transitive impact; inferred edges remain labeled',
+    'Trace callers and references (direction "in", the default) or callees (direction "out"); inferred edges remain labeled. Depth defaults to 1 (direct only, like CLI `callers`/`callees`); pass depth "all" for transitive impact like CLI `impact`.',
     {
       query: z.string().min(1),
       direction: z.enum(['in', 'out']).optional(),
       depth: z
         .union([z.number().int().min(1).max(100), z.literal('all')])
-        .optional(),
+        .optional()
+        .describe('Traversal depth (default 1) or "all"'),
       in: z.string().optional(),
       max_tokens: budget,
     },

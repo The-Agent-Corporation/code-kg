@@ -1,31 +1,31 @@
 # Search Tests
 
-This file was generated from existing `@lat` test backlinks so bootstrap output can preserve current test specifications.
+This file was generated from `@lat` backlinks in test code; each section names the test that checks it.
 
 ## Provider Detection
 
-This generated test specification preserves the existing `@lat` backlink target `search#Provider Detection`.
+Checked by `tests/search.test.ts`: detectProvider.
 
 ## RAG Replay Tests
 
-This generated test group preserves nested `@lat` backlink targets under RAG Replay Tests.
+Groups 5 test specifications: Detects deleted sections when file is removed; Finds auth section for login query; Finds performance section for latency query; Incremental index skips unchanged sections; Indexes all sections.
 
 ### Detects deleted sections when file is removed
 
-This generated test specification preserves the existing `@lat` backlink target `search#RAG Replay Tests#Detects deleted sections when file is removed`.
+Checked by `tests/search.test.ts`: search (rag) › detects deleted sections when file is removed.
 
 ### Finds auth section for login query
 
-This generated test specification preserves the existing `@lat` backlink target `search#RAG Replay Tests#Finds auth section for login query`.
+Checked by `tests/search.test.ts`: search (rag) › finds auth section for login query.
 
 ### Finds performance section for latency query
 
-This generated test specification preserves the existing `@lat` backlink target `search#RAG Replay Tests#Finds performance section for latency query`.
+Checked by `tests/search.test.ts`: search (rag) › finds performance section for latency query.
 
 ### Incremental index skips unchanged sections
 
-This generated test specification preserves the existing `@lat` backlink target `search#RAG Replay Tests#Incremental index skips unchanged sections`.
+Checked by `tests/search.test.ts`: search (rag) › incremental index skips unchanged sections.
 
 ### Indexes all sections
 
-This generated test specification preserves the existing `@lat` backlink target `search#RAG Replay Tests#Indexes all sections`.
+Checked by `tests/search.test.ts`: search (rag) › indexes all sections.

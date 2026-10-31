@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { join, posix, resolve, relative } from 'node:path';
+import { isAbsolute, join, posix, resolve, relative, sep } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { CmdContext, CmdResult } from '../context.js';
@@ -11,6 +11,9 @@ import { readJson } from './cache.js';
 import { sourceHash } from './structural.js';
 import { currentMeanings } from './meaning.js';
 import { visibleGraph } from './visibility.js';
+import { InputError } from './errors.js';
+import { isIdentifierQuery, STOP_WORDS } from './search.js';
+import { anchorChanges, manifestOwner, sectionNodeIds } from './anchors.js';
 import type {
   EntityNode,
   MaterializationManifest,
@@ -42,29 +45,32 @@ export type QueryResult = {
   warnings: string[];
   backend: string;
 };
-const STOP = new Set(
-  'a an and are at be by can do does for from how i in is it of on or the this to what where which who with'.split(
-    ' ',
-  ),
-);
 export function tokenize(text: string): string[] {
   return text
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
     .toLowerCase()
     .split(/[^a-z0-9]+/)
-    .filter((token) => token.length > 1 && !STOP.has(token));
+    .filter((token) => token.length > 1 && !STOP_WORDS.has(token));
+}
+/** Agent tool payloads name files by absolute path; graph nodes use project-relative ones. */
+export function projectQuery(root: string, query: string): string {
+  if (!isAbsolute(query)) return query;
+  const path = relative(resolve(root), query);
+  return path && !path.startsWith('..') && !isAbsolute(path)
+    ? path.split(sep).join('/')
+    : query;
 }
 export function withinScope(path: string, scope?: string): boolean {
   if (!scope || scope === '.') return true;
   const clean = posix.normalize(scope.replace(/\\/g, '/')).replace(/\/$/, '');
   if (clean.startsWith('/') || clean === '..' || clean.startsWith('../')) {
-    throw new Error('Scope must be a project-relative path.');
+    throw new InputError('Scope must be a project-relative path.');
   }
   return path === clean || path.startsWith(clean + '/');
 }
 export function bounded(text: string, maxTokens = 3000): string {
   if (!Number.isInteger(maxTokens) || maxTokens < 64 || maxTokens > 32000)
-    throw new Error('max_tokens must be an integer between 64 and 32000.');
+    throw new InputError('max_tokens must be an integer between 64 and 32000.');
   const max = maxTokens * 4;
   return text.length <= max
     ? text
@@ -87,6 +93,25 @@ export async function currentSource(
     .split('\n')
     .slice(start - 1, end)
     .join('\n');
+}
+
+/**
+ * Knowledge-score bonus per semantic match: 1 for the closest match, falling
+ * linearly with similarity to 0 at the noise floor. When nothing beats the
+ * floor the query has no semantic match, so no section gets a bonus.
+ */
+// @lat: [[lat.md/concepts#Concepts#Search Backends]]
+export function semanticBonus(
+  matches: { section: { id: string }; score: number }[],
+  floor: number,
+): Map<string, number> {
+  const best = Math.max(...matches.map((match) => match.score));
+  const bonus = new Map<string, number>();
+  if (!(best > floor)) return bonus;
+  for (const match of matches)
+    if (match.score > floor)
+      bonus.set(match.section.id, (match.score - floor) / (best - floor));
+  return bonus;
 }
 
 function graphRank(
@@ -136,13 +161,13 @@ export async function ask(
   query: string,
   opts: QueryOptions = {},
 ): Promise<QueryResult> {
-  if (!query.trim()) throw new Error('Provide a search query.');
+  if (!query.trim()) throw new InputError('Provide a search query.');
   withinScope('', opts.in);
   if (
     opts.limit !== undefined &&
     (!Number.isInteger(opts.limit) || opts.limit < 1 || opts.limit > 100)
   )
-    throw new Error('Limit must be between 1 and 100.');
+    throw new InputError('Limit must be between 1 and 100.');
   const graph = await visibleGraph(root, await freshGraph(root));
   const meanings = await currentMeanings(root, graph);
   const manifest = await readJson<MaterializationManifest>(
@@ -225,8 +250,10 @@ export async function ask(
   const sections = flattenSections(
     await loadAllSections(join(root, 'lat.md')).catch(() => []),
   );
-  const semantic = new Map<string, number>();
-  if (opts.semantic !== false) {
+  let semantic = new Map<string, number>();
+  let semanticRan = false;
+  const identifier = isIdentifierQuery(query);
+  if (opts.semantic !== false && !identifier) {
     try {
       const key = getEmbeddingKey();
       if (key && sections.length) {
@@ -235,10 +262,11 @@ export async function ask(
           query,
           key,
           opts.limit ?? 8,
+          undefined,
+          true,
         );
-        found.matches.forEach((match, i) =>
-          semantic.set(match.section.id, 1 / (1 + i)),
-        );
+        semantic = semanticBonus(found.matches, found.noiseFloor ?? -1);
+        semanticRan = true;
       }
     } catch (error) {
       warnings.push(
@@ -248,6 +276,10 @@ export async function ask(
     }
   }
   const knowledgeFiles = new Map<string, string>();
+  const graphNodes = new Map(graph.nodes.map((node) => [node.id, node]));
+  const graphFiles = new Set(
+    graph.nodes.filter((n) => n.kind === 'file').map((n) => n.source_file),
+  );
   for (const section of sections) {
     let body = knowledgeFiles.get(section.filePath);
     if (body === undefined) {
@@ -258,15 +290,18 @@ export async function ask(
       .split('\n')
       .slice(section.startLine - 1, section.endLine)
       .join('\n');
-    const owner = Object.values(manifest?.sections ?? {}).find(
-      (s) => s.file === section.filePath,
-    );
+    const owner = manifestOwner(manifest, section);
     if (owner?.status === 'suppressed' || owner?.status === 'orphaned')
       continue;
+    // A section headed by a source path, such as a file card, is about that file.
     if (
       opts.in &&
-      !withinScope(section.filePath, opts.in) &&
-      !owner?.source_node_ids.some((id) => nodes.some((n) => n.id === id))
+      !(graphFiles.has(section.heading)
+        ? withinScope(section.heading, opts.in)
+        : withinScope(section.filePath, opts.in) ||
+          (owner ? sectionNodeIds(owner) : []).some((id) =>
+            nodes.some((n) => n.id === id),
+          ))
     )
       continue;
     const words = new Set(tokenize(section.heading + ' ' + text));
@@ -276,9 +311,13 @@ export async function ask(
     if (!value) continue;
     const baseline =
       owner?.source_hashes ?? manifest?.sections.architecture?.source_hashes;
-    const stale = Object.entries(baseline ?? {}).some(
-      ([p, h]) => graph.source_hashes?.[p] !== h,
-    );
+    const anchors = owner && anchorChanges(owner, graphNodes);
+    const stale =
+      Object.entries(baseline ?? {}).some(
+        ([p, h]) => graph.source_hashes?.[p] !== h,
+      ) ||
+      !!anchors?.missing.length ||
+      !!anchors?.changed.length;
     hits.push({
       id: section.id,
       kind: 'knowledge',
@@ -329,7 +368,11 @@ export async function ask(
     warnings,
     backend: semantic.size
       ? 'knowledge + semantic + lexical + graph'
-      : 'knowledge + lexical + graph',
+      : semanticRan
+        ? 'knowledge + lexical + graph (no semantic match closer than off-topic text)'
+        : identifier && opts.semantic !== false
+          ? 'knowledge + lexical + graph (identifier query; semantic skipped)'
+          : 'knowledge + lexical + graph',
   };
 }
 
@@ -366,6 +409,7 @@ export async function trace(
   opts: { direction?: 'in' | 'out'; depth?: number; in?: string } = {},
 ) {
   withinScope('', opts.in);
+  query = projectQuery(root, query);
   const graph = await visibleGraph(root, await freshGraph(root));
   const visible = graph.nodes.filter(
     (n) => n.kind !== 'module' && withinScope(n.source_file ?? '', opts.in),
@@ -391,7 +435,7 @@ export async function trace(
   }[] = [];
   const depth = opts.depth ?? 1;
   if ((!Number.isInteger(depth) || depth < 1) && depth !== Infinity)
-    throw new Error('Depth must be a positive integer or all.');
+    throw new InputError('Depth must be a positive integer or all.');
   const incoming = opts.direction !== 'out';
   for (let d = 1; frontier.size && d <= depth; d++) {
     const next = new Set<string>();
@@ -412,7 +456,22 @@ export async function trace(
     }
     frontier = next;
   }
-  return { query, seeds, hits, warnings: graph.analysis.parse_errors };
+  const truncated =
+    frontier.size > 0 &&
+    graph.edges.some((edge) => {
+      if (edge.relation === 'contains') return false;
+      const from = incoming ? edge.target : edge.source;
+      const to = incoming ? edge.source : edge.target;
+      return frontier.has(from) && !visited.has(to) && ids.has(to);
+    });
+  return {
+    query,
+    seeds,
+    hits,
+    depth,
+    truncated,
+    warnings: graph.analysis.parse_errors,
+  };
 }
 export async function traceCommand(
   ctx: CmdContext,
@@ -425,12 +484,21 @@ export async function traceCommand(
   } = {},
 ): Promise<CmdResult> {
   const result = await trace(ctx.projectRoot, query, opts);
+  const moreHint =
+    ctx.mode === 'mcp'
+      ? 'call again with depth: "all" for transitive results'
+      : 'rerun with --depth all for transitive results';
   return {
     output: bounded(
       [
         '# Code-KG ' + (opts.direction === 'out' ? 'Dependencies' : 'Impact'),
         '',
         'Query: ' + query,
+        'Depth: ' +
+          (result.depth === Infinity ? 'all' : result.depth) +
+          (result.truncated
+            ? ' (more results beyond this depth; ' + moreHint + ')'
+            : ''),
         ...result.warnings.map((w) => 'Warning: ' + w),
         ...result.seeds.map(
           (n) => 'Seed: ' + n.label + ' (' + n.source_file + ')',
@@ -523,6 +591,7 @@ export async function skeletonCommand(
     ctx.projectRoot,
     await freshGraph(ctx.projectRoot),
   );
+  path = projectQuery(ctx.projectRoot, path);
   const files = [
     ...new Set(
       graph.nodes.flatMap((n) => (n.source_file ? [n.source_file] : [])),
@@ -567,7 +636,7 @@ export async function grepCommand(
   pattern: string,
   opts: QueryOptions & { regex?: boolean; ignoreCase?: boolean } = {},
 ): Promise<CmdResult> {
-  if (!pattern) throw new Error('Provide a search pattern.');
+  if (!pattern) throw new InputError('Provide a search pattern.');
   withinScope('', opts.in);
   const graph = await visibleGraph(
     ctx.projectRoot,
@@ -618,10 +687,22 @@ export async function grepCommand(
           }
         }
       } catch (error) {
-        if ((error as any).code !== 1)
-          throw new Error(
-            'Regex search requires ripgrep: ' + (error as Error).message,
+        const failure = error as { code?: number | string; stderr?: string };
+        if (failure.code === 1 && !failure.stderr?.trim()) continue;
+        if (failure.code === 'ENOENT')
+          throw new InputError(
+            'Regex search requires ripgrep (rg) on PATH; omit --regex for a literal search.',
           );
+        const detail = (failure.stderr ?? '').trim();
+        if (/regex parse error/i.test(detail))
+          throw new InputError(
+            'Invalid regex: ' +
+              detail.replace(/^rg: regex parse error:\s*/i, ''),
+          );
+        throw new Error(
+          'ripgrep failed' +
+            (detail ? ': ' + detail : ' with exit code ' + failure.code),
+        );
       }
     }
   } else

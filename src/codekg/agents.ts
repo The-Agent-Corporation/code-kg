@@ -1,5 +1,12 @@
 import { constants as fsConstants, existsSync } from 'node:fs';
-import { access, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import {
+  access,
+  mkdir,
+  readFile,
+  rm,
+  rmdir,
+  writeFile,
+} from 'node:fs/promises';
 import { delimiter, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { CmdContext, CmdResult } from '../context.js';
@@ -16,8 +23,7 @@ const SECTION_END = '<!-- code-kg:agents:end -->';
 const CODEX_HOOK_COMMAND = 'code-kg hook-check';
 const CODEX_HOOK_MATCHER =
   'Bash|Grep|Glob|Read|LS|List|read_file|list_directory';
-const GENERIC_SEARCH_COMMAND =
-  'code-kg search "<question>" --backend auto-semantic';
+const GENERIC_SEARCH_COMMAND = 'code-kg ask "<question>"';
 
 type HookCommandSelection = {
   hookCommand: string;
@@ -138,11 +144,10 @@ function managedAgentsSection(fallbackInvocation?: string): string {
   }
   lines.push(
     'Rules:',
-    '- Before broad source reads, grep/glob searches, or answering codebase-structure questions, use `code-kg search "<question>"` or MCP `codekg_search` first.',
-    '- Prefer `code-kg ask "<question>"` or MCP `codekg_ask` for combined knowledge and fresh source context. Use `--in <directory>` to scope a monorepo query.',
+    '- Before broad source reads, grep/glob searches, or answering codebase-structure questions, use `code-kg ask "<question>"` or MCP `codekg_ask` first; it returns knowledge sections and fresh source together. Use `--in <directory>` to scope a monorepo query.',
     '- Before changing a symbol or file, inspect `code-kg impact <symbol-or-file>`; use `callers`, `callees`, `skeleton`, and `map` for targeted exploration.',
     '- Source descriptions are inferred, not accepted knowledge. Verify source evidence and stale-section warnings; refreshing the index never approves or rewrites curated knowledge.',
-    '- For conceptual queries, prefer `code-kg search "<question>" --backend auto-semantic` or `codekg_search` with `backend: "auto-semantic"` so semantic search is used when configured and lexical search is used as a fallback.',
+    '- To list knowledge sections only, use `code-kg search "<question>" --backend auto-semantic` or `codekg_search` with `backend: "auto-semantic"`: semantic search when configured, lexical search for code names and paths or as a fallback.',
     '- Use `code-kg section "<section-id>"` or MCP `codekg_section` to read full sections with outgoing and incoming relationships before opening raw source.',
     '- Treat `lat.md/` as the primary map and raw source as the implementation detail to inspect after the relevant knowledge sections are known.',
     '- After modifying code or knowledge docs, run `code-kg check` and use `code-kg drift` to compare source and the knowledge base.',
@@ -287,7 +292,7 @@ async function installCodexHook(
     : [];
   preToolUse.push({
     matcher: CODEX_HOOK_MATCHER,
-    hooks: [{ type: 'command', command: hookCommand }],
+    hooks: [{ type: 'command', command: hookCommand, timeout: 10 }],
   });
   const next: CodexHooksConfig = {
     ...config,
@@ -360,6 +365,14 @@ async function uninstallCodexHook(projectRoot: string): Promise<string> {
     delete nextHooks.PreToolUse;
   }
   const next: CodexHooksConfig = { ...config, hooks: nextHooks };
+  if (
+    Object.keys(nextHooks).length === 0 &&
+    Object.keys(next).every((key) => key === 'hooks')
+  ) {
+    await rm(hooksPath);
+    await rmdir(join(projectRoot, '.codex')).catch(() => undefined);
+    return 'removed Codex hook';
+  }
   await writeFile(hooksPath, JSON.stringify(next, null, 2) + '\n');
   return 'removed Codex hook';
 }
@@ -421,17 +434,53 @@ async function agentsStatusCommand(ctx: CmdContext): Promise<CmdResult> {
   return { output: lines.join('\n') };
 }
 
+function markerCount(content: string, marker: string): number {
+  return content.split(marker).length - 1;
+}
+
+/** Install and uninstall splice exactly one START…END block. */
+async function malformedAgentsBlock(
+  projectRoot: string,
+): Promise<string | null> {
+  const content = await readText(join(projectRoot, 'AGENTS.md'));
+  if (content === null) return null;
+  const starts = markerCount(content, SECTION_START);
+  const ends = markerCount(content, SECTION_END);
+  if (starts === 0 && ends === 0) return null;
+  if (
+    starts === 1 &&
+    ends === 1 &&
+    content.indexOf(SECTION_START) < content.indexOf(SECTION_END)
+  ) {
+    return null;
+  }
+  const found =
+    starts === 1 && ends === 1
+      ? 'its end marker comes before its start marker'
+      : `it has ${starts} start and ${ends} end marker(s)`;
+  return `AGENTS.md must contain at most one \`${SECTION_START}\` … \`${SECTION_END}\` block, but ${found}; nothing was changed. Fix or remove the Code-KG markers by hand, then re-run.`;
+}
+
+// @lat: [[lat.md/concepts#Concepts#Agent Guidance and Hooks]]
 export async function agentsCommand(
   ctx: CmdContext,
   opts: AgentsOptions,
 ): Promise<CmdResult> {
   if (opts.action === 'status') return agentsStatusCommand(ctx);
 
+  const malformed = await malformedAgentsBlock(ctx.projectRoot);
+  if (malformed) {
+    return {
+      output: ['# Code-KG Agents', '', `- ${malformed}`].join('\n'),
+      isError: true,
+    };
+  }
+
   const changes =
     opts.action === 'install'
       ? await (async () => {
           const hookSelection = await selectHookCommand();
-          return [
+          const installed = [
             await installAgentsMd(
               ctx.projectRoot,
               hookSelection.fallbackInvocation,
@@ -439,6 +488,12 @@ export async function agentsCommand(
             await installCodexHook(ctx.projectRoot, hookSelection.hookCommand),
             await installGitHook(ctx.projectRoot),
           ];
+          if (hookSelection.fallbackInvocation) {
+            installed.push(
+              `warning: \`code-kg\` is not on PATH, so AGENTS.md and .codex/hooks.json use this machine's path (${hookSelection.fallbackInvocation}). Run \`code-kg install-global\` and re-run \`code-kg agents install\` before committing them.`,
+            );
+          }
+          return installed;
         })()
       : [
           await uninstallAgentsMd(ctx.projectRoot),
@@ -718,7 +773,7 @@ function queryFromSearchCommand(command: string): string | undefined {
 
 function suggestedSearchCommand(query: string | undefined): string {
   if (!query?.trim()) return GENERIC_SEARCH_COMMAND;
-  return `code-kg search "${escapeSearchQuery(query.trim())}" --backend auto-semantic`;
+  return `code-kg ask "${escapeSearchQuery(query.trim())}"`;
 }
 
 function hookAdditionalContext(action: HookAction): string {
@@ -731,7 +786,7 @@ function hookAdditionalContext(action: HookAction): string {
   }
 
   const searchCommand = suggestedSearchCommand(action.query);
-  return `Code-KG: this repo has a reviewable knowledge graph. Before broad raw-source search, run \`${searchCommand}\` or MCP \`codekg_search\` with backend \`auto-semantic\`, then use \`code-kg section "<section-id>"\` before opening raw files.`;
+  return `Code-KG: this repo has a reviewable knowledge graph. Before broad raw-source search, run \`${searchCommand}\` or MCP \`codekg_ask\` for matching knowledge sections and fresh source together, then use \`code-kg section "<section-id>"\` to read a full section.`;
 }
 
 function hookNudgeOutput(action: HookAction): string {

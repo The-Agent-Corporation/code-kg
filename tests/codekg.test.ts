@@ -47,10 +47,12 @@ import { doctorCommand } from '../src/codekg/doctor.js';
 import { discoverProject } from '../src/codekg/discovery.js';
 import { installGlobalCommand } from '../src/codekg/global-install.js';
 import { semanticCommand } from '../src/codekg/semantic.js';
+import { closeDb, ensureSchema, openDb } from '../src/search/db.js';
 import { contextCommand } from '../src/codekg/context.js';
 import { gapsCommand } from '../src/codekg/gaps.js';
 import { changedCommand } from '../src/codekg/changed.js';
 import { updateCommand } from '../src/codekg/update.js';
+import { skeletonCommand, traceCommand } from '../src/codekg/query.js';
 import type {
   ManifestRelationship,
   MaterializationManifest,
@@ -284,6 +286,19 @@ describe('code-kg bootstrap', () => {
     const gitignore = await readFile(join(root, '.gitignore'), 'utf-8');
     expect(gitignore).toContain('.code-kg/cache/');
     expect(gitignore).toContain('lat.md/.cache/');
+    expect(gitignore).not.toContain('search.sqlite');
+
+    const manifestFile = join(
+      root,
+      '.code-kg',
+      'materialization-manifest.json',
+    );
+    const firstManifest = await readFile(manifestFile, 'utf-8');
+    const rerun = await writeBootstrapPlan(await createBootstrapPlan(root));
+    expect(rerun).toContain(
+      'kept existing .code-kg/materialization-manifest.json',
+    );
+    expect(await readFile(manifestFile, 'utf-8')).toBe(firstManifest);
 
     const result = await codeKgCheckCommand(ctx(root));
     expect(result.isError).toBeFalsy();
@@ -348,29 +363,20 @@ describe('code-kg bootstrap', () => {
     );
 
     await writeBootstrapPlan(await createBootstrapPlan(root));
-    const architecture = await readFile(
-      join(root, 'lat.md', 'architecture.md'),
-      'utf-8',
-    );
-    const tests = await readFile(
-      join(root, 'lat.md', 'tests', 'tests.md'),
-      'utf-8',
-    );
+    const files = await readFile(join(root, 'lat.md', 'files.md'), 'utf-8');
     const search = await localSearchCommand(
       ctx(root),
       'memory endpoint tests',
       5,
     );
 
-    expect(architecture).toContain('## Source File Highlights');
-    expect(architecture).toContain('### apps/api/memory.py');
-    expect(architecture).toContain('memory_context_endpoint');
-    expect(tests).toContain('## Source Test Highlights');
-    expect(tests).toContain('### tests/test_memory.py');
-    expect(tests).toContain('test_memory_context_endpoint');
+    expect(files).toContain('## apps/api/memory.py');
+    expect(files).toContain('memory_context_endpoint');
+    expect(files).toContain('## tests/test_memory.py');
+    expect(files).toContain('- Test: test_memory_context_endpoint');
     expect(search.isError).toBeFalsy();
     expect(search.output).toContain(
-      'lat.md/tests/tests#Tests#Source Test Highlights#tests/test_memory.py',
+      'lat.md/files#Source Files#tests/test_memory.py',
     );
   });
 
@@ -387,6 +393,13 @@ describe('code-kg bootstrap', () => {
         '',
         '// @lat: [[search#RAG Replay Tests#Indexes all sections]]',
         'export const indexesAllSections = true;',
+        '',
+        "describe('tokens', () => {",
+        '  // @lat: [[auth-flow#Refreshes token]]',
+        "  it('refreshes before expiry', () => {});",
+        '});',
+        '// @lat: [[auth-flow#Session]]',
+        "describe('session', () => {});",
         '',
       ].join('\n'),
     );
@@ -408,9 +421,20 @@ describe('code-kg bootstrap', () => {
 
     expect(changes).toContain('created lat.md/tests/auth-flow.md');
     expect(result.isError).toBeFalsy();
-    expect(authSpecs).toContain('## Rejects expired token');
+    expect(authSpecs).toContain(
+      '## Rejects expired token\n\nChecked by `tests/auth.test.ts`.',
+    );
+    expect(authSpecs).toContain(
+      '## Refreshes token\n\nChecked by `tests/auth.test.ts`: tokens › refreshes before expiry.',
+    );
+    expect(authSpecs).toContain(
+      '## Session\n\nChecked by `tests/auth.test.ts`: session.',
+    );
+    expect(authSpecs).not.toContain('preserves the existing');
     expect(mcpSpecs).toContain('## Lists all tools');
-    expect(searchSpecs).toContain('## RAG Replay Tests');
+    expect(searchSpecs).toContain(
+      '## RAG Replay Tests\n\nGroups 1 test specification: Indexes all sections.',
+    );
     expect(searchSpecs).toContain('### Indexes all sections');
   });
 
@@ -475,7 +499,7 @@ describe('code-kg bootstrap', () => {
 
     expect(result.isError).toBeTruthy();
     expect(result.output).toContain(
-      'Manifest section architecture is edit-safe but has no source_spans.',
+      'Manifest section architecture is edit-safe but has no source_spans or source_anchors.',
     );
   });
 
@@ -568,6 +592,26 @@ describe('code-kg bootstrap', () => {
     expect(result.output).toContain(
       'lat.md/architecture#Architecture#Entry Points',
     );
+  });
+
+  it('matches words below the leading paragraph and ignores question words', async () => {
+    const root = await makeProject();
+    await writeBootstrapPlan(await createBootstrapPlan(root));
+    await writeFile(
+      join(root, 'lat.md', 'notes.md'),
+      '# Notes\n\nShort lead paragraph.\n\n## Rollback\n\nUndo a release.\n\nThe flux capacitor is reset after every rollback.\n',
+    );
+
+    const deep = await localSearchCommand(
+      ctx(root),
+      'what resets the capacitor',
+      5,
+    );
+    const filler = await localSearchCommand(ctx(root), 'what is the', 5);
+
+    expect(deep.output).toContain('lat.md/notes#Notes#Rollback');
+    expect(filler.isError).toBe(true);
+    expect(filler.output).toBe('No sections matched "what is the".');
   });
 
   it('uses local lexical search as the default Code-KG search backend', async () => {
@@ -671,8 +715,9 @@ describe('code-kg bootstrap', () => {
 
       expect(result.isError).toBeTruthy();
       expect(result.output).toContain(
-        'No semantic embedding provider configured',
+        'No semantic embedding provider configured. Run `code-kg semantic enable-local`',
       );
+      expect(result.output).not.toContain('lat init');
     } finally {
       for (const [key, value] of Object.entries(originalEnv)) {
         if (value === undefined) {
@@ -698,12 +743,17 @@ describe('code-kg bootstrap', () => {
     expect(result.output).toContain('installed AGENTS.md guidance');
     expect(result.output).toContain('installed Codex hook');
     expect(agentsMd).toContain('<!-- code-kg:agents:start -->');
-    expect(agentsMd).toContain('Before broad source reads');
-    expect(agentsMd).toContain('code-kg search "<question>"');
+    expect(agentsMd).toContain(
+      'Before broad source reads, grep/glob searches, or answering codebase-structure questions, use `code-kg ask "<question>"` or MCP `codekg_ask` first',
+    );
+    expect(agentsMd).toContain(
+      'To list knowledge sections only, use `code-kg search "<question>" --backend auto-semantic`',
+    );
     expect(hooks.hooks.PreToolUse).toHaveLength(1);
     expect(hooks.hooks.PreToolUse[0].matcher).toContain('Grep');
     expect(hooks.hooks.PreToolUse[0].matcher).toContain('Read');
     expect(hooks.hooks.PreToolUse[0].hooks[0].command).toContain('hook-check');
+    expect(hooks.hooks.PreToolUse[0].hooks[0].timeout).toBe(10);
   });
 
   it('uses code-kg on PATH for installed Codex hooks when available', async () => {
@@ -938,10 +988,13 @@ describe('code-kg bootstrap', () => {
     expect(parsed.hookSpecificOutput.hookEventName).toBe('PreToolUse');
     expect(parsed.hookSpecificOutput.additionalContext).toContain('Code-KG');
     expect(parsed.hookSpecificOutput.additionalContext).toContain(
-      'code-kg search "entry points" --backend auto-semantic',
+      'code-kg ask "entry points"',
+    );
+    expect(parsed.hookSpecificOutput.additionalContext).toContain(
+      'MCP `codekg_ask`',
     );
     expect(parsed.hookSpecificOutput.additionalContext).not.toContain(
-      'code-kg search "<question>"',
+      '"<question>"',
     );
     expect(parsed.hookSpecificOutput.additionalContext).toContain(
       'code-kg section "<section-id>"',
@@ -962,7 +1015,7 @@ describe('code-kg bootstrap', () => {
     };
 
     expect(parsed.hookSpecificOutput.additionalContext).toContain(
-      'code-kg search "user \\"token\\"" --backend auto-semantic',
+      'code-kg ask "user \\"token\\""',
     );
   });
 
@@ -985,10 +1038,10 @@ describe('code-kg bootstrap', () => {
 
     expect(
       JSON.parse(grepResult.output).hookSpecificOutput.additionalContext,
-    ).toContain('code-kg search "memory coverage" --backend auto-semantic');
+    ).toContain('code-kg ask "memory coverage"');
     expect(
       JSON.parse(globResult.output).hookSpecificOutput.additionalContext,
-    ).toContain('code-kg search "**/*.py" --backend auto-semantic');
+    ).toContain('code-kg ask "**/*.py"');
   });
 
   it('nudges structured raw source read payloads toward sections without inventing a query', async () => {
@@ -1008,7 +1061,7 @@ describe('code-kg bootstrap', () => {
     expect(contextText).toContain('src/index.ts');
     expect(contextText).toContain('code-kg context "src/index.ts"');
     expect(contextText).toContain('code-kg section "<section-id>"');
-    expect(contextText).not.toContain('code-kg search "src/index.ts"');
+    expect(contextText).not.toContain('code-kg ask "src/index.ts"');
   });
 
   it('does not nudge structured reads of Code-KG knowledge files', async () => {
@@ -1049,11 +1102,17 @@ describe('code-kg bootstrap', () => {
         },
       }),
     });
+    const askResult = await hookCheckCommand(ctx(root), {
+      input: JSON.stringify({
+        tool_input: { command: 'code-kg ask "entry points"' },
+      }),
+    });
     const testResult = await hookCheckCommand(ctx(root), {
       input: JSON.stringify({ tool_input: { command: 'pnpm vitest run' } }),
     });
 
     expect(codeKgResult.output).toBe('');
+    expect(askResult.output).toBe('');
     expect(testResult.output).toBe('');
   });
 
@@ -1083,6 +1142,25 @@ describe('code-kg bootstrap', () => {
     expect(result.output).toContain('makeValue');
     expect(result.output).toContain('src/util.ts');
     expect(result.output).toContain('## Knowledge Sections');
+  });
+
+  it('accepts absolute paths inside the project, as agent hooks pass them', async () => {
+    const root = await makeProject();
+    await writeBootstrapPlan(await createBootstrapPlan(root));
+    const file = join(root, 'src', 'util.ts');
+
+    const context = await contextCommand(ctx(root), file);
+    const skeleton = await skeletonCommand(ctx(root), file);
+    const impact = await traceCommand(ctx(root), file);
+    const outside = await contextCommand(ctx(root), join(tmpdir(), 'util.ts'));
+
+    expect(context.isError).toBeFalsy();
+    expect(context.output).toContain('imported by: `src/index.ts`');
+    expect(skeleton.isError).toBeFalsy();
+    expect(skeleton.output).toContain('makeValue');
+    expect(impact.output).toContain('Seed: src/util.ts (src/util.ts)');
+    expect(impact.output).toContain('- src/index.ts | src/index.ts:1');
+    expect(outside.isError).toBe(true);
   });
 
   it('reports useful documentation and coverage gaps', async () => {
@@ -1153,9 +1231,23 @@ describe('code-kg bootstrap', () => {
       expect(result.isError).toBeFalsy();
       expect(result.output).toContain('# Code-KG Update');
       expect(result.output).toContain('materialized knowledge base');
+      expect(result.output).toMatch(/- \d+ files unchanged/);
+      expect(result.output).not.toContain('kept existing');
       expect(result.output).toContain('semantic reindex: skipped');
       expect(result.output).toContain('code-kg check: passed');
       expect(result.output).toContain('No drift findings');
+
+      await writeFile(
+        join(root, 'lat.md', 'notes.md'),
+        '# Notes\n\nHand-written notes.\n\n## Values\n\nSee [[src/util.ts#missingValue]].\n',
+      );
+      const failed = await updateCommand(ctx(root));
+
+      expect(failed.isError).toBe(true);
+      expect(failed.output).toContain('code-kg check: failed');
+      expect(failed.output).toContain(
+        'broken link [[src/util.ts#missingValue]]',
+      );
     } finally {
       for (const [key, value] of Object.entries(originalEnv)) {
         if (value === undefined) {
@@ -1195,7 +1287,7 @@ describe('code-kg bootstrap', () => {
       expect(result.output).toContain('lat.md/: found');
       expect(result.output).toContain('code-kg check: passed');
       expect(result.output).toContain('materialization-manifest.json: found');
-      expect(result.output).toContain('manifest sections: generated=5');
+      expect(result.output).toContain('manifest sections: generated=6');
       expect(result.output).toContain('.code-kg/cache/: ignored');
       expect(result.output).toContain('AGENTS.md guidance: installed');
       expect(result.output).toContain('Codex hook: installed');
@@ -1419,6 +1511,82 @@ describe('code-kg bootstrap', () => {
         'provider: local (Xenova/bge-small-en-v1.5, 384d)',
       );
       expect(status.output).toContain('vector cache: missing');
+    } finally {
+      for (const [key, value] of Object.entries(originalEnv)) {
+        if (value === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = value;
+        }
+      }
+    }
+  });
+
+  it('chooses the local embedding model by name, or by id with its dimensions', async () => {
+    const root = await makeProject();
+    const configRoot = await mkdtemp(join(tmpdir(), 'codekg-config-'));
+    roots.push(configRoot);
+    await writeBootstrapPlan(await createBootstrapPlan(root));
+    const names = [
+      'XDG_CONFIG_HOME',
+      'LAT_EMBEDDING_PROVIDER',
+      'LAT_LOCAL_EMBEDDING_MODEL',
+      'LAT_LOCAL_EMBEDDING_DIMENSIONS',
+    ];
+    const originalEnv = Object.fromEntries(
+      names.map((name) => [name, process.env[name]]),
+    );
+    for (const name of names) delete process.env[name];
+    process.env.XDG_CONFIG_HOME = configRoot;
+    const enable = (model?: string, dimensions?: number) =>
+      semanticCommand(ctx(root), { action: 'enable-local', model, dimensions });
+    const saved = async () =>
+      JSON.parse(
+        await readFile(join(configRoot, 'lat', 'config.json'), 'utf-8'),
+      ) as Record<string, unknown>;
+    const model = async () => {
+      const config = await saved();
+      return [config.local_embedding_model, config.local_embedding_dimensions];
+    };
+
+    try {
+      const db = openDb(join(root, 'lat.md'));
+      await ensureSchema(db, 384, 'local:Xenova/bge-small-en-v1.5');
+      await closeDb(db);
+
+      const base = await enable('base');
+      expect(base.isError).toBeFalsy();
+      expect(base.output).toContain(
+        'provider: local (Xenova/bge-base-en-v1.5, 768d)',
+      );
+      expect(base.output).toContain(
+        'vector cache: present (built with local:Xenova/bge-small-en-v1.5; rebuilt on the next search',
+      );
+      expect(await model()).toStrictEqual(['Xenova/bge-base-en-v1.5', 768]);
+
+      expect((await enable()).isError).toBeFalsy();
+      expect(await model()).toStrictEqual(['Xenova/bge-base-en-v1.5', 768]);
+
+      const unknown = await enable('acme/embedder');
+      expect(unknown.isError).toBe(true);
+      expect(unknown.output).toContain('pass --dimensions');
+      expect((await enable('base', 512)).output).toBe(
+        'Xenova/bge-base-en-v1.5 has 768 dimensions, not 512.',
+      );
+      expect((await enable('acme/embedder', Number('x'))).output).toBe(
+        '--dimensions must be a positive integer.',
+      );
+      expect(await model()).toStrictEqual(['Xenova/bge-base-en-v1.5', 768]);
+
+      expect((await enable('acme/embedder', 512)).isError).toBeFalsy();
+      expect(await model()).toStrictEqual(['acme/embedder', 512]);
+
+      const small = await enable('small');
+      expect(small.output).toContain(
+        'provider: local (Xenova/bge-small-en-v1.5, 384d)',
+      );
+      expect(small.output).not.toContain('rebuilt');
+      expect((await saved()).embedding_provider).toBe('local');
     } finally {
       for (const [key, value] of Object.entries(originalEnv)) {
         if (value === undefined) {
@@ -1727,10 +1895,7 @@ describe('code-kg bootstrap', () => {
       join(root, 'lat.md', 'architecture.md'),
       'utf-8',
     );
-    const tests = await readFile(
-      join(root, 'lat.md', 'tests', 'tests.md'),
-      'utf-8',
-    );
+    const files = await readFile(join(root, 'lat.md', 'files.md'), 'utf-8');
     const search = await localSearchCommand(
       ctx(root),
       'what tests cover memory',
@@ -1740,12 +1905,11 @@ describe('code-kg bootstrap', () => {
     expect(architecture).toContain('## Entry Point Flow');
     expect(architecture).toContain('### apps/api/main.py');
     expect(architecture).toContain('apps/api/memory.py');
-    expect(tests).toContain('## Test Coverage Links');
-    expect(tests).toContain('### apps/api/memory.py');
-    expect(tests).toContain('tests/test_memory.py');
+    expect(files).toContain('## apps/api/memory.py');
+    expect(files).toContain('- Tested by: `tests/test_memory.py`');
     expect(search.isError).toBeFalsy();
     expect(search.output).toContain(
-      'lat.md/tests/tests#Tests#Test Coverage Links#apps/api/memory.py',
+      'lat.md/files#Source Files#apps/api/memory.py',
     );
   });
 
@@ -2109,6 +2273,93 @@ describe('code-kg bootstrap', () => {
     );
     expect(architecture).toContain('Human edited architecture notes.');
     expect(proposal).toContain('- Code files: 3');
+
+    await writeFile(join(root, 'lat.md', 'architecture.md'), proposal);
+    const adopted = await writeBootstrapPlan(await createBootstrapPlan(root));
+
+    expect(adopted).toContain(
+      'removed stale merge proposal .code-kg/cache/merge-proposals/architecture.md for architecture',
+    );
+    expect(
+      existsSync(
+        join(root, '.code-kg', 'cache', 'merge-proposals', 'architecture.md'),
+      ),
+    ).toBe(false);
+  });
+
+  it('keeps a deleted generated file deleted until it is restored', async () => {
+    const root = await makeProject();
+    await writeBootstrapPlan(await createBootstrapPlan(root));
+    const files = join(root, 'lat.md', 'files.md');
+    const original = await readFile(files, 'utf-8');
+    await unlink(files);
+    expect((await codeKgCheckCommand(ctx(root))).output).toContain(
+      'lat.md/files.md was deleted; code-kg update marks it orphaned',
+    );
+
+    const first = await writeBootstrapPlan(await createBootstrapPlan(root));
+    const second = await writeBootstrapPlan(await createBootstrapPlan(root));
+
+    expect(first).toContain('marked orphaned lat.md/files.md');
+    expect(second).toContain('kept orphaned lat.md/files.md');
+    expect(existsSync(files)).toBe(false);
+    expect((await readManifest(root)).sections.files.status).toBe('orphaned');
+    for (const index of ['lat.md', 'architecture.md', 'tests/tests.md'])
+      expect(
+        await readFile(join(root, 'lat.md', index), 'utf-8'),
+      ).not.toContain('[[files]]');
+    expect((await codeKgCheckCommand(ctx(root))).isError).toBeFalsy();
+    expect((await driftCommand(ctx(root))).output).toContain(
+      'Generated file lat.md/files.md is orphaned: it was deleted',
+    );
+
+    await writeFile(files, original);
+    await writeBootstrapPlan(await createBootstrapPlan(root));
+    expect((await readManifest(root)).sections.files.status).toBe('generated');
+    expect(await readFile(join(root, 'lat.md', 'lat.md'), 'utf-8')).toContain(
+      '[[files]]',
+    );
+
+    await unlink(files);
+    await writeBootstrapPlan(await createBootstrapPlan(root));
+    await writeFile(files, '# Source Files\n\nMy own notes.\n');
+    const edited = await writeBootstrapPlan(await createBootstrapPlan(root));
+    expect(edited).toContain('kept edited lat.md/files.md');
+    expect(edited).toContain(
+      'merge proposal .code-kg/cache/merge-proposals/files.md for files',
+    );
+  });
+
+  it('marks a generated spec file orphaned when nothing generates it any more', async () => {
+    const root = await makeProject();
+    const test = join(root, 'tests', 'auth.test.ts');
+    await writeFile(
+      test,
+      "// @lat: [[auth-flow#Session]]\ndescribe('session', () => {});\n",
+    );
+    await writeBootstrapPlan(await createBootstrapPlan(root));
+    await writeFile(test, "describe('session', () => {});\n");
+
+    const changes = await writeBootstrapPlan(await createBootstrapPlan(root));
+
+    expect(changes).toContain('marked orphaned lat.md/tests/auth-flow.md');
+    expect(existsSync(join(root, 'lat.md', 'tests', 'auth-flow.md'))).toBe(
+      true,
+    );
+    expect((await readManifest(root)).sections['tests.auth-flow'].status).toBe(
+      'orphaned',
+    );
+    expect((await codeKgCheckCommand(ctx(root))).isError).toBeFalsy();
+    expect((await driftCommand(ctx(root))).output).toContain(
+      'Generated file lat.md/tests/auth-flow.md is orphaned: nothing generates it any more',
+    );
+
+    await unlink(join(root, 'lat.md', 'tests', 'auth-flow.md'));
+    await writeBootstrapPlan(await createBootstrapPlan(root));
+    expect(
+      (await readManifest(root)).sections['tests.auth-flow'],
+    ).toBeUndefined();
+    expect((await codeKgCheckCommand(ctx(root))).isError).toBeFalsy();
   });
 
   it('lists inferred relationships in the confidence review queue', async () => {

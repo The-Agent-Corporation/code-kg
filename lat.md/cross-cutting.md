@@ -8,14 +8,14 @@ Cross-cutting concerns are seeded from deterministic import relationships and sh
 Use this section for auth, persistence, configuration, background work, observability, and other flows that cross module boundaries.
 
 - tests/codekg.test.ts (file)
-- src/codekg/cli.ts (file)
-- src/codekg/agents.ts (file)
 - src/codekg/bootstrap.ts (file)
+- src/codekg/cli.ts (file)
+- src/context.ts (file)
+- src/codekg/agents.ts (file)
+- tests/retrieval-eval.test.ts (file)
 - tests/codekg-intelligence.test.ts (file)
 - src/lattice.ts (file)
-- src/cli/init.ts (file)
-- src/context.ts (file)
-- tests/cases.test.ts (file)
+- src/codekg/graph.ts (file)
 - src/codekg/types.ts (file)
 
 ## Cross-Community Imports
@@ -23,12 +23,12 @@ Use this section for auth, persistence, configuration, background work, observab
 These imports cross the first-pass directory communities and may indicate integration paths worth documenting.
 
 - scripts/cook-test-rag.ts imports src/config.ts
-- tests/cases.test.ts imports src/cli/check.ts
-- tests/cases.test.ts imports src/cli/refs.ts
-- tests/cases.test.ts imports src/cli/section.ts
-- tests/cases.test.ts imports src/code-refs.ts
-- tests/cases.test.ts imports src/context.ts
-- tests/cases.test.ts imports src/format.ts
-- tests/cases.test.ts imports src/lattice.ts
-- tests/codekg-intelligence.test.ts imports src/codekg/agent-context.ts
-- tests/codekg-intelligence.test.ts imports src/codekg/agents.ts
+- tests/agents-edge-cases.test.ts imports src/codekg/agents.ts
+- tests/agents-edge-cases.test.ts imports src/context.ts
+- tests/anchor.test.ts imports src/codekg/anchor.ts
+- tests/anchor.test.ts imports src/codekg/anchors.ts
+- tests/anchor.test.ts imports src/codekg/backlinks.ts
+- tests/anchor.test.ts imports src/codekg/bootstrap.ts
+- tests/anchor.test.ts imports src/codekg/check.ts
+- tests/anchor.test.ts imports src/codekg/context.ts
+- tests/anchor.test.ts imports src/codekg/drift.ts

@@ -1,8 +1,8 @@
 import type { CmdContext, CmdResult, Styler } from '../context.js';
 import { openDb, ensureSchema, closeDb } from '../search/db.js';
-import { detectProvider } from '../search/provider.js';
+import { detectProvider, providerModelId } from '../search/provider.js';
 import { indexSections, type IndexStats } from '../search/index.js';
-import { searchSections } from '../search/search.js';
+import { noiseFloor, searchSections } from '../search/search.js';
 import {
   loadAllSections,
   flattenSections,
@@ -10,9 +10,16 @@ import {
 } from '../lattice.js';
 import { formatResultList, formatNavHints } from '../format.js';
 
+export type SemanticMatch = SectionMatch & {
+  /** Cosine similarity to the query; see searchSections. */
+  score: number;
+};
+
 export type SearchResult = {
   query: string;
-  matches: SectionMatch[];
+  matches: SemanticMatch[];
+  /** Present when requested; see noiseFloor. */
+  noiseFloor?: number;
 };
 
 export type IndexProgress = {
@@ -35,7 +42,7 @@ async function withDb<T>(
   const db = openDb(latDir);
 
   try {
-    await ensureSchema(db, provider.dimensions);
+    await ensureSchema(db, provider.dimensions, providerModelId(provider));
 
     const countResult = await db.execute('SELECT COUNT(*) as n FROM sections');
     const isEmpty = (countResult.rows[0].n as number) === 0;
@@ -52,7 +59,8 @@ async function withDb<T>(
 
 /**
  * Run a semantic search across lat.md sections.
- * Handles indexing (with optional progress callback). Returns matched sections.
+ * Handles indexing (with optional progress callback). Returns matched sections,
+ * and the index's noise floor when `withNoiseFloor` is set.
  */
 export async function runSearch(
   latDir: string,
@@ -60,23 +68,29 @@ export async function runSearch(
   key: string,
   limit: number,
   progress?: IndexProgress,
+  withNoiseFloor = false,
 ): Promise<SearchResult> {
   return withDb(latDir, key, progress, async (db, provider) => {
     const results = await searchSections(db, query, provider, key, limit);
     if (results.length === 0) {
       return { query, matches: [] };
     }
+    const floor = withNoiseFloor
+      ? { noiseFloor: await noiseFloor(db, provider, key) }
+      : {};
 
     const allSections = await loadAllSections(latDir);
     const flat = flattenSections(allSections);
     const byId = new Map(flat.map((s) => [s.id, s]));
 
-    const matches = results
-      .map((r) => byId.get(r.id))
-      .filter((s): s is NonNullable<typeof s> => !!s)
-      .map((s) => ({ section: s, reason: 'semantic match' }));
+    const matches = results.flatMap((r) => {
+      const section = byId.get(r.id);
+      return section
+        ? [{ section, reason: 'semantic match', score: r.score }]
+        : [];
+    });
 
-    return { query, matches };
+    return { query, matches, ...floor };
   });
 }
 
@@ -117,11 +131,18 @@ export function cliProgress(reindex: boolean, s: Styler): IndexProgress {
   };
 }
 
+/** Wording that differs between the lat and code-kg front ends. */
+export type SearchPresentation = {
+  noProvider?: (ctx: CmdContext) => string;
+  navHints?: (ctx: CmdContext) => string;
+};
+
 export async function searchCommand(
   ctx: CmdContext,
   query: string | undefined,
   opts: { limit: number; reindex?: boolean },
   progress?: IndexProgress,
+  presentation: SearchPresentation = {},
 ): Promise<CmdResult> {
   const { getEmbeddingKey, getConfigPath } = await import('../config.js');
   let key: string | undefined;
@@ -133,14 +154,15 @@ export async function searchCommand(
   if (!key) {
     const s = ctx.styler;
     return {
-      output:
-        s.red('No semantic embedding provider configured.') +
-        ' Set LAT_EMBEDDING_PROVIDER=local for local embeddings, provide a key via LAT_LLM_KEY, LAT_LLM_KEY_FILE, LAT_LLM_KEY_HELPER, or run ' +
-        s.cyan('lat init') +
-        (ctx.mode === 'cli'
-          ? ' to save one in ' + s.dim(getConfigPath())
-          : '') +
-        '.',
+      output: presentation.noProvider
+        ? presentation.noProvider(ctx)
+        : s.red('No semantic embedding provider configured.') +
+          ' Set LAT_EMBEDDING_PROVIDER=local for local embeddings, provide a key via LAT_LLM_KEY, LAT_LLM_KEY_FILE, LAT_LLM_KEY_HELPER, or run ' +
+          s.cyan('lat init') +
+          (ctx.mode === 'cli'
+            ? ' to save one in ' + s.dim(getConfigPath())
+            : '') +
+          '.',
       isError: true,
     };
   }
@@ -159,6 +181,6 @@ export async function searchCommand(
   return {
     output:
       formatResultList(ctx, `Search results for "${query}":`, result.matches) +
-      formatNavHints(ctx),
+      (presentation.navHints ?? formatNavHints)(ctx),
   };
 }

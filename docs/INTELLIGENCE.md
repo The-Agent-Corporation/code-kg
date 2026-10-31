@@ -141,7 +141,8 @@ untouched generated manifest-owned files, skips curated/edited/authored prose, a
 checks for concurrent file changes before writing.
 
 Its 250-character leading paragraph is a search preview. Subsequent paragraphs
-retain detailed knowledge and are included in semantic section indexing. Preview
+retain detailed knowledge and are included in semantic section indexing and
+lexical search scoring. Preview
 enrichment rejects overlong, multi-paragraph, or incomplete responses rather than
 clipping them; the original paragraph and subsequent details are preserved when
 generation fails. A partial failure returns an error even if other previews were
@@ -168,6 +169,11 @@ marks the section curated. It does not modify prose or promote relationship
 confidence. Other section stable IDs require source coverage in their manifest
 nodes, spans, or prior hashes. Missing coverage or extraction errors block review
 acknowledgement. Normal retrieval, hooks, and cache refresh never perform it.
+
+Review acknowledges prose, not line numbers. If an `edit-safe` section's span
+files changed since its spans were recorded, `--write` drops the spans in those
+files so `apply-backlinks --write` cannot insert at stale lines. A section left
+with no spans becomes `coverage-only`.
 
 ## Agent Integration
 

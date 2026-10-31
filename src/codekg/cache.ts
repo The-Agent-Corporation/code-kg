@@ -13,11 +13,16 @@ export async function readJson<T>(path: string): Promise<T | null> {
 export async function writeJsonAtomic(
   path: string,
   value: unknown,
+  indent?: number,
 ): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
   const temporary = path + '.' + process.pid + '.' + randomUUID() + '.tmp';
   try {
-    await writeFile(temporary, JSON.stringify(value) + '\n', 'utf8');
+    await writeFile(
+      temporary,
+      JSON.stringify(value, null, indent) + '\n',
+      'utf8',
+    );
     await rename(temporary, path);
   } finally {
     await rm(temporary, { force: true });

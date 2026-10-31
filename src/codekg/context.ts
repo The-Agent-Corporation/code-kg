@@ -3,7 +3,9 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { CmdContext, CmdResult } from '../context.js';
 import { flattenSections, loadAllSections, type Section } from '../lattice.js';
+import { sectionNodeIds } from './anchors.js';
 import { freshGraph } from './fresh.js';
+import { projectQuery } from './query.js';
 import type {
   EntityNode,
   MaterializationManifest,
@@ -20,14 +22,20 @@ export type ContextInfo = {
   importedBy: string[];
   testedBy: string[];
   tests: string[];
+  /** Entries of `testedBy`/`tests` linked only by INFERRED path references. */
+  inferredTests: string[];
 };
 
-function inlineList(items: string[]): string {
+function inlineList(items: string[], inferred: string[] = []): string {
   if (items.length === 0) return 'none detected';
   return items
     .slice(0, 8)
-    .map((item) => `\`${item}\``)
+    .map((item) => formatTestLabel(item, inferred))
     .join(', ');
+}
+
+export function formatTestLabel(item: string, inferred: string[]): string {
+  return inferred.includes(item) ? `\`${item}\` (inferred)` : `\`${item}\``;
 }
 
 async function readManifest(
@@ -83,11 +91,13 @@ function relationshipLabels(
   nodeIds: Set<string>,
   relation: RelationshipEdge['relation'],
   direction: 'outgoing' | 'incoming',
+  confidence?: (value: RelationshipEdge['confidence']) => boolean,
 ): string[] {
   const nodes = new Map(graph.nodes.map((node) => [node.id, node]));
   return unique(
     graph.edges
       .filter((edge) => edge.relation === relation)
+      .filter((edge) => !confidence || confidence(edge.confidence))
       .filter((edge) =>
         direction === 'outgoing'
           ? nodeIds.has(edge.source)
@@ -109,7 +119,7 @@ function manifestSectionIdsForNodes(
   const ids = new Set<string>();
   if (!manifest) return ids;
   for (const section of Object.values(manifest.sections)) {
-    if (section.source_node_ids.some((id) => nodeIds.has(id))) {
+    if (sectionNodeIds(section).some((id) => nodeIds.has(id))) {
       ids.add(section.public_section_id);
     }
     if (section.source_spans.some((span) => files.has(span.file))) {
@@ -151,6 +161,7 @@ export async function buildContextInfo(
   query: string,
   graphArg?: ProjectGraph,
 ): Promise<ContextInfo | null> {
+  query = projectQuery(ctx.projectRoot, query);
   const graph = graphArg ?? (await freshGraph(ctx.projectRoot));
   const nodes = matchedNodes(graph, query);
   if (nodes.length === 0) return null;
@@ -206,6 +217,18 @@ export async function buildContextInfo(
       'incoming',
     ),
     tests: relationshipLabels(graph, relationshipNodeIds, 'tests', 'outgoing'),
+    inferredTests: (['incoming', 'outgoing'] as const).flatMap((direction) => {
+      const label = (inferred: boolean) =>
+        relationshipLabels(
+          graph,
+          relationshipNodeIds,
+          'tests',
+          direction,
+          (confidence) => (confidence === 'INFERRED') === inferred,
+        );
+      const extracted = new Set(label(false));
+      return label(true).filter((item) => !extracted.has(item));
+    }),
   };
 }
 
@@ -232,8 +255,8 @@ export function formatContextInfo(info: ContextInfo): string {
     '',
     `- imports: ${inlineList(info.imports)}`,
     `- imported by: ${inlineList(info.importedBy)}`,
-    `- tested by: ${inlineList(info.testedBy)}`,
-    `- tests: ${inlineList(info.tests)}`,
+    `- tested by: ${inlineList(info.testedBy, info.inferredTests)}`,
+    `- tests: ${inlineList(info.tests, info.inferredTests)}`,
     '',
     '## Commands',
     '',

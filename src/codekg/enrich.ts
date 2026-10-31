@@ -208,7 +208,15 @@ function sectionSnippet(
 
 export async function enrichCommand(ctx: CmdContext): Promise<CmdResult> {
   const lines = ['# Code-KG Enrich', ''];
-  const key = getLlmKey();
+  let key: string | undefined;
+  try {
+    key = getLlmKey();
+  } catch (error) {
+    return {
+      output: [...lines, `- skipped: ${(error as Error).message}`].join('\n'),
+      isError: true,
+    };
+  }
   if (!key) {
     return {
       output: [
@@ -241,7 +249,7 @@ export async function enrichCommand(ctx: CmdContext): Promise<CmdResult> {
   let failed = 0;
   const maxRewrites = Number(process.env.CODEKG_ENRICH_LIMIT ?? 40);
 
-  // Prefer overview / community prose before per-file highlights.
+  // Prefer overview / community prose before per-file cards.
   const work: {
     file: string;
     original: string;
@@ -280,8 +288,7 @@ export async function enrichCommand(ctx: CmdContext): Promise<CmdResult> {
       if (id.includes('Communities') || id.includes('Structural')) return 1;
       if (id.includes('Repository Snapshot') || id.includes('Cross-Cutting'))
         return 2;
-      if (id.includes('Source File Highlights') || id.includes('Source Test'))
-        return 4;
+      if (id.startsWith('lat.md/files#')) return 4;
       return 3;
     };
     return score(a.section.id) - score(b.section.id);

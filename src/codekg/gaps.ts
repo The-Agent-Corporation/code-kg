@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { CmdContext, CmdResult } from '../context.js';
 import { flattenSections, loadAllSections } from '../lattice.js';
+import { sectionNodeIds } from './anchors.js';
 import { extractProjectGraph } from './graph.js';
 import type { MaterializationManifest } from './types.js';
 
@@ -43,28 +44,40 @@ export async function gapsCommand(ctx: CmdContext): Promise<CmdResult> {
       (entry) =>
         !entry.path.includes('.test.') && !entry.path.startsWith('tests/'),
     );
-  const testedTargets = new Set(
-    graph.edges
-      .filter((edge) => edge.relation === 'tests')
-      .map((edge) => edge.target),
-  );
+  const testTargets = (inferred: boolean) =>
+    new Set(
+      graph.edges
+        .filter(
+          (edge) =>
+            edge.relation === 'tests' &&
+            (edge.confidence === 'INFERRED') === inferred,
+        )
+        .map((edge) => edge.target),
+    );
+  const testedTargets = testTargets(false);
+  const inferredTargets = testTargets(true);
   const anchoredNodeIds = new Set(
-    Object.values(manifest.sections).flatMap(
-      (section) => section.source_node_ids,
-    ),
+    Object.values(manifest.sections).flatMap(sectionNodeIds),
   );
 
   const filesWithoutSections = codeFiles
     .filter((file) => !sectionText.includes(file.path))
     .map((file) => `\`${file.path}\``);
   const filesWithoutTestCoverage = codeFiles
-    .filter((file) => !testedTargets.has(file.id))
+    .filter(
+      (file) => !testedTargets.has(file.id) && !inferredTargets.has(file.id),
+    )
+    .map((file) => `\`${file.path}\``);
+  const filesWithInferredTestsOnly = codeFiles
+    .filter(
+      (file) => !testedTargets.has(file.id) && inferredTargets.has(file.id),
+    )
     .map((file) => `\`${file.path}\``);
   const sectionsWithoutAnchors = Object.values(manifest.sections)
     .filter(
       (section) =>
         section.status !== 'suppressed' &&
-        section.source_node_ids.length === 0 &&
+        sectionNodeIds(section).length === 0 &&
         section.source_spans.length === 0,
     )
     .map((section) => `[[${section.public_section_id}]]`);
@@ -83,6 +96,12 @@ export async function gapsCommand(ctx: CmdContext): Promise<CmdResult> {
       '## Files Without Test Coverage',
       '',
       ...bullet(filesWithoutTestCoverage, 'none detected'),
+      '',
+      '## Files Covered Only By Inferred Test Edges',
+      '',
+      "Tests load these by path (a subprocess call or embedded script, built output, or a path built from the test file's location) rather than importing them. Check that a test really exercises them.",
+      '',
+      ...bullet(filesWithInferredTestsOnly, 'none detected'),
       '',
       '## Sections Without Source Anchors',
       '',

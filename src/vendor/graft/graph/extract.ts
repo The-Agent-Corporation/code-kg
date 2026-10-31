@@ -18,6 +18,7 @@ import PHP from "tree-sitter-php";
 import { basename } from "node:path";
 import { contentHash } from "../util/id.js";
 import { collectBindings, goReceiverVarOf, resolveRecvType, type FileBindings } from "./bindings.js";
+import { clearStart } from "./clear-start.js";
 import type { Kind, NodeV1, Relation } from "./types.js";
 
 export type Language = "typescript" | "tsx" | "python" | "go" | "java" | "kotlin" | "swift" | "php" | "r";
@@ -586,6 +587,7 @@ function walk(node: Parser.SyntaxNode, ctx: WalkCtx, out: NodeV1[], edges: RawEd
       kind: desc.kind,
       path: ctx.rel,
       span: `L${desc.hashNode.startPosition.row + 1}-L${desc.hashNode.endPosition.row + 1}`,
+      clear_start: clearStart(desc.hashNode, ctx.source),
       signature: clean(ctx.source.slice(desc.hashNode.startIndex, desc.headerEnd)),
       exported:
         ctx.lang === "python"
@@ -814,6 +816,7 @@ function walk(node: Parser.SyntaxNode, ctx: WalkCtx, out: NodeV1[], edges: RawEd
         kind: "class",
         path: ctx.rel,
         span: `L${node.startPosition.row + 1}-L${node.endPosition.row + 1}`,
+        clear_start: clearStart(node, ctx.source),
         signature: clean(ctx.source.slice(node.startIndex, body.startIndex)),
         exported: false,
         origin: "ast",

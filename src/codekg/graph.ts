@@ -8,6 +8,12 @@ import {
   sourceHash,
 } from './structural.js';
 import { writeJsonAtomic } from './cache.js';
+import {
+  closingParen,
+  scanSource,
+  stringAt,
+  type SourceScan,
+} from './source-scan.js';
 import type {
   Community,
   DiscoveryResult,
@@ -398,6 +404,155 @@ function analyzeGraph(fragment: GraphFragment): ProjectGraph {
   };
 }
 
+const PATH_MENTION = /[\w@.-]+(?:\/[\w@.-]+)+/g;
+const QUOTED = String.raw`(['"\x60])([^'"\x60\n]+)\1`;
+/** `from 'p'`, `import('p')`, `require('p')`. */
+const LOADER_SPECIFIER = new RegExp(
+  String.raw`(?:\bfrom\s+|\bimport\s*\(\s*|\brequire\s*\(\s*)` + QUOTED,
+  'g',
+);
+/** `new URL('p', import.meta.url)`, resolved from the test file. */
+const URL_SPECIFIER = new RegExp(
+  String.raw`\bnew URL\(\s*${QUOTED}\s*,\s*import\.meta\.url\s*\)`,
+  'g',
+);
+/** `join(__dirname, '..', 'dist', 'cli.js')` built only from literals. */
+const ANCHORED_JOIN =
+  /\b(?:join|resolve)\(\s*(?:import\.meta\.dirname|__dirname)\s*((?:,\s*(['"`])[^'"`\n]*\2\s*)+),?\s*\)/g;
+/** A subprocess call name, also as `promisify(execFile)(...)`. */
+const PROCESS_CALL =
+  /\b(?:spawn|spawnSync|exec|execSync|execFile|execFileSync|fork|execa|execaNode|Worker|Popen|check_output|check_call|subprocess\.run|os\.system)\b[\s)]*\(/g;
+
+/** Argument ranges `[start, end)` of subprocess calls in code, not text. */
+function processCalls(scan: SourceScan): Array<[number, number]> {
+  const calls: Array<[number, number]> = [];
+  for (const match of scan.code.matchAll(PROCESS_CALL)) {
+    if (stringAt(scan, match.index)) continue;
+    const start = match.index + match[0].length - 1;
+    const end = closingParen(scan, start);
+    if (end !== -1) calls.push([start, end]);
+  }
+  return calls;
+}
+
+/** Repo paths a mention can mean: built output maps back to its source. */
+function mentionCandidates(path: string): string[] {
+  const normalized = posix.normalize(path);
+  if (normalized.startsWith('../') || normalized === '..') return [];
+  return [
+    normalized,
+    normalized.replace(/(^|\/)dist\//, '$1'),
+    normalized.replace(/(^|\/)dist\//, '$1src/'),
+  ];
+}
+
+/**
+ * Module paths a test file shows evidence of loading: loader specifiers and
+ * paths built from the test file's own location in its code, and any path or
+ * loader specifier inside a subprocess call's arguments, such as a script run
+ * with `node -e`. Text in comments and in other strings, such as assertion
+ * expectations, fixture contents and mock targets, does not count.
+ */
+function loadedPaths(
+  testPath: string,
+  content: string,
+): Array<{ index: number; candidates: string[] }> {
+  const testDir = posix.dirname(testPath);
+  const scan = scanSource(testPath, content);
+  const { code } = scan;
+  const calls = processCalls(scan);
+  const isEvidence = (index: number) =>
+    !stringAt(scan, index) ||
+    calls.some(([start, end]) => start <= index && index < end);
+  const loads: Array<{ index: number; candidates: string[] }> = [];
+  const relative = (index: number, mention: string, fromRoot: boolean) => {
+    const local = /^\.{1,2}\//.test(mention)
+      ? mentionCandidates(posix.join(testDir, mention))
+      : [];
+    const root = fromRoot
+      ? mentionCandidates(mention.replace(/^(?:\.{1,2}\/)+/, ''))
+      : [];
+    loads.push({ index, candidates: [...local, ...root] });
+  };
+
+  for (const match of code.matchAll(LOADER_SPECIFIER)) {
+    if (isEvidence(match.index)) relative(match.index, match[2], true);
+  }
+  for (const match of code.matchAll(URL_SPECIFIER)) {
+    if (isEvidence(match.index)) relative(match.index, match[2], false);
+  }
+  for (const match of code.matchAll(ANCHORED_JOIN)) {
+    if (!isEvidence(match.index)) continue;
+    const segments = [...match[1].matchAll(/(['"`])([^'"`\n]*)\1/g)].map(
+      (segment) => segment[2],
+    );
+    loads.push({
+      index: match.index,
+      candidates: mentionCandidates(posix.join(testDir, ...segments)),
+    });
+  }
+  for (const [start, end] of calls) {
+    for (const match of code.slice(start, end).matchAll(PATH_MENTION)) {
+      relative(start + match.index, match[0], true);
+    }
+  }
+  return loads;
+}
+
+/**
+ * Tests that load a module by path (a subprocess script, a built `dist/`
+ * file, a dynamic import string) have no static import edge. Such a test gets
+ * an INFERRED `tests` edge to the module, unless an extracted edge already
+ * covers the pair.
+ */
+// @lat: [[lat.md/concepts#Concepts#Relationship Confidence]]
+function inferredTestEdges(
+  paths: string[],
+  categories: Map<string, string>,
+  contents: Map<string, string>,
+  existing: Set<string>,
+): RelationshipEdge[] {
+  const targets = new Map<string, string>();
+  for (const path of paths) {
+    if (categories.get(path) !== 'code') continue;
+    targets.set(path, path);
+    const built = path.replace(/\.(ts|tsx)$/, '.js');
+    if (built !== path && !categories.has(built)) targets.set(built, path);
+  }
+  const edges: RelationshipEdge[] = [];
+  for (const path of paths) {
+    const content = contents.get(path);
+    if (categories.get(path) !== 'test' || !content) continue;
+    for (const { index, candidates } of loadedPaths(path, content)) {
+      const target = candidates
+        .map((candidate) => targets.get(candidate))
+        .find(Boolean);
+      if (!target || target === path) continue;
+      const id = stableId(
+        'edge',
+        fileNode(path).id,
+        'tests',
+        fileNode(target).id,
+      );
+      if (existing.has(id)) continue;
+      const line = content.slice(0, index).split('\n').length;
+      const relationship = edge(
+        fileNode(path).id,
+        fileNode(target).id,
+        'tests',
+        path,
+        line,
+      );
+      relationship.confidence = 'INFERRED';
+      relationship.confidence_score = 0.7;
+      existing.add(relationship.id);
+      edges.push(relationship);
+    }
+  }
+  return edges;
+}
+
+// @lat: [[lat.md/concepts#Concepts#Structural Extraction]]
 export async function extractProjectGraph(
   rootArg = '.',
   discoveryArg?: DiscoveryResult,
@@ -429,14 +584,12 @@ export async function extractProjectGraph(
     file.search_text = content.slice(0, 16000);
     const nodes = [module, file];
     const edges = [edge(module.id, file.id, 'contains', path)];
+    const sourceLines = content.split('\n');
     for (const symbol of extracted?.legacy ?? []) {
       const node = symbolNode(path, symbol);
       node.signature = symbol.signature;
       node.body_hash = sourceHash(
-        content
-          .split('\n')
-          .slice(symbol.startLine - 1, symbol.endLine)
-          .join('\n'),
+        sourceLines.slice(symbol.startLine - 1, symbol.endLine).join('\n'),
       );
       nodes.push(node);
       edges.push(edge(file.id, node.id, 'contains', path, symbol.startLine));
@@ -491,6 +644,7 @@ export async function extractProjectGraph(
     }
     node.body_hash =
       raw.kind === 'file' ? node.body_hash : 'sha256:' + raw.body_hash;
+    if (raw.kind !== 'file') node.clear_start = raw.clear_start;
     node.signature = raw.signature ?? undefined;
     node.search_text = raw.body_text ?? node.search_text;
     node.origin = raw.origin;
@@ -530,6 +684,18 @@ export async function extractProjectGraph(
       );
     }
   }
+  fragment.edges.push(
+    ...inferredTestEdges(
+      codePaths,
+      fileCategories,
+      snapshot.contents,
+      new Set(
+        fragment.edges
+          .filter((entry) => entry.relation === 'tests')
+          .map((entry) => entry.id),
+      ),
+    ),
+  );
   fragment.edges = [
     ...new Map(fragment.edges.map((entry) => [entry.id, entry])).values(),
   ].sort((a, b) => a.id.localeCompare(b.id));

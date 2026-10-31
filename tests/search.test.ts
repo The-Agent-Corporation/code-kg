@@ -6,7 +6,12 @@ import {
   detectProvider,
   type EmbeddingProvider,
 } from '../src/search/provider.js';
-import { openDb, ensureSchema, closeDb } from '../src/search/db.js';
+import {
+  openDb,
+  ensureSchema,
+  closeDb,
+  indexedModel,
+} from '../src/search/db.js';
 import { indexSections } from '../src/search/index.js';
 import { searchSections } from '../src/search/search.js';
 import { startReplayServer, hasReplayData } from './rag-replay-server.js';
@@ -145,6 +150,38 @@ describe('ensureSchema', () => {
         sql: "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'sections'",
       });
       expect(rows.rows[0].sql).toContain('F32_BLOB(384)');
+    } finally {
+      if (db) await closeDb(db);
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it('rebuilds vector tables when the model changes, and adopts an index that predates model tracking', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'lat-schema-model-'));
+    const latDir = join(tmp, 'lat.md');
+    let db: Client | undefined;
+    const sectionCount = async () =>
+      (await db!.execute('SELECT COUNT(*) AS n FROM sections')).rows[0].n;
+    const addSection = () =>
+      db!.execute(
+        "INSERT INTO sections (id, file, heading, content, content_hash, embedding, updated_at) VALUES ('s', 'f', 'h', 'c', 'x', vector('[1, 0]'), 0)",
+      );
+
+    try {
+      db = openDb(latDir);
+      await ensureSchema(db, 2);
+      await addSection();
+
+      await ensureSchema(db, 2, 'local:a');
+      expect(await sectionCount()).toBe(1);
+      expect(await indexedModel(db)).toBe('local:a');
+
+      await ensureSchema(db, 2, 'local:a');
+      expect(await sectionCount()).toBe(1);
+
+      await ensureSchema(db, 2, 'local:b');
+      expect(await sectionCount()).toBe(0);
+      expect(await indexedModel(db)).toBe('local:b');
     } finally {
       if (db) await closeDb(db);
       rmSync(tmp, { recursive: true, force: true });
