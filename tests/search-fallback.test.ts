@@ -6,14 +6,22 @@ import {
   createBootstrapPlan,
   writeBootstrapPlan,
 } from '../src/codekg/bootstrap.js';
-import { codeKgSearchCommand } from '../src/codekg/search.js';
+import { ask } from '../src/codekg/query.js';
+import {
+  codeKgSearchCommand,
+  isIdentifierQuery,
+} from '../src/codekg/search.js';
 import { flattenSections, loadAllSections } from '../src/lattice.js';
 import { plainStyler, type CmdContext } from '../src/context.js';
 
-const semantic = vi.hoisted(() => ({ searchSections: vi.fn() }));
+const semantic = vi.hoisted(() => ({
+  searchSections: vi.fn(),
+  noiseFloor: vi.fn(),
+}));
 
 vi.mock('../src/search/search.js', () => ({
   searchSections: semantic.searchSections,
+  noiseFloor: semantic.noiseFloor,
 }));
 vi.mock('../src/search/index.js', () => ({
   indexSections: async () => ({ added: 0, updated: 0, removed: 0 }),
@@ -50,6 +58,7 @@ beforeEach(async () => {
   vi.stubEnv('XDG_CONFIG_HOME', configRoot);
   vi.stubEnv('LAT_EMBEDDING_PROVIDER', 'local');
   semantic.searchSections.mockReset();
+  semantic.noiseFloor.mockReset();
 });
 
 afterEach(async () => {
@@ -73,6 +82,65 @@ describe('auto-semantic search', () => {
       'Backend: local lexical (auto-semantic fallback; Semantic search failed: 401 Unauthorized)',
     );
     expect(result.output).toContain('lat.md/architecture#Architecture');
+  });
+});
+
+describe('identifier queries', () => {
+  it('are code names and paths, not prose', () => {
+    for (const query of [
+      'writeJsonAtomic',
+      'CmdContext',
+      'source_anchor_policy',
+      'src/codekg/cache.ts',
+      'lat.md',
+      'src/codekg/search.ts#rankSectionsLexically',
+      'readSectionBodies rankSectionsLexically',
+    ])
+      expect(isIdentifierQuery(query), query).toBe(true);
+    for (const query of [
+      '',
+      'drift',
+      'edit-safe',
+      'how is drift reported?',
+      'what does readSectionBodies return',
+      'Drift is reported.',
+    ])
+      expect(isIdentifierQuery(query), query).toBe(false);
+  });
+
+  it('use lexical results in auto-semantic search', async () => {
+    const ctx = await project();
+
+    const result = await codeKgSearchCommand(ctx, 'src/index.ts', {
+      backend: 'auto-semantic',
+    });
+
+    expect(semantic.searchSections).not.toHaveBeenCalled();
+    expect(result.output).toContain(
+      'Backend: local lexical (auto-semantic; identifier query)',
+    );
+    expect(result.output).toContain('lat.md/files#Source Files#src/index.ts');
+  });
+
+  it('skip the semantic bonus in ask, which other queries still get', async () => {
+    const ctx = await project();
+    const [section] = flattenSections(await loadAllSections(ctx.latDir));
+    semantic.searchSections.mockResolvedValue([{ id: section.id, score: 0.9 }]);
+    semantic.noiseFloor.mockResolvedValue(0.5);
+
+    const identifier = await ask(ctx.projectRoot, 'src/index.ts', {
+      source: false,
+    });
+    expect(semantic.searchSections).not.toHaveBeenCalled();
+    expect(identifier.backend).toBe(
+      'knowledge + lexical + graph (identifier query; semantic skipped)',
+    );
+
+    const prose = await ask(ctx.projectRoot, 'entry points', {
+      source: false,
+    });
+    expect(semantic.searchSections).toHaveBeenCalledOnce();
+    expect(prose.backend).toBe('knowledge + semantic + lexical + graph');
   });
 });
 

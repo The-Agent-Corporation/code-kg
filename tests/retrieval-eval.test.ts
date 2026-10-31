@@ -233,8 +233,9 @@ const HELD_OUT_LEXICAL_FLOOR = { recallAt5: 0.6, mrr: 0.45 };
 const HELD_OUT_SEMANTIC_FLOOR = { recallAt5: 0.733, mrr: 0.63 };
 const HELD_OUT_ASK_FLOOR = { recallAt5: 0.733, mrr: 0.578 };
 const HELD_OUT_SEMANTIC_ASK_FLOOR = { recallAt5: 0.8, mrr: 0.649 };
+const IDENTIFIER_LEXICAL_FLOOR = { recallAt5: 0.9, mrr: 0.867 };
 const IDENTIFIER_ASK_FLOOR = { recallAt5: 1, mrr: 1 };
-const IDENTIFIER_SEMANTIC_ASK_FLOOR = { recallAt5: 1, mrr: 0.683 };
+const IDENTIFIER_SEMANTIC_ASK_FLOOR = { recallAt5: 1, mrr: 1 };
 /**
  * Generated per-file sections are top-N lists that reshuffle as the code
  * changes, so a run may fall this far below a floor. One question leaving
@@ -386,6 +387,18 @@ describe('retrieval eval (lexical)', () => {
     expectFloor(result, HELD_OUT_LEXICAL_FLOOR, 'held-out lexical');
   });
 
+  it('stays at or above the recorded floor on identifiers', () => {
+    const result = fileScore(
+      IDENTIFIERS,
+      IDENTIFIERS.map(({ question }) =>
+        rankSectionsLexically(sections, question, 10, bodies).map((section) =>
+          sectionFiles(section.id, section.heading),
+        ),
+      ),
+    );
+    expectFloor(result, IDENTIFIER_LEXICAL_FLOOR, 'identifier lexical');
+  });
+
   it('keeps ask without semantic search at or above the held-out floor', async () => {
     expectFloor(
       await askScore(HELD_OUT, false),
@@ -475,26 +488,21 @@ describe.skipIf(process.env.LAT_TEST_LOCAL_EMBEDDINGS !== '1')(
       }
     }
 
-    it('keeps ask with semantic search on held-out questions at or above its floor and ask without it', async () => {
-      const lexical = await askScore(HELD_OUT, false);
-      const semantic = await semanticAskScore(HELD_OUT);
-      expectFloor(
-        semantic,
-        HELD_OUT_SEMANTIC_ASK_FLOOR,
-        'held-out semantic ask',
-      );
-      expect(semantic.recallAt5).toBeGreaterThanOrEqual(
-        lexical.recallAt5 - SLACK,
-      );
-      expect(semantic.mrr).toBeGreaterThanOrEqual(lexical.mrr - SLACK);
-    }, 300_000);
-
-    it('keeps ask with semantic search on identifiers at or above its floor', async () => {
-      expectFloor(
-        await semanticAskScore(IDENTIFIERS),
-        IDENTIFIER_SEMANTIC_ASK_FLOOR,
-        'identifier semantic ask',
-      );
-    }, 300_000);
+    it.each([
+      ['held-out', HELD_OUT, HELD_OUT_SEMANTIC_ASK_FLOOR],
+      ['identifier', IDENTIFIERS, IDENTIFIER_SEMANTIC_ASK_FLOOR],
+    ] as const)(
+      'keeps ask with semantic search on %s questions at or above its floor and ask without it',
+      async (label, set, floor) => {
+        const lexical = await askScore(set, false);
+        const semantic = await semanticAskScore(set);
+        expectFloor(semantic, floor, `${label} semantic ask`);
+        expect(semantic.recallAt5).toBeGreaterThanOrEqual(
+          lexical.recallAt5 - SLACK,
+        );
+        expect(semantic.mrr).toBeGreaterThanOrEqual(lexical.mrr - SLACK);
+      },
+      300_000,
+    );
   },
 );

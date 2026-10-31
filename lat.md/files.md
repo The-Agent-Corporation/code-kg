@@ -542,9 +542,9 @@ Source file `src/codekg/query.ts` defines `QueryOptions`, `QueryHit`, `QueryResu
 - `projectQuery` (function): Agent tool payloads name files by absolute path; graph nodes use project-relative ones.
 - `semanticBonus` (function): Knowledge-score bonus per semantic match: 1 for the closest match, falling linearly with similarity to 0 at the noise floor.
 - Also defines: `QueryOptions`, `QueryHit`, `QueryResult`, `tokenize`, `withinScope`, `bounded`, `currentSource`, `graphRank`, `ask`, `formatQuery`, `askCommand`, `trace`, `traceCommand`, `mapCommand`, `skeletonCommand`, `grepCommand`
-- Tested by: `tests/cards.test.ts`, `tests/codekg-intelligence.test.ts`, `tests/codekg.test.ts`, `tests/input-errors.test.ts`, `tests/retrieval-eval.test.ts`, `tests/semantic-score.test.ts`, and 1 more
+- Tested by: `tests/cards.test.ts`, `tests/codekg-intelligence.test.ts`, `tests/codekg.test.ts`, `tests/input-errors.test.ts`, `tests/retrieval-eval.test.ts`, `tests/search-fallback.test.ts`, and 2 more
 - Imports: `src/cli/search.ts`, `src/codekg/anchors.ts`, `src/codekg/cache.ts`, `src/codekg/errors.ts`, `src/codekg/fresh.ts`, `src/codekg/meaning.ts`, and 7 more
-- Imported by: `src/codekg/agent-context.ts`, `src/codekg/context.ts`, `src/codekg/mcp.ts`, `src/codekg/workspace.ts`, `tests/cards.test.ts`, `tests/codekg-intelligence.test.ts`, and 5 more
+- Imported by: `src/codekg/agent-context.ts`, `src/codekg/context.ts`, `src/codekg/mcp.ts`, `src/codekg/workspace.ts`, `tests/cards.test.ts`, `tests/codekg-intelligence.test.ts`, and 6 more
 
 ## src/codekg/reconcile.ts
 
@@ -568,12 +568,14 @@ Source file `src/codekg/review-source.ts` defines `reviewSourceCommand`, `review
 
 ## src/codekg/search.ts
 
-Source file `src/codekg/search.ts` defines `CodeKgSearchBackend`, `ResolvedSearchBackend`, `CodeKgSearchOptions`, and 13 more.
+Source file `src/codekg/search.ts` defines `CodeKgSearchBackend`, `ResolvedSearchBackend`, `CodeKgSearchOptions`, and 15 more.
 
 - Used by `code-kg search`: Search lat.md sections with local or semantic retrieval
 - Used by `MCP codekg_search`: Search across curated lat.md sections with local lexical search by default, semantic embedding search when requested, or auto-semantic fallback
 - `withCodeKgNavHints` (function): Replaces the lat.md runtime's `lat section`/`lat_section` hints.
 - `STOP_WORDS` (const): Question words that match nearly every section's prose.
+- `IDENTIFIER` (const): A camelCase, PascalCase or snake_case name, or a dotted or slashed path.
+- `isIdentifierQuery` (function): True for queries made only of code names or paths, such as `writeJsonAtomic` or `src/codekg/cache.ts`.
 - `readSectionBodies` (function): Each section's text below its heading, keyed by section id.
 - `rankSectionsLexically` (function): Sections matching `query` lexically, best first.
 - Also defines: `CodeKgSearchBackend`, `ResolvedSearchBackend`, `CodeKgSearchOptions`, `SearchBackendSelection`, `formatCodeKgNavHints`, `scoreSection`, `localSearchCommand`, `fallbackLabel`, `selectCodeKgSearchBackend`, `semanticSearchCommand`, `withBackendLabel`, `codeKgSearchCommand`
@@ -1260,25 +1262,27 @@ Test file `tests/retrieval-eval.test.ts` checks `src/codekg/query.ts`, `src/code
 - Test: retrieval eval (lexical) › names curated sections that exist, and an existing answer for every question
 - Test: retrieval eval (lexical) › stays at or above the recorded floor
 - Test: retrieval eval (lexical) › stays at or above the recorded floor on held-out questions
+- Test: retrieval eval (lexical) › stays at or above the recorded floor on identifiers
 - Test: retrieval eval (lexical) › keeps ask without semantic search at or above the held-out floor
 - Test: retrieval eval (lexical) › keeps ask without semantic search at or above the identifier floor
 - Test: stays at or above the recorded floor
 - Test: stays at or above the recorded floor on held-out questions
-- Test: keeps ask with semantic search on held-out questions at or above its floor and ask without it
-- Test: keeps ask with semantic search on identifiers at or above its floor
 - Checks: `src/codekg/query.ts`, `src/codekg/search.ts`, `src/codekg/types.ts`, `src/lattice.ts`, `src/search/db.ts`, `src/search/index.ts`, and 2 more
 - Imports: `src/codekg/query.ts`, `src/codekg/search.ts`, `src/codekg/types.ts`, `src/lattice.ts`, `src/search/db.ts`, `src/search/index.ts`, and 2 more
 
 ## tests/search-fallback.test.ts
 
-Test file `tests/search-fallback.test.ts` checks `src/codekg/bootstrap.ts`, `src/codekg/search.ts`, and 2 more.
+Test file `tests/search-fallback.test.ts` checks `src/codekg/bootstrap.ts`, `src/codekg/query.ts`, and 3 more.
 
 - Test: auto-semantic search › falls back to lexical results when semantic search throws
+- Test: identifier queries › are code names and paths, not prose
+- Test: identifier queries › use lexical results in auto-semantic search
+- Test: identifier queries › skip the semantic bonus in ask, which other queries still get
 - Test: explicit semantic search › returns an error result instead of throwing
 - Test: explicit semantic search › points to Code-KG commands when no provider is configured
 - Test: explicit semantic search › suggests Code-KG navigation commands with semantic results
-- Checks: `src/codekg/bootstrap.ts`, `src/codekg/search.ts`, `src/context.ts`, `src/lattice.ts`
-- Imports: `src/codekg/bootstrap.ts`, `src/codekg/search.ts`, `src/context.ts`, `src/lattice.ts`
+- Checks: `src/codekg/bootstrap.ts`, `src/codekg/query.ts`, `src/codekg/search.ts`, `src/context.ts`, `src/lattice.ts`
+- Imports: `src/codekg/bootstrap.ts`, `src/codekg/query.ts`, `src/codekg/search.ts`, `src/context.ts`, `src/lattice.ts`
 
 ## tests/search.test.ts
 

@@ -873,7 +873,8 @@ Backend selection:
 - A user can explicitly configure `search.backend=local-semantic`,
   `search.backend=hosted-semantic`, or `search.backend=auto-semantic`.
 - In `auto-semantic` mode, hosted semantic search may be used when configured,
-  then local semantic search, then lexical search as fallback.
+  then local semantic search, then lexical search as fallback. Identifier
+  queries (code names and paths only) use lexical search.
 - Search results report the active backend so agents and users know what ranking
   quality and cost profile they are getting.
 

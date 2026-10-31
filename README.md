@@ -226,8 +226,10 @@ Use `--backend auto-semantic` when you want the best configured backend without
 breaking offline/local workflows. It selects semantic search when an embedding
 provider is configured and falls back to local lexical search when none is
 configured or the semantic search fails (for example, an expired key or a
-model that cannot be downloaded). Search output includes a `Backend:` line so
-agents can see which path was used and why.
+model that cannot be downloaded). Queries made only of code names or paths,
+such as `writeJsonAtomic` or `src/codekg/cache.ts`, always use lexical search,
+because embeddings rarely place the defining file near them. Search output
+includes a `Backend:` line so agents can see which path was used and why.
 
 Run the opt-in local retrieval eval with:
 

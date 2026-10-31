@@ -12,7 +12,7 @@ import { sourceHash } from './structural.js';
 import { currentMeanings } from './meaning.js';
 import { visibleGraph } from './visibility.js';
 import { InputError } from './errors.js';
-import { STOP_WORDS } from './search.js';
+import { isIdentifierQuery, STOP_WORDS } from './search.js';
 import { anchorChanges, manifestOwner, sectionNodeIds } from './anchors.js';
 import type {
   EntityNode,
@@ -252,7 +252,8 @@ export async function ask(
   );
   let semantic = new Map<string, number>();
   let semanticRan = false;
-  if (opts.semantic !== false) {
+  const identifier = isIdentifierQuery(query);
+  if (opts.semantic !== false && !identifier) {
     try {
       const key = getEmbeddingKey();
       if (key && sections.length) {
@@ -369,7 +370,9 @@ export async function ask(
       ? 'knowledge + semantic + lexical + graph'
       : semanticRan
         ? 'knowledge + lexical + graph (no semantic match closer than off-topic text)'
-        : 'knowledge + lexical + graph',
+        : identifier && opts.semantic !== false
+          ? 'knowledge + lexical + graph (identifier query; semantic skipped)'
+          : 'knowledge + lexical + graph',
   };
 }
 
